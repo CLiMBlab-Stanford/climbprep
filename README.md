@@ -30,7 +30,7 @@ task performed (or `Rest` if no task) and `SeriesNumber` is the integer
 number for the run as recorded in the corresponding dicoms. There is a third
 (technically optional) field called `EventFile` that provides paths
 (relative to the source directory for the subject/session that you are
-creating) to the BIDS-style events.tsv file containing onsets, durations,
+creating) to the BIDS-style `events.tsv` file containing onsets, durations,
 and trial types for all events in the task corresponding to the run.
 Please create this unless the run is task-free (e.g., rest).
 Creating this table is the main manual labor for experimenters who have
@@ -45,6 +45,10 @@ command:
     python -m climblab.bidsify <PROJECT_NAME> <SUBJECT_ID> <SESSION_ID>
 
 Run the above with `-h` to see all available command line options.
+
+If you are BIDSifying the first-ever session from a new subject,
+make sure to add their ID to the project's `participants.tsv`
+file.
 
 ### Preprocessing (fmriprep)
 
