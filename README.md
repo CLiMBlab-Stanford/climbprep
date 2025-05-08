@@ -5,6 +5,19 @@ of fMRI data in Stanford's CLiMB Lab.
 
 ## Usage
 
+### Repair
+
+Much of the global repository metadata, especially `participants.tsv`, can
+be automatically generated from the project data itself, so a utility is
+provided to do this. Currently, repair only updates `participants.tsv`,
+and it does so by removing any participants who don't have a subdirectory
+and adding any missing participants who do have a subdirectory. It also
+automatically generates a column `tasks` containing a comma-delimited
+list of all tasks in the participant's `func` folder(s), to enable easy
+searching for specific tasks. To perform repair, run:
+
+    python -m climbprep.repair
+
 ### BIDSification
 
 Whether working with our own data or data from other labs, the first step is
@@ -42,8 +55,9 @@ Once the source directory is created as described above and `runs.csv`
 has been added, the data can be BIDSified in one go with the following
 command:
 
-    python -m climblab.bidsify <PROJECT_NAME> <SUBJECT_ID> <SESSION_ID>
+    python -m climbprep.bidsify <SUBJECT_ID> -p <PROJECT_ID>
 
+(the `-p` option can be omitted if the project is `climblab`).
 Run the above with `-h` to see all available command line options.
 
 If you are BIDSifying the first-ever session from a new subject,
