@@ -35,7 +35,9 @@ if __name__ == '__main__':
     args = argparser.parse_args()
 
     participant = args.participant.replace('sub-', '')
-    session = args.session.sub('ses-', '')
+    session = args.session
+    if session:
+        session = session.sub('ses-', '')
     project_path = os.path.join(BIDS_PATH, args.project)
     subdir = 'sub-%s' % participant
     if session:
