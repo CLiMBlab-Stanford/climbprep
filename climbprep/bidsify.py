@@ -22,7 +22,7 @@ if __name__ == '__main__':
                                          'modeling. If the task for a run is missing from the table '
                                          'or the table is missing altogether, the taskname '
                                          'will be `UnknownTask`.'))
-    argparser.add_argument('subject', help="BIDS subject ID.")
+    argparser.add_argument('participant', help="BIDS participant ID.")
     argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", "evlab", '
                                                                         'etc.). Default: "climblab"'))
     argparser.add_argument('-s', '--session', default=None, help="BIDS session ID. If ``None``, assume single-session.")
@@ -34,10 +34,12 @@ if __name__ == '__main__':
     argparser.add_argument('-C', '--config_path', default=None, help="Path to config (json) for dcm2bids. Generated if unused.")
     args = argparser.parse_args()
 
+    participant = args.participant.replace('sub-', '')
+    session = args.session.sub('ses-', '')
     project_path = os.path.join(BIDS_PATH, args.project)
-    subdir = 'sub-%s' % args.subject
-    if args.session:
-        subdir = os.path.join(subdir, 'ses-%s' % args.session)
+    subdir = 'sub-%s' % participant
+    if session:
+        subdir = os.path.join(subdir, 'ses-%s' % session)
     src_path = os.path.join(project_path, 'sourcedata', subdir)
     assert os.path.exists(src_path), 'Path not found: %s' % src_path
     run_table_path = os.path.join(src_path, 'runs.csv')
@@ -106,12 +108,12 @@ if __name__ == '__main__':
             clobber = ' --clobber'
         else:
             clobber = ''
-        if args.session:
-            session = ' -s %s' % args.session
+        if session:
+            session_str = ' -s %s' % session
         else:
-            session = ''
+            session_str = ''
         os.system('dcm2bids -d %s -p %s%s -c %s -o %s --auto_extract_entities%s --skip_dcm2niix --force_dcm2bids' % (
-            os.path.join(tmp_dir, 'tmp_dcm2bids', 'helper'), args.subject, session, config_path, project_path, clobber))
+            os.path.join(tmp_dir, 'tmp_dcm2bids', 'helper'), participant, session_str, config_path, project_path, clobber))
 
         dirnames = ('func', 'derived')
         for dirname in dirnames:

@@ -5,6 +5,32 @@ of fMRI data in Stanford's CLiMB Lab.
 
 ## Usage
 
+### Cluster job creation/submission
+
+Many of the utilities in this repository are compute/memory intensive and are
+thus intended to be run in parallel on the cluster. For convenience, you can
+generate batch scripts for different types of jobs and submit them to the
+scheduler. To do this, run:
+
+    python -m climbprep.make_jobs <SUBJECT_ID>( <SUBJECT_ID>)* -p <PROJECT_ID> -j <JOB_TYPE>
+
+(the `-p` option can be omitted if the project is `climblab`).
+Run the above with `-h` to see all available command line options.
+
+The result will be a collection of files with the suffix `*.pbs` (in the
+current working directory by default, although this can be configured),
+each containing a batch script for the SLURM scheduler. You can submit
+these individually using the standard SLURM interface:
+
+    sbatch <FILE>.pbs
+
+Or you can use the `sbatch.sh` script to submit many at once:
+
+    ./sbatch.sh *.pbs
+
+Logs from stdin/err for each script will be written to a matching file
+in the current working directory with the suffix `*.out`.
+
 ### Repair
 
 Much of the global repository metadata, especially `participants.tsv`, can
@@ -17,6 +43,10 @@ list of all tasks in the participant's `func` folder(s), to enable easy
 searching for specific tasks. To perform repair, run:
 
     python -m climbprep.repair
+
+Because `repair` modifies global files, *it should not be run in parallel*.
+Only run it if you are confident that no one else in the group is running
+`repair` or editing a `participants.tsv` file.
 
 ### BIDSification
 
@@ -64,9 +94,33 @@ If you are BIDSifying the first-ever session from a new subject,
 make sure to add their ID to the project's `participants.tsv`
 file.
 
-### Preprocessing (fmriprep)
+### Preprocessing (fMRIprep)
 
-TODO
+Preprocessing is handled by fMRIprep, which the `preprocess` script in this
+repository simply wraps while also helping to maintain norms in the lab around
+default settings and the file organization of the outputs. For this reason,
+lab members are encouraged to use this codebase for preprocessing whenever
+possible, rather than running fMRIprep directly. To preprocess a participant,
+run:
+
+    python -m climblab.preprocess <SUBJECT_ID> -p <PROJECT_ID> <FMRIPREP_ARGS>
+
+(the `-p` option can be omitted if the project is `climblab`).
+Run the above with `-h` to see all available command line options.
+Any additional command line options will be passed directly to fMRIprep.
+This will result in preprocessed derivatives stored at the following
+location relative to the BIDS project's root:
+
+    derivatives/fmriprep/<PREPROCESSING_LABEL>/sub-<SUBJECT_ID>
+
+By default, `<PREPROCESSING_LABEL>` is `main`, but this can be configured by
+the user. The use of a label for preprocessing is designed to enable multiple
+preprocessing configurations for the same data, as required by the analyses.
+
+This utility will also place fMRIprep's working directory in a standard
+location that will support resumption if preprocessing gets interrupted.
+This is important because preprocessing takes a while (a day or more for
+a typical session)!
 
 ### First-levels
 
