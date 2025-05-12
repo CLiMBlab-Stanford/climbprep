@@ -58,10 +58,10 @@ facilitate secondary analyses. The current set of projects are:
 - `climblab` (the main project)
 - `evlab` (data from the Fedorenko Lab)
 
-Our general BIDS directory is found at `/juice2/scr2/nlp/climblab/BIDS`.
+Our general BIDS directory is found at `/juice6/u/nlp/climblab/BIDS`.
 Each project is a subdirectory. To BIDSify new fMRI source data,
 first copy the new source directory (in any format supported by dcm2bids)
-to `/juice2/scr2/nlp/climblab/BIDS/<project>/sourcedata/sub-<subjectID>/ses-<sessionID>`,
+to `/juice6/u/nlp/climblab/BIDS/<project>/sourcedata/sub-<subjectID>/ses-<sessionID>`,
 replacing all bracketed variables with appropriate values. Subject and session
 IDs must follow BIDS naming conventions.
 
