@@ -3,6 +3,16 @@
 An in-progress repository to streamline and standardize preprocessing and analysis
 of fMRI data in Stanford's CLiMB Lab.
 
+## Setup
+
+There is no intallation for this software per se, but you do need to set up your
+software environment. First, copy the lines in this directory's `.bashrc` file
+into your own user's `.bashrc` (typically located at `~/.bashrc`), if they
+do not already exist there.
+
+Second, make sure you have a conda environment set up to support the needed
+Python packages. TODO
+
 ## Usage
 
 ### Cluster job creation/submission

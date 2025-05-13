@@ -117,23 +117,30 @@ if __name__ == '__main__':
         os.system('dcm2bids -d %s -p %s%s -c %s -o %s --auto_extract_entities%s --skip_dcm2niix --force_dcm2bids' % (
             os.path.join(tmp_dir, 'tmp_dcm2bids', 'helper'), participant, session_str, config_path, project_path, clobber))
 
-        dirnames = ('func', 'derived')
+        dirnames = ('anat', 'func', 'derived')
         for dirname in dirnames:
             dir_path = os.path.join(out_path, dirname)
             if not os.path.exists(dir_path):
                 continue
             for path in os.listdir(dir_path):
-                if path.endswith('.json'):
+                if dirname == 'anat':
                     filepath = os.path.join(dir_path, path)
-                    with open(filepath, 'r') as f:
-                        sidecar = json.load(f)
-                    if 'EventsFile' in sidecar:
-                        events_path_new = os.path.join(dir_path, path.replace('bold.json', 'events.tsv'))
-                        if events_path_new != sidecar['EventsFile']:
-                            shutil.copy2(sidecar['EventsFile'], events_path_new)
-                            sidecar['EventsFile'] = events_path_new
-                    with open(filepath, 'w') as f:
-                        json.dump(sidecar, f, indent=2)
+                    if filepath.endswith('.nii.gz'):
+                        filepath_tmp = filepath.replace('.nii.gz', '_tmp.nii.gz')
+                        os.system('synthstrip-singularity -i %s -o %s' % (filepath, filepath_tmp))
+                        shutil.move(filepath_tmp, filepath)
+                else:
+                    if path.endswith('.json'):
+                        filepath = os.path.join(dir_path, path)
+                        with open(filepath, 'r') as f:
+                            sidecar = json.load(f)
+                        if 'EventsFile' in sidecar:
+                            events_path_new = os.path.join(dir_path, path.replace('bold.json', 'events.tsv'))
+                            if events_path_new != sidecar['EventsFile']:
+                                shutil.copy2(sidecar['EventsFile'], events_path_new)
+                                sidecar['EventsFile'] = events_path_new
+                        with open(filepath, 'w') as f:
+                            json.dump(sidecar, f, indent=2)
 
         os.system('bids-validator %s' % project_path)
 
