@@ -21,14 +21,15 @@ if __name__ == '__main__':
     argparser.add_argument('participants', nargs='*', help='ID(s) of participant(s).')
     argparser.add_argument('-p', '--project', default='climblab', help='BIDS project name (default `climblab`)')
     argparser.add_argument('-j', '--job_types', nargs='+', default=['preprocess'], help='Type of job to run. One of ``["bidsify", "preprocess"]``')
-    argparser.add_argument('-t', '--time', type=int, default=48, help='Maximum number of hours to train models')
+    argparser.add_argument('-t', '--time', type=int, default=72, help='Maximum number of hours to train models')
     argparser.add_argument('-n', '--n_cores', type=int, default=8, help='Number of cores to request')
-    argparser.add_argument('-m', '--memory', type=int, default=32, help='Number of GB of memory to request')
-    argparser.add_argument('-P', '--partition', default='sphinx', help='Value for SLURM --partition setting, if applicable')
+    argparser.add_argument('-m', '--memory', type=int, default=64, help='Number of GB of memory to request')
+    argparser.add_argument('-P', '--partition', default='john', help='Value for SLURM --partition setting, if applicable')
     argparser.add_argument('-a', '--account', default='nlp', help='Value for SLURM --account setting, if applicable')
     argparser.add_argument('-e', '--exclude', nargs='+', help='Nodes to exclude')
     argparser.add_argument('-c', '--cli_args', default='', help='Command line arguments to pass into call')
     argparser.add_argument('-o', '--outdir', default='./', help='Directory in which to place generated batch scripts.')
+    argparser.add_argument('--session', default=None, help='Specific session to bidsify (ignored for other job types)')
     args = argparser.parse_args()
 
     participants = args.participants
@@ -48,6 +49,11 @@ if __name__ == '__main__':
         exclude = []
     cli_args = args.cli_args.replace('\\', '') # Delete escape characters
     outdir = args.outdir
+    session = args.session
+    if session:
+        session_str = ' -s %s' % session
+    else:
+        session_str = ''
 
     if not os.path.exists(outdir):
         os.makedirs(outdir)
@@ -66,7 +72,7 @@ if __name__ == '__main__':
             wrapper = '%s'
             for job_type in job_types:
                 if job_type.lower() == 'bidsify':
-                    job_str = wrapper % ('python -m climbprep.bidsify %s -p %s %s' % (participant, project, cli_args))
+                    job_str = wrapper % ('python -m climbprep.bidsify %s -p %s%s %s' % (participant, project, session_str, cli_args))
                 elif job_type.lower() == 'preprocess':
                     job_str = wrapper % ('python -m climbprep.preprocess %s -p %s %s' % (participant, project, cli_args))
                 else:
