@@ -21,9 +21,8 @@ if __name__ == '__main__':
     argparser.add_argument('-c', '--config', default='main', help=('Keyword (currently `main`) '
         'or YAML config file to used to parameterize preprocessing. If a keyword is provided, will '
         'the default settings for associated with that keyword. '
-        'To see the list of possible values and their defaults, run this script without using this '
-        'argument and look at the `config.yml` file that is automatically generated in the output '
-        'directory (the `derivatives/fmriprep/main` directory of the relevant BIDS project).'))
+        'The possible config fields and values are just the `fmriprep` command-line arguments and their possible'
+        'values. For details, see the `fmriprep` documentation.'))
     args, kwargs = argparser.parse_known_args()
 
     participant = args.participant.replace('sub-', '')

@@ -30,7 +30,7 @@ if __name__ == '__main__':
                                                     'This is useful for saving the outputs of '
                                                     'dcm2niix if you are debugging things.'))
     argparser.add_argument('-c', '--config', default=None, help=("Path to config (json) for dcm2bids. Generated "
-                                                                 "if unused."))
+                                                                 "if unused. See dcm2bids docs for details."))
     argparser.add_argument('-O', '--overwrite', action='store_true', help="Overwrite existing outputs.")
     args = argparser.parse_args()
 
