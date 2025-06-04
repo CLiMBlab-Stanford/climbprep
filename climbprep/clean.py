@@ -143,7 +143,7 @@ if __name__ == '__main__':
             )
             if not sample_mask:
                 sample_mask = []
-            sample_mask = [x if x else [] for x in sample_mask]
+            sample_mask = [[] if x is None else x for x in sample_mask]
 
             for img_path, _sample_mask in zip(img_paths, sample_mask):
                 _sample_mask = pd.DataFrame(dict(sample_mask=list(_sample_mask)))
@@ -204,7 +204,7 @@ if __name__ == '__main__':
             )
             if not sample_mask:
                 sample_mask = []
-            sample_mask = [x if x else [] for x in sample_mask]
+            sample_mask = [[] if x is None else x for x in sample_mask]
 
             for img_path, _sample_mask in zip(img_paths, sample_mask):
                 _sample_mask = pd.DataFrame(dict(sample_mask=list(_sample_mask)))
