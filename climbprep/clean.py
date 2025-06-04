@@ -27,16 +27,13 @@ if __name__ == '__main__':
 
     participant = args.participant.replace('sub-', '')
     config = args.config
-    if config == 'firstlevels':
-        config_default = DEFAULTS['clean']['firstlevels']
-        config = {}
-    elif config == 'fc':
-        config_default = DEFAULTS['clean']['fc']
+    if config in ('firstlevels', 'fc'):
+        config_default = DEFAULTS['clean'][config]
         config = {}
     else:
         assert os.path.exists(config), ('Provided config (%s) does not match any known keyword or any existing '
                                         'filepath. Please provide a valid config.' % config)
-        config_default = DEFAULTS['clean']['firstlevels']
+        config_default = DEFAULTS['clean'][CLEAN_DEFAULT_KEY]
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
     config = {x: config.get(x, config_default[x]) for x in config_default}

@@ -61,3 +61,6 @@ DEFAULTS = dict(
         )
     )
 )
+
+PREPROCESS_DEFAULT_KEY = 'main'
+CLEAN_DEFAULT_KEY = 'firstlevels'
