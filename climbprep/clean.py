@@ -1,6 +1,5 @@
 import json
 import yaml
-import numpy as np
 import pandas as pd
 from nilearn import image, surface, maskers, signal, interfaces
 import argparse
@@ -143,7 +142,8 @@ if __name__ == '__main__':
                 fd_threshold=config['fd_threshold']
             )
             if not sample_mask:
-                sample_mask = np.array([])
+                sample_mask = []
+            sample_mask = [x if x else [] for x in sample_mask]
 
             for img_path, _sample_mask in zip(img_paths, sample_mask):
                 _sample_mask = pd.DataFrame(dict(sample_mask=list(_sample_mask)))
@@ -202,6 +202,9 @@ if __name__ == '__main__':
                 std_dvars_threshold=config['std_dvars_threshold'],
                 fd_threshold=config['fd_threshold']
             )
+            if not sample_mask:
+                sample_mask = []
+            sample_mask = [x if x else [] for x in sample_mask]
 
             for img_path, _sample_mask in zip(img_paths, sample_mask):
                 _sample_mask = pd.DataFrame(dict(sample_mask=list(_sample_mask)))
