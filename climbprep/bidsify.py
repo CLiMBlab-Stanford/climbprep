@@ -8,6 +8,7 @@ import argparse
 
 from climbprep.constants import *
 
+
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser(('Convenience utility to convert fMRI source data to BIDS. '
                                          'The source data may be of any structure readable by dcm2bids, '

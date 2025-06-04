@@ -4,14 +4,7 @@ import argparse
 
 from climbprep.constants import *
 
-CONFIG = dict(
-    main=dict(
-        preprocessing_label='main',
-        fs_license_file=FS_LICENSE_PATH,
-        output_space=['MNI152NLin2009cAsym', 'T1w', 'fsnative'],
-        skull_strip_t1w='skip'
-    )
-)
+DEFAULT = 'main'
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser('Run fMRIprep on a participant')
@@ -30,13 +23,13 @@ if __name__ == '__main__':
     project_path = os.path.join(BIDS_PATH, project)
 
     config = args.config
-    if config in CONFIG:
-        config_default = CONFIG[config]
+    if config in DEFAULTS['preprocess']:
+        config_default = DEFAULTS['preprocess'][config]
         config = {}
     else:
         assert os.path.exists(config), ('Provided config (%s) does not match any known keyword or any existing '
                                         'filepath. Please provide a valid config.' % config)
-        config_default = CONFIG['main']
+        config_default = DEFAULTS['preprocess'][DEFAULT]
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
     for key in config_default:

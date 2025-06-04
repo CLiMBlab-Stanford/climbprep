@@ -26,7 +26,7 @@ JOB_ORDER = [
     'firstlevels'
 ]
 
- 
+
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser('''
     Generate SLURM batch jobs to run climbprep jobs

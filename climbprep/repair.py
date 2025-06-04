@@ -8,6 +8,7 @@ import argparse
 
 from climbprep.constants import *
 
+
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser(('Utility to repair BIDS directories. Currently just updates '
                                          '`participants.tsv`.'))

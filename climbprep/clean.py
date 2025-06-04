@@ -8,50 +8,9 @@ import argparse
 
 SPACE = re.compile('.+_space-([a-zA-Z0-9]+)_')
 RUN = re.compile('.+_run-([0-9]+)_')
-CONFIG_FIRSTLEVELS = dict(
-    cleaning_label='firstlevels',
-    preprocessing_label='main',
-    strategy=(
-        'motion',
-        'high_pass',
-        'wm_csf',
-        'global_signal',
-        'compcor',
-        'scrub'
-    ),
-    smoothing_fwhm=4,
-    std_dvars_threshold=1.5,
-    fd_threshold=0.5,
-    scrub=False,
-    standardize=False,
-    detrend=True,
-    low_pass=None,
-    high_pass=0.01,
-    n_jobs=-1
-)
-CONFIG_FC = dict(
-    cleaning_label='fc',
-    preprocessing_label='main',
-    strategy=(
-        'motion',
-        'high_pass',
-        'wm_csf',
-        'global_signal',
-        'compcor',
-        'scrub'
-    ),
-    smoothing_fwhm=4,
-    std_dvars_threshold=1.5,
-    fd_threshold=0.5,
-    scrub=True,
-    standardize=True,
-    detrend=True,
-    low_pass=0.1,
-    high_pass=0.01,
-    n_jobs=-1
-)
 
 from climbprep.constants import *
+
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser('Run fMRIprep on a participant')
@@ -69,15 +28,15 @@ if __name__ == '__main__':
     participant = args.participant.replace('sub-', '')
     config = args.config
     if config == 'firstlevels':
-        config_default = CONFIG_FIRSTLEVELS
+        config_default = DEFAULTS['clean']['firstlevels']
         config = {}
     elif config == 'fc':
-        config_default = CONFIG_FC
+        config_default = DEFAULTS['clean']['fc']
         config = {}
     else:
         assert os.path.exists(config), ('Provided config (%s) does not match any known keyword or any existing '
                                         'filepath. Please provide a valid config.' % config)
-        config_default = CONFIG_FIRSTLEVELS
+        config_default = DEFAULTS['clean']['firstlevels']
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
     config = {x: config.get(x, config_default[x]) for x in config_default}

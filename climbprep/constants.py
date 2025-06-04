@@ -7,3 +7,57 @@ FS_LICENSE_PATH = os.path.join(LAB_PATH, 'freesurfer', 'license.txt')
 DEFAULT_TASK = 'UnknownTask'
 FMRIPREP_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fmriprep.simg')
 
+DEFAULTS = dict(
+    preprocess=dict(
+        main=dict(
+            preprocessing_label='main',
+            fs_license_file=FS_LICENSE_PATH,
+            output_space=['MNI152NLin2009cAsym', 'T1w', 'fsnative'],
+            skull_strip_t1w='skip'
+        )
+    ),
+    clean=dict(
+        firstlevels=dict(
+            cleaning_label='firstlevels',
+            preprocessing_label='main',
+            strategy=(
+                'motion',
+                'high_pass',
+                'wm_csf',
+                'global_signal',
+                'compcor',
+                'scrub'
+            ),
+            smoothing_fwhm=4,
+            std_dvars_threshold=1.5,
+            fd_threshold=0.5,
+            scrub=False,
+            standardize=False,
+            detrend=True,
+            low_pass=None,
+            high_pass=0.01,
+            n_jobs=-1
+        ),
+        fc=dict(
+            cleaning_label='fc',
+            preprocessing_label='main',
+            strategy=(
+                'motion',
+                'high_pass',
+                'wm_csf',
+                'global_signal',
+                'compcor',
+                'scrub'
+            ),
+            smoothing_fwhm=4,
+            std_dvars_threshold=1.5,
+            fd_threshold=0.5,
+            scrub=True,
+            standardize=True,
+            detrend=True,
+            low_pass=0.1,
+            high_pass=0.01,
+            n_jobs=-1
+        )
+    )
+)
