@@ -1,17 +1,26 @@
 # climbprep
 
-An in-progress repository to streamline and standardize preprocessing and analysis
+An in-house repository to streamline and standardize preprocessing and analysis
 of fMRI data in Stanford's CLiMB Lab.
 
-## Setup
 
-There is no intallation for this software per se, but you do need to set up your
-software environment. First, copy the lines in this directory's `.bashrc` file
-into your own user's `.bashrc` (typically located at `~/.bashrc`), if they
-do not already exist there.
+## Installation
 
-Second, make sure you have a conda environment set up to support the needed
-Python packages. TODO
+Installation is just a matter of setting up an [Anaconda](https://www.anaconda.com/) environment
+with the right software dependencies. Once you have Anaconda installed, you can create the
+environment by running the following command in the terminal:
+
+```bash
+conda env create -f conda.yml
+```
+
+This will create a new environment called `climbprep` with all the necessary dependencies,
+which you can activate by running:
+
+```bash
+conda activate climbprep
+```
+
 
 ## Modifying the pipeline
 
@@ -28,10 +37,12 @@ changes by placing all constants, including default configurations, in the
 without affecting core functionality. If you want to expand existing keyword-
 accessible configurations, you can freely add configurations to `constants.py`.
 
+
 ## Usage
 
 Full help strings for all the utilities below can be obtained by running
 the command with the `-h` argument.
+
 
 ### Cluster job creation/submission
 
@@ -40,9 +51,14 @@ thus intended to be run in parallel on the cluster. For convenience, you can
 generate batch scripts for different types of jobs and submit them to the
 scheduler. To do this, run:
 
-    python -m climbprep.make_jobs <PARTICIPANT_ID>( <PARTICIPANT_ID>)* -p <PROJECT_ID> -j <JOB_TYPE>
+    python -m climbprep.make_jobs <PARTICIPANT_ID>( <PARTICIPANT_ID>)* -p <PROJECT_ID>
 
 (the `-p` option can be omitted if the project is `climblab`).
+By default, this will run the participant (and if relevant any component sessions)
+sequentially through the entire climbprep pipeline, from bidsification through cleaning.
+If you have a subset of steps you want to run, you can specify them as a space-delimited
+list using the `-j` option.
+
 Run the above with `-h` to see all available command line options.
 
 The result will be a collection of files with the suffix `*.pbs` (in the
@@ -58,6 +74,7 @@ Or you can use the `sbatch.sh` script to submit many at once:
 
 Logs from stdin/err for each script will be written to a matching file
 in the current working directory with the suffix `*.out`.
+
 
 ### Repair
 
@@ -75,6 +92,7 @@ searching for specific tasks. To perform repair, run:
 Because `repair` modifies global files, *it should not be run in parallel*.
 Only run it if you are confident that no one else in the group is running
 `repair` or editing a `participants.tsv` file.
+
 
 ### BIDSification
 
@@ -124,6 +142,7 @@ If you are BIDSifying the first-ever session from a new subject,
 make sure to add their ID to the project's `participants.tsv`
 file.
 
+
 ### Preprocessing (fMRIprep)
 
 Preprocessing is handled by fMRIprep, which the `preprocess` script in this
@@ -151,6 +170,7 @@ This utility will also place fMRIprep's working directory in a standard
 location that will support resumption if preprocessing gets interrupted.
 This is important because preprocessing takes a while (a day or more for
 a typical session)!
+
 
 ### Cleaning
 
