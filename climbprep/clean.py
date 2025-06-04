@@ -20,9 +20,7 @@ if __name__ == '__main__':
     argparser.add_argument('-c', '--config', default='firstlevels', help=('Keyword (currently `firstlevels` or '
         '`fc`) or YAML config file to used to parameterize cleaning. If a keyword is provided, will use the default '
         'settings for that type of downstream analysis. If not provided, will use default settings. '
-        'To see the list of possible values and their defaults, run this script without using this '
-        'argument and look at the `config.yml` file that is automatically generated in the output '
-        'directory (the `derivatives/cleaning` directory of the relevant BIDS project).'))
+        'To view the available config options, see `DEFAULTS["clean"]["firstlevels"]` in `climbprep/constants.py`.'))
     args = argparser.parse_args()
 
     participant = args.participant.replace('sub-', '')

@@ -13,7 +13,25 @@ do not already exist there.
 Second, make sure you have a conda environment set up to support the needed
 Python packages. TODO
 
+## Modifying the pipeline
+
+Contributions to this codebase from lab members are welcome! Just please make sure
+to work in a branch/fork and submit a pull request for review before merging
+any changes to the main branch.
+
+One probably frequent modification scenario is if there's some new configuration
+for one of these steps that is likely to be generally useful to the lab, and you
+want to make it conveniently available lab-wide by keyword rather than having
+to pass around config files. The codebase is set up to facilitate these kinds of
+changes by placing all constants, including default configurations, in the
+`climbprep/constants.py` file, allowing them to be easily changed or expanded
+without affecting core functionality. If you want to expand existing keyword-
+accessible configurations, you can freely add configurations to `constants.py`.
+
 ## Usage
+
+Full help strings for all the utilities below can be obtained by running
+the command with the `-h` argument.
 
 ### Cluster job creation/submission
 
@@ -22,7 +40,7 @@ thus intended to be run in parallel on the cluster. For convenience, you can
 generate batch scripts for different types of jobs and submit them to the
 scheduler. To do this, run:
 
-    python -m climbprep.make_jobs <SUBJECT_ID>( <SUBJECT_ID>)* -p <PROJECT_ID> -j <JOB_TYPE>
+    python -m climbprep.make_jobs <PARTICIPANT_ID>( <PARTICIPANT_ID>)* -p <PROJECT_ID> -j <JOB_TYPE>
 
 (the `-p` option can be omitted if the project is `climblab`).
 Run the above with `-h` to see all available command line options.
@@ -95,10 +113,12 @@ Once the source directory is created as described above and `runs.csv`
 has been added, the data can be BIDSified in one go with the following
 command:
 
-    python -m climbprep.bidsify <SUBJECT_ID> -p <PROJECT_ID>
+    python -m climbprep.bidsify <PARTICIPANT_ID> -p <PROJECT_ID> -c <CONFIG>
 
 (the `-p` option can be omitted if the project is `climblab`).
-Run the above with `-h` to see all available command line options.
+The optional `-c` argument can be used to specify a `dcm2bids`-compatible
+configuration file, although there should rarely be a need to deviate
+from the default (automatically-generated) config.
 
 If you are BIDSifying the first-ever session from a new subject,
 make sure to add their ID to the project's `participants.tsv`
@@ -113,19 +133,19 @@ lab members are encouraged to use this codebase for preprocessing whenever
 possible, rather than running fMRIprep directly. To preprocess a participant,
 run:
 
-    python -m climblab.preprocess <SUBJECT_ID> -p <PROJECT_ID> <FMRIPREP_ARGS>
+    python -m climblab.preprocess <PARTICIPANT_ID> -p <PROJECT_ID> -c <CONFIG>
 
 (the `-p` option can be omitted if the project is `climblab`).
-Run the above with `-h` to see all available command line options.
-Any additional command line options will be passed directly to fMRIprep.
+The optional `-c` argument can be used to specify a YAML configuration
+containing fMRIprep CLI args, which will be passed directly to fMRIprep.
 This will result in preprocessed derivatives stored at the following
 location relative to the BIDS project's root:
 
-    derivatives/fmriprep/<PREPROCESSING_LABEL>/sub-<SUBJECT_ID>
+    derivatives/fmriprep/<PREPROCESSING_LABEL>/sub-<PARTICIPANT_ID>
 
-By default, `<PREPROCESSING_LABEL>` is `main`, but this can be configured by
-the user. The use of a label for preprocessing is designed to enable multiple
-preprocessing configurations for the same data, as required by the analyses.
+By default, `<PREPROCESSING_LABEL>` is `main`, but this can be changed in the
+config. The use of a label for preprocessing is designed to enable multiple
+preprocessing configurations for the same data, as required by different analyses.
 
 This utility will also place fMRIprep's working directory in a standard
 location that will support resumption if preprocessing gets interrupted.
@@ -141,28 +161,24 @@ high-motion volumes. The cleaning step is intended to be run after
 fMRIprep preprocessing is complete. To clean a participant's data,
 run:
 
-    python -m climblab.clean <SUBJECT_ID> -p <PROJECT_ID> -c <CONFIG> <CLEAN_ARGS>
+    python -m climblab.clean <PARTICIPANT_ID> -p <PROJECT_ID> -c <CONFIG>
 
 (the `-p` option can be omitted if the project is `climblab`).
-Run the above with `-h` to see all available command line options.
-
 The `-c` argument can be omitted (defaulting to firstlevels standard settings),
 or set to either `firstlevels` or `fc` to respectively use default
 settings for firstlevels estimation (no rescaling or scrubbing) or
 functional connectivity (rescaling and scrubbing), or set to a path
-containing a YAML configuration file. To see an example of such a file,
-run this command without using the `-c` argument and look at the resulting
-`config.yml` file in the output directory below. You can then customize
-this config as you wish and rerun.
+containing a YAML configuration file. To view the available config options,
+see `DEFAULTS['clean']['firstlevels']` in `climbprep/constants.py`.
 
 Cleaning will result in cleaned derivatives stored at the following
 location relative to the BIDS project's root:
 
-    derivatives/cleaned/<CLEANING_LABEL>/sub-<SUBJECT_ID>
+    derivatives/cleaned/<CLEANING_LABEL>/sub-<PARTICIPANT_ID>
 
 In addition to cleaned images, this directory will contain a `samplemask.tsv`
 file for each cleaned run, which contains the indices of *retained* volumes
-under scrubbing (i.e., removal) of runs with excessive head motion. These
+under scrubbing (i.e., removal) of volumes with excessive head motion. These
 files will be produced regardless of whether scrubbing was applied during
 cleaning (this is a configurable setting), because some `nilearn` functions
 allow these sample masks to be passed as a parameter to functions (e.g., 
