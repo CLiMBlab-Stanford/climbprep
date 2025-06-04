@@ -70,8 +70,10 @@ if __name__ == '__main__':
     config = args.config
     if config == 'firstlevels':
         config_default = CONFIG_FIRSTLEVELS
+        config = {}
     elif config == 'fc':
         config_default = CONFIG_FC
+        config = {}
     else:
         assert os.path.exists(config), 'Path not found: %s' % config
         config_default = CONFIG_FIRSTLEVELS
