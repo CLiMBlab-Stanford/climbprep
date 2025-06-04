@@ -44,7 +44,7 @@ Full help strings for all the utilities below can be obtained by running
 the command with the `-h` argument.
 
 
-### Cluster job creation/submission
+### make_jobs
 
 Many of the utilities in this repository are compute/memory intensive and are
 thus intended to be run in parallel on the cluster. For convenience, you can
@@ -76,7 +76,7 @@ Logs from stdin/err for each script will be written to a matching file
 in the current working directory with the suffix `*.out`.
 
 
-### Repair
+### repair
 
 Much of the global repository metadata, especially `participants.tsv`, can
 be automatically generated from the project data itself, so a utility is
@@ -94,7 +94,7 @@ Only run it if you are confident that no one else in the group is running
 `repair` or editing a `participants.tsv` file.
 
 
-### BIDSification
+### bidsify
 
 Whether working with our own data or data from other labs, the first step is
 to convert the data into the BIDS format. We maintain running BIDS "projects"
@@ -143,7 +143,7 @@ make sure to add their ID to the project's `participants.tsv`
 file.
 
 
-### Preprocessing (fMRIprep)
+### preprocess
 
 Preprocessing is handled by fMRIprep, which the `preprocess` script in this
 repository simply wraps while also helping to maintain norms in the lab around
@@ -172,7 +172,7 @@ This is important because preprocessing takes a while (a day or more for
 a typical session)!
 
 
-### Cleaning
+### clean
 
 The cleaning step simplifies and standardizes the lab's procedures for
 what can be thought of as the final stage of preprocessing, namely,
@@ -211,7 +211,7 @@ scrubbed. If scrubbing is not applied, the file description will be
 `desc-clean_ses-scrubbed`.
 
 
-### First-levels
+### model
 
 TODO
 

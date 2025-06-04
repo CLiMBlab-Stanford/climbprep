@@ -1,23 +1,18 @@
-import os
-import re
 import json
 import yaml
 import pandas as pd
 from nilearn import image, surface, maskers, signal, interfaces
 import argparse
 
-SPACE = re.compile('.+_space-([a-zA-Z0-9]+)_')
-RUN = re.compile('.+_run-([0-9]+)_')
-
 from climbprep.constants import *
 
 
 if __name__ == '__main__':
-    argparser = argparse.ArgumentParser('Run fMRIprep on a participant')
+    argparser = argparse.ArgumentParser("Clean (denoise) a participant's functional data")
     argparser.add_argument('participant', help='BIDS participant ID')
     argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", '
                                                                         '"evlab", etc.). Default: "climblab"'))
-    argparser.add_argument('-c', '--config', default='firstlevels', help=('Keyword (currently `firstlevels` or '
+    argparser.add_argument('-c', '--config', default=CLEAN_DEFAULT_KEY, help=('Keyword (currently `firstlevels` or '
         '`fc`) or YAML config file to used to parameterize cleaning. If a keyword is provided, will use the default '
         'settings for that type of downstream analysis. If not provided, will use default settings. '
         'To view the available config options, see `DEFAULTS["clean"]["firstlevels"]` in `climbprep/constants.py`.'))
@@ -25,7 +20,7 @@ if __name__ == '__main__':
 
     participant = args.participant.replace('sub-', '')
     config = args.config
-    if config in ('firstlevels', 'fc'):
+    if config in DEFAULTS['clean']:
         config_default = DEFAULTS['clean'][config]
         config = {}
     else:
@@ -81,8 +76,8 @@ if __name__ == '__main__':
         runs = set()
         for img_path in os.listdir(func_path):
             if img_path.endswith('desc-preproc_bold.nii.gz'):
-                space = SPACE.match(img_path)
-                run = RUN.match(img_path)
+                space = SPACE_RE.match(img_path)
+                run = RUN_RE.match(img_path)
                 if space and run:
                     space = space.group(1)
                     run = run.group(1)
@@ -107,8 +102,8 @@ if __name__ == '__main__':
                     assert TR, 'RepetitionTime information not found in raw sidecar: %s' % raw_sidecar_path
                     TRs_by_file[img_path] = TR
             elif img_path.endswith('_bold.func.gii') and '_hemi-L_' in img_path:
-                space = SPACE.match(img_path)
-                run = RUN.match(img_path)
+                space = SPACE_RE.match(img_path)
+                run = RUN_RE.match(img_path)
                 run = run.group(1)
                 runs.add(run)
                 if space and run:
@@ -139,7 +134,7 @@ if __name__ == '__main__':
         for space in volumes_by_space:
             img_paths = volumes_by_space[space]
             img_fullpaths = [os.path.join(func_path, x) for x in img_paths]
-            confounds_imgs = [confounds_by_run[RUN.match(x).group(1)] for x in img_paths]
+            confounds_imgs = [confounds_by_run[RUN_RE.match(x).group(1)] for x in img_paths]
             confounds, sample_mask = interfaces.fmriprep.load_confounds(
                 confounds_imgs,
                 strategy=config['strategy'],
@@ -197,7 +192,7 @@ if __name__ == '__main__':
 
             img_paths = surfaces_by_space[space]
             img_fullpaths = [os.path.join(func_path, x) for x in img_paths]
-            confounds_imgs = [confounds_by_run[RUN.match(x).group(1)] for x in img_paths]
+            confounds_imgs = [confounds_by_run[RUN_RE.match(x).group(1)] for x in img_paths]
             confounds, sample_mask = interfaces.fmriprep.load_confounds(
                 confounds_imgs,
                 strategy=config['strategy'],

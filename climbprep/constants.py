@@ -1,3 +1,4 @@
+import re
 import os
 
 LAB_PATH = os.path.normpath(os.path.join('/', 'juice6', 'u', 'nlp', 'climblab'))
@@ -6,6 +7,11 @@ WORK_PATH = os.path.join(LAB_PATH, 'work')
 FS_LICENSE_PATH = os.path.join(LAB_PATH, 'freesurfer', 'license.txt')
 DEFAULT_TASK = 'UnknownTask'
 FMRIPREP_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fmriprep.simg')
+
+SPACE_RE = re.compile('.+_space-([a-zA-Z0-9]+)_')
+RUN_RE = re.compile('.+_run-([0-9]+)_')
+TASK_RE = re.compile('.+_task-([a-zA-Z0-9]+)_')
+HEMI_RE = re.compile('.+_task-([a-zA-Z0-9]+)_')
 
 DEFAULTS = dict(
     preprocess=dict(
@@ -59,8 +65,16 @@ DEFAULTS = dict(
             high_pass=0.01,
             n_jobs=-1
         )
+    ),
+    model=dict(
+        main=dict(
+            model_label='main',
+            cleaning_label='firstlevels',
+            n_jobs=-1
+        )
     )
 )
 
 PREPROCESS_DEFAULT_KEY = 'main'
 CLEAN_DEFAULT_KEY = 'firstlevels'
+MODEL_DEFAULT_KEY = 'main'
