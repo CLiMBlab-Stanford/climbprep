@@ -71,8 +71,8 @@ facilitate secondary analyses. The current set of projects are:
 Our general BIDS directory is found at `/juice6/u/nlp/climblab/BIDS`.
 Each project is a subdirectory. To BIDSify new fMRI source data,
 first copy the new source directory (in any format supported by dcm2bids)
-to `/juice6/u/nlp/climblab/BIDS/<project>/sourcedata/sub-<subjectID>/ses-<sessionID>`,
-replacing all bracketed variables with appropriate values. Subject and session
+to `/juice6/u/nlp/climblab/BIDS/<project>/sourcedata/sub-<subjectID>`,
+replacing all bracketed variables with appropriate values. Subject
 IDs must follow BIDS naming conventions.
 
 It is strongly encouraged (but not technically required) to also create
@@ -131,6 +131,49 @@ This utility will also place fMRIprep's working directory in a standard
 location that will support resumption if preprocessing gets interrupted.
 This is important because preprocessing takes a while (a day or more for
 a typical session)!
+
+### Cleaning
+
+The cleaning step simplifies and standardizes the lab's procedures for
+what can be thought of as the final stage of preprocessing, namely,
+removing unwanted confounds from the data and (optionally) censoring
+high-motion volumes. The cleaning step is intended to be run after
+fMRIprep preprocessing is complete. To clean a participant's data,
+run:
+
+    python -m climblab.clean <SUBJECT_ID> -p <PROJECT_ID> -c <CONFIG> <CLEAN_ARGS>
+
+(the `-p` option can be omitted if the project is `climblab`).
+Run the above with `-h` to see all available command line options.
+
+The `-c` argument can be omitted (defaulting to firstlevels standard settings),
+or set to either `firstlevels` or `fc` to respectively use default
+settings for firstlevels estimation (no rescaling or scrubbing) or
+functional connectivity (rescaling and scrubbing), or set to a path
+containing a YAML configuration file. To see an example of such a file,
+run this command without using the `-c` argument and look at the resulting
+`config.yml` file in the output directory below. You can then customize
+this config as you wish and rerun.
+
+Cleaning will result in cleaned derivatives stored at the following
+location relative to the BIDS project's root:
+
+    derivatives/cleaned/<CLEANING_LABEL>/sub-<SUBJECT_ID>
+
+In addition to cleaned images, this directory will contain a `samplemask.tsv`
+file for each cleaned run, which contains the indices of *retained* volumes
+under scrubbing (i.e., removal) of runs with excessive head motion. These
+files will be produced regardless of whether scrubbing was applied during
+cleaning (this is a configurable setting), because some `nilearn` functions
+allow these sample masks to be passed as a parameter to functions (e.g., 
+firstlevel fitting) that take un-scrubbed data as input. If you choose to
+apply scrubbing, note that this will make any downstream computations that
+rely on unscrubbed data (e.g., bandpassing) invalid. By default, data for 
+firstlevels are not scrubbed, whereas data for connectivity analyses are
+scrubbed. If scrubbing is not applied, the file description will be
+`desc-clean`, whereas if scrubbing is applied, the file description will be
+`desc-clean_ses-scrubbed`.
+
 
 ### First-levels
 

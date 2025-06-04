@@ -11,8 +11,8 @@ from climbprep.constants import *
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser(('Utility to repair BIDS directories. Currently just updates '
                                          '`participants.tsv`.'))
-    argparser.add_argument('-p', '--projects', nargs='+', default=[], help=('Name of BIDS project (e.g., "climblab", "evlab", '
-                                                                           'etc.). If unspecified, do all projects'))
+    argparser.add_argument('-p', '--projects', nargs='+', default=[], help=('Name of BIDS project (e.g., "climblab", '
+        '"evlab", etc.). If unspecified, do all projects'))
     args = argparser.parse_args()
 
     if not args.projects:
