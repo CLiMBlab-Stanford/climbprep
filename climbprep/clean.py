@@ -86,7 +86,7 @@ if __name__ == '__main__':
                 task = TASK_RE.match(img_path)
                 if space and run and task:
                     space = space.group(1)
-                    type_by_space['space'] = 'vol'
+                    type_by_space[space] = 'vol'
                     run = run.group(1)
                     task = task.group(1)
                     if space == 'T1w':
@@ -120,7 +120,7 @@ if __name__ == '__main__':
                 task = TASK_RE.match(img_path)
                 if space and run and task:
                     space = space.group(1)
-                    type_by_space['space'] = 'surf'
+                    type_by_space[space] = 'vol'
                     run = run.group(1)
                     task = task.group(1)
                     # confounds = f'sub-{participant}{ses_str}_task-{task}_run-{run}_desc-confounds_timeseries.tsv'
