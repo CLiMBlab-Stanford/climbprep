@@ -95,7 +95,7 @@ if __name__ == '__main__':
                         mask = f'sub-{participant}{ses_str}_space-{space}_label-GM_probseg.nii.gz'
                     mask = os.path.join(anat_path, mask)
                     # confounds = f'sub-{participant}{ses_str}_task-{task}_run-{run}_desc-confounds_timeseries.tsv'
-                    confounds = os.path.join(func_path, func_path)
+                    confounds = os.path.join(func_path, img_path)
                     assert os.path.exists(confounds), 'Confounds file not found: %s' % confounds
                     func = os.path.join(func_path, img_path)
                     raw_sidecar_path = os.path.join(
@@ -124,7 +124,7 @@ if __name__ == '__main__':
                     run = run.group(1)
                     task = task.group(1)
                     # confounds = f'sub-{participant}{ses_str}_task-{task}_run-{run}_desc-confounds_timeseries.tsv'
-                    confounds = os.path.join(func_path, func_path)
+                    confounds = os.path.join(func_path, img_path)
                     assert os.path.exists(confounds), 'Confounds file not found: %s' % confounds
                     func = os.path.join(func_path, img_path)
                     raw_sidecar_path = os.path.join(
@@ -162,6 +162,8 @@ if __name__ == '__main__':
                 func_path = datasets[space][run]['func']
                 func_file = os.path.basename(func_path)
                 TR = datasets[space][run]['TR']
+
+                print(confounds)
 
                 confounds, sample_mask = interfaces.fmriprep.load_confounds(
                     confounds,
