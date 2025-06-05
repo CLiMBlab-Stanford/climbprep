@@ -208,7 +208,7 @@ if __name__ == '__main__':
                         out_dir, func_file.replace('desc-preproc', desc)
                     )
                     run.to_filename(run_path)
-                elif type_by_space[space] == 'vol':  # Surface data
+                elif type_by_space[space] == 'surf':  # Surface data
                     mask_nii = None
                     if space == 'fsnative':
                         space_str = ''
