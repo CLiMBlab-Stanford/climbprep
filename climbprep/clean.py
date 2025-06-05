@@ -163,15 +163,13 @@ if __name__ == '__main__':
                 func_file = os.path.basename(func_path)
                 TR = datasets[space][run]['TR']
 
-                print(confounds)
-
                 confounds, sample_mask = interfaces.fmriprep.load_confounds(
                     confounds,
                     strategy=config['strategy'],
                     std_dvars_threshold=config['std_dvars_threshold'],
                     fd_threshold=config['fd_threshold']
                 )
-                if not sample_mask:
+                if sample_mask is None:
                     sample_mask = []
 
                 _sample_mask = pd.DataFrame(dict(sample_mask=list(sample_mask)))
