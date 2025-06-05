@@ -77,7 +77,7 @@ if __name__ == '__main__':
         else:
             ses_str = ''
 
-        datasets = {}  # Structure: space > run > filetype (func, mask, confounds, tr) > value
+        datasets = {}  # Structure: space > task > run > filetype (func, mask, confounds, tr) > value
         type_by_space = {}
         for img_path in os.listdir(func_path):
             if img_path.endswith('desc-preproc_bold.nii.gz'):
@@ -108,12 +108,14 @@ if __name__ == '__main__':
                     assert TR, 'RepetitionTime information not found in raw sidecar: %s' % raw_sidecar_path
                     if space not in datasets:
                         datasets[space] = {}
-                    if run not in datasets[space]:
-                        datasets[space][run] = {}
-                    datasets[space][run]['func'] = func
-                    datasets[space][run]['mask'] = mask
-                    datasets[space][run]['confounds'] = confounds
-                    datasets[space][run]['TR'] = TR
+                    if task not in datasets[space]:
+                        datasets[space][task] = {}
+                    if run not in datasets[space][task]:
+                        datasets[space][task][run] = {}
+                    datasets[space][task][run]['func'] = func
+                    datasets[space][task][run]['mask'] = mask
+                    datasets[space][task][run]['confounds'] = confounds
+                    datasets[space][task][run]['TR'] = TR
             elif img_path.endswith('_bold.func.gii') and '_hemi-L_' in img_path:
                 space = SPACE_RE.match(img_path)
                 run = RUN_RE.match(img_path)
@@ -137,12 +139,14 @@ if __name__ == '__main__':
                     assert TR, 'RepetitionTime information not found in raw sidecar: %s' % raw_sidecar_path
                     if space not in datasets:
                         datasets[space] = {}
-                    if run not in datasets[space]:
-                        datasets[space][run] = {}
-                    datasets[space][run]['func'] = func
-                    datasets[space][run]['mask'] = None
-                    datasets[space][run]['confounds'] = confounds
-                    datasets[space][run]['TR'] = TR
+                    if task not in datasets[space]:
+                        datasets[space][task] = {}
+                    if run not in datasets[space][task]:
+                        datasets[space][task][run] = {}
+                    datasets[space][task][run]['func'] = func
+                    datasets[space][task][run]['mask'] = None
+                    datasets[space][task][run]['confounds'] = confounds
+                    datasets[space][task][run]['TR'] = TR
 
 
         out_dir = os.path.join(derivatives_path, 'cleaned', cleaning_label, subdir)
@@ -156,98 +160,99 @@ if __name__ == '__main__':
 
         # Volumetric data
         for space in datasets:
-            for run in datasets[space]:
-                confounds = datasets[space][run]['confounds']
-                mask = datasets[space][run]['mask']
-                func_path = datasets[space][run]['func']
-                func_file = os.path.basename(func_path)
-                TR = datasets[space][run]['TR']
+            for task in datasets[space]:
+                for run in datasets[space][task]:
+                    confounds = datasets[space][task][run]['confounds']
+                    mask = datasets[space][task][run]['mask']
+                    func_path = datasets[space][task][run]['func']
+                    func_file = os.path.basename(func_path)
+                    TR = datasets[space][task][run]['TR']
 
-                confounds, sample_mask = interfaces.fmriprep.load_confounds(
-                    confounds,
-                    strategy=config['strategy'],
-                    std_dvars_threshold=config['std_dvars_threshold'],
-                    fd_threshold=config['fd_threshold']
-                )
-                if sample_mask is None:
-                    sample_mask = []
+                    confounds, sample_mask = interfaces.fmriprep.load_confounds(
+                        confounds,
+                        strategy=config['strategy'],
+                        std_dvars_threshold=config['std_dvars_threshold'],
+                        fd_threshold=config['fd_threshold']
+                    )
+                    if sample_mask is None:
+                        sample_mask = []
 
-                _sample_mask = pd.DataFrame(dict(sample_mask=list(sample_mask)))
-                sample_mask_path = os.path.join(
-                    out_dir, func_file.replace('_bold.nii.gz', '_samplemask.tsv')
-                )
-                _sample_mask.to_csv(sample_mask_path, sep='\t', index=False)
+                    _sample_mask = pd.DataFrame(dict(sample_mask=list(sample_mask)))
+                    sample_mask_path = os.path.join(
+                        out_dir, func_file.replace('_bold.nii.gz', '_samplemask.tsv')
+                    )
+                    _sample_mask.to_csv(sample_mask_path, sep='\t', index=False)
 
-                if type_by_space[space] == 'vol':  # Volumetric data
-                    mask_nii = load_img(mask)
-                    func = load_img(func_path)
-                    mask_nii = image.math_img(
-                        'img > 0.5',
-                        img=image.resample_to_img(
-                            mask_nii, func, interpolation='nearest', force_resample=True, copy_header=True
+                    if type_by_space[space] == 'vol':  # Volumetric data
+                        mask_nii = load_img(mask)
+                        func = load_img(func_path)
+                        mask_nii = image.math_img(
+                            'img > 0.5',
+                            img=image.resample_to_img(
+                                mask_nii, func, interpolation='nearest', force_resample=True, copy_header=True
+                            )
                         )
-                    )
 
-                    masker = maskers.NiftiMasker(
-                        mask_img=mask_nii,
-                        standardize=config['standardize'],
-                        detrend=config['detrend'],
-                        t_r=TR,
-                        low_pass=config['smoothing_fwhm'],
-                        high_pass=config['high_pass']
-                    )
-                    kwargs = dict(confounds=confounds)
-                    if config['scrub']:
-                        kwargs['sample_mask'] = sample_mask[i]
-                        desc = 'desc-cleanscrubbed'
-                    else:
-                        desc = 'desc-clean'
-                    run = masker.fit_transform(func_path, **kwargs)
-                    run = masker.inverse_transform(run)
-                    run_path = os.path.join(
-                        out_dir, func_file.replace('desc-preproc', desc)
-                    )
-                    run.to_filename(run_path)
-                elif type_by_space[space] == 'surf':  # Surface data
-                    mask_nii = None
-                    if space == 'fsnative':
-                        space_str = ''
-                    else:
-                        space_str = '_space-%s' % space
-                    surf_L_path = os.path.join(
-                        fmriprep_path, 'anat', f'sub-{participant}{ses_str}{space_str}_hemi-L_pial.surf.gii'
-                    )
-                    surf_R_path = surf_L_path.replace('_hemi-L_', '_hemi-R_')
-
-                    masker = maskers.SurfaceMasker(
-                        mask_img=None,
-                        standardize=config['standardize'],
-                        detrend=config['detrend'],
-                        t_r=TR,
-                        low_pass=config['smoothing_fwhm'],
-                        high_pass=config['high_pass']
-                    )
-                    kwargs = dict(confounds=confounds)
-                    if config['scrub']:
-                        kwargs['sample_mask'] = sample_mask[i]
-                        desc = 'desc-cleanscrubbed'
-                    else:
-                        desc = 'desc-clean'
-                    mesh = surface.PolyMesh(left=surf_L_path, right=surf_R_path)
-                    data = surface.PolyData(left=func_path, right=func_path.replace('_hemi-L_', '_hemi-R_'))
-                    img = surface.SurfaceImage(mesh, data)
-
-                    run = masker.fit_transform(img, **kwargs)
-                    run = masker.inverse_transform(run)
-                    for hemi in ('left', 'right'):
-                        if hemi == 'left':
-                            desc_hemi = '_hemi-L_'
+                        masker = maskers.NiftiMasker(
+                            mask_img=mask_nii,
+                            standardize=config['standardize'],
+                            detrend=config['detrend'],
+                            t_r=TR,
+                            low_pass=config['smoothing_fwhm'],
+                            high_pass=config['high_pass']
+                        )
+                        kwargs = dict(confounds=confounds)
+                        if config['scrub']:
+                            kwargs['sample_mask'] = sample_mask[i]
+                            desc = 'desc-cleanscrubbed'
                         else:
-                            desc_hemi = '_hemi-R_'
-                        img_path_hemi = func_file.replace('_hemi-L_', desc_hemi)
+                            desc = 'desc-clean'
+                        run = masker.fit_transform(func_path, **kwargs)
+                        run = masker.inverse_transform(run)
                         run_path = os.path.join(
-                            out_dir, img_path_hemi.replace('_bold.func.gii', '_%s_bold.func.gii' % desc)
+                            out_dir, func_file.replace('desc-preproc', desc)
                         )
-                        run.data.to_filename(run_path)
-                else:
-                    raise ValueError('Unknown space: %s' % space)
+                        run.to_filename(run_path)
+                    elif type_by_space[space] == 'surf':  # Surface data
+                        mask_nii = None
+                        if space == 'fsnative':
+                            space_str = ''
+                        else:
+                            space_str = '_space-%s' % space
+                        surf_L_path = os.path.join(
+                            fmriprep_path, 'anat', f'sub-{participant}{ses_str}{space_str}_hemi-L_pial.surf.gii'
+                        )
+                        surf_R_path = surf_L_path.replace('_hemi-L_', '_hemi-R_')
+
+                        masker = maskers.SurfaceMasker(
+                            mask_img=None,
+                            standardize=config['standardize'],
+                            detrend=config['detrend'],
+                            t_r=TR,
+                            low_pass=config['smoothing_fwhm'],
+                            high_pass=config['high_pass']
+                        )
+                        kwargs = dict(confounds=confounds)
+                        if config['scrub']:
+                            kwargs['sample_mask'] = sample_mask[i]
+                            desc = 'desc-cleanscrubbed'
+                        else:
+                            desc = 'desc-clean'
+                        mesh = surface.PolyMesh(left=surf_L_path, right=surf_R_path)
+                        data = surface.PolyData(left=func_path, right=func_path.replace('_hemi-L_', '_hemi-R_'))
+                        img = surface.SurfaceImage(mesh, data)
+
+                        run = masker.fit_transform(img, **kwargs)
+                        run = masker.inverse_transform(run)
+                        for hemi in ('left', 'right'):
+                            if hemi == 'left':
+                                desc_hemi = '_hemi-L_'
+                            else:
+                                desc_hemi = '_hemi-R_'
+                            img_path_hemi = func_file.replace('_hemi-L_', desc_hemi)
+                            run_path = os.path.join(
+                                out_dir, img_path_hemi.replace('_bold.func.gii', '_%s_bold.func.gii' % desc)
+                            )
+                            run.data.to_filename(run_path)
+                    else:
+                        raise ValueError('Unknown space: %s' % space)
