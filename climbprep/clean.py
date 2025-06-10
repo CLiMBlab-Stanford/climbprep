@@ -158,7 +158,6 @@ if __name__ == '__main__':
         with open(config_path, 'w') as f:
             yaml.safe_dump(config, f, sort_keys=False)
 
-        # Volumetric data
         for space in datasets:
             for task in datasets[space]:
                 for run in datasets[space][task]:
@@ -174,6 +173,10 @@ if __name__ == '__main__':
                         std_dvars_threshold=config['std_dvars_threshold'],
                         fd_threshold=config['fd_threshold']
                     )
+                    confounds_path = os.path.join(
+                        out_dir, func_file.replace('_bold.nii.gz', '_confounds.tsv')
+                    )
+                    confounds.to_csv(confounds_path, sep='\t', index=False)
                     if sample_mask is None:
                         sample_mask = []
 
@@ -234,7 +237,7 @@ if __name__ == '__main__':
                         )
                         kwargs = dict(confounds=confounds)
                         if config['scrub']:
-                            kwargs['sample_mask'] = sample_mask[i]
+                            kwargs['sample_mask'] = sample_mask
                             desc = 'desc-cleanscrubbed'
                         else:
                             desc = 'desc-clean'

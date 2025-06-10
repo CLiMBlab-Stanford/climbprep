@@ -23,27 +23,6 @@ DEFAULTS = dict(
         )
     ),
     clean=dict(
-        firstlevels=dict(
-            cleaning_label='firstlevels',
-            preprocessing_label='main',
-            strategy=(
-                'motion',
-                'high_pass',
-                'wm_csf',
-                'global_signal',
-                'compcor',
-                'scrub'
-            ),
-            smoothing_fwhm=4,
-            std_dvars_threshold=1.5,
-            fd_threshold=0.5,
-            scrub=False,
-            standardize=False,
-            detrend=True,
-            low_pass=None,
-            high_pass=0.01,
-            n_jobs=-1
-        ),
         fc=dict(
             cleaning_label='fc',
             preprocessing_label='main',
@@ -64,17 +43,37 @@ DEFAULTS = dict(
             low_pass=0.1,
             high_pass=0.01,
             n_jobs=-1
+        ),
+        firstlevels=dict(
+            cleaning_label='firstlevels',
+            preprocessing_label='main',
+            strategy=(
+                'motion',
+                'high_pass',
+                'wm_csf',
+                'global_signal',
+                'scrub'
+            ),
+            smoothing_fwhm=4,
+            std_dvars_threshold=1.5,
+            fd_threshold=0.5,
+            scrub=False,
+            standardize=False,
+            detrend=True,
+            low_pass=None,
+            high_pass=0.01,
+            n_jobs=-1
         )
     ),
     model=dict(
         main=dict(
             model_label='main',
-            cleaning_label='firstlevels',
+            preprocessing_label='main',
             n_jobs=-1
         )
     )
 )
 
 PREPROCESS_DEFAULT_KEY = 'main'
-CLEAN_DEFAULT_KEY = 'firstlevels'
+CLEAN_DEFAULT_KEY = 'fc'
 MODEL_DEFAULT_KEY = 'main'
