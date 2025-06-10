@@ -54,7 +54,7 @@ if __name__ == '__main__':
     participants = args.participants
     project = args.project
     if not participants:
-        participants = [x for x in os.listdir(os.path.join(BIDS_PATH, project)) if x.startswith('sub-')]
+        participants = [x for x in os.listdir(os.path.join(BIDS_PATH, project, 'sourcedata')) if x.startswith('sub-')]
     participants = [x.replace('sub-', '') for x in participants]
     job_types = args.job_types
     time = args.time
@@ -99,13 +99,13 @@ if __name__ == '__main__':
                 if job_type not in job_types:
                     continue
                 if job_type.lower() == 'bidsify':
-                    job_str = wrapper % ('python -m climbprep.bidsify %s -p %s%s' %
+                    job_str = wrapper % ('python -m climbprep.bidsify %s -p %s%s\n' %
                                          (participant, project, bidsify_config_str))
                 elif job_type.lower() == 'preprocess':
-                    job_str = wrapper % ('python -m climbprep.preprocess %s -p %s%s' %
+                    job_str = wrapper % ('python -m climbprep.preprocess %s -p %s%s\n' %
                                          (participant, project, preprocess_config_str))
                 elif job_type.lower() == 'clean':
-                    job_str = wrapper % ('python -m climbprep.preprocess %s -p %s%s' %
+                    job_str = wrapper % ('python -m climbprep.clean %s -p %s%s\n' %
                                          (participant, project, clean_config_str))
                 else:
                     raise ValueError('Unrecognized job type: %s.' % job_type)
