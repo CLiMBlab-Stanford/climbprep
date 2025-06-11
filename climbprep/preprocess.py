@@ -14,7 +14,7 @@ if __name__ == '__main__':
         'the default settings for associated with that keyword. '
         'The possible config fields and values are just the `fmriprep` command-line arguments and their possible'
         'values. For details, see the `fmriprep` documentation.'))
-    args, kwargs = argparser.parse_known_args()
+    args = argparser.parse_args()
 
     participant = args.participant.replace('sub-', '')
     project = args.project
@@ -35,7 +35,7 @@ if __name__ == '__main__':
             config[key] = config_default[key]
     assert 'preprocessing_label' in config, 'Required field `preprocessing_label` not found in config. ' \
                                             'Please provide a valid config file or keyword.'
-    preprocessing_label = config['preprocessing_label']
+    preprocessing_label = config.pop('preprocessing_label'
 
     out_path = os.path.join(project_path, 'derivatives', 'fmriprep', preprocessing_label)
     work_path = os.path.join(WORK_PATH, project, participant)
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     kwarg_strings = []
     for key in config:
         key_str = '--%s' % key.replace('_', '-')
-        val =  config[val]
+        val =  config[key]
         if isinstance(val, list) or isinstance(val, tuple):
             val = ' '.join(val)
         kwarg_strings.append(f'{key_str} {val}')
@@ -56,7 +56,7 @@ if __name__ == '__main__':
         f'--participant-label {participant}',
     ] + kwarg_strings
     cmd = f'fmriprep {" ".join(args)}'
-    cmd = f'''singularity exec {FMRIPREP_IMG} bash -c "{' '.join([cmd] + kwargs)}"'''
+    cmd = f'''singularity exec {FMRIPREP_IMG} bash -c "{cmd}"'''
 
     print(cmd)
     os.system(cmd)
