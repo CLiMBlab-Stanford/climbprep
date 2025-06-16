@@ -35,7 +35,7 @@ if __name__ == '__main__':
             config[key] = config_default[key]
     assert 'preprocessing_label' in config, 'Required field `preprocessing_label` not found in config. ' \
                                             'Please provide a valid config file or keyword.'
-    preprocessing_label = config.pop('preprocessing_label'
+    preprocessing_label = config.pop('preprocessing_label')
 
     out_path = os.path.join(project_path, 'derivatives', 'fmriprep', preprocessing_label)
     work_path = os.path.join(WORK_PATH, project, participant)
