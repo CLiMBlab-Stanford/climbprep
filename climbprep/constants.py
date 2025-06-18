@@ -20,7 +20,8 @@ DEFAULTS = dict(
             preprocessing_label='main',
             fs_license_file=FS_LICENSE_PATH,
             output_space=['MNI152NLin2009cAsym', 'T1w', 'fsnative'],
-            skull_strip_t1w='skip'
+            skull_strip_t1w='skip',
+            cifti_output='91k'
         )
     ),
     clean=dict(

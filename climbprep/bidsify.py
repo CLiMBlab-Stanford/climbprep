@@ -89,7 +89,7 @@ if __name__ == '__main__':
                     continue
                 dtype, suffix = meta['BidsGuess']
                 suffix = suffix.split('_')[-1]
-                if dtype != 'discard':
+                if dtype not in ('derived', 'discard'):
                     if dtype == 'func' and len(descriptions) and \
                             'AcquisitionTime' in meta and 'AcquisitionTime' in descriptions[-1]['criteria'] and \
                             meta['AcquisitionTime'] == descriptions[-1]['criteria']['AcquisitionTime']:
