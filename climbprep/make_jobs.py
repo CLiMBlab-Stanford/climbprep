@@ -94,6 +94,7 @@ if __name__ == '__main__':
                 f.write('#SBATCH --account=%s\n' % account)
             if exclude:
                 f.write('#SBATCH --exclude=%s\n' % exclude)
+            f.write('\n\nset -e\n\n')
             wrapper = '%s'
             for job_type in JOB_ORDER:
                 if job_type not in job_types:
