@@ -4,6 +4,7 @@ import os
 LAB_PATH = os.path.normpath(os.path.join('/', 'juice6', 'u', 'nlp', 'climblab'))
 BIDS_PATH = os.path.join(LAB_PATH, 'BIDS')
 WORK_PATH = os.path.join(LAB_PATH, 'work')
+MODELFILES_PATH = os.path.join(LAB_PATH, 'modelfiles')
 FS_LICENSE_PATH = os.path.join(LAB_PATH, 'freesurfer', 'license.txt')
 DEFAULT_TASK = 'UnknownTask'
 FMRIPREP_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fmriprep.simg')
@@ -40,18 +41,19 @@ DEFAULTS = dict(
             scrub=True,
             standardize=True,
             detrend=True,
+            motion='derivatives',
+            wm_csf='basic',
             low_pass=0.1,
             high_pass=0.01,
             n_jobs=-1
         ),
-        firstlevels=dict(
+        firstlevels_like=dict(
             cleaning_label='firstlevels',
             preprocessing_label='main',
             strategy=(
                 'motion',
                 'high_pass',
                 'wm_csf',
-                'global_signal',
                 'scrub'
             ),
             smoothing_fwhm=4,
@@ -60,20 +62,34 @@ DEFAULTS = dict(
             scrub=False,
             standardize=False,
             detrend=True,
+            motion='derivatives',
+            wm_csf='basic',
             low_pass=None,
             high_pass=0.01,
             n_jobs=-1
         )
     ),
     model=dict(
-        main=dict(
+        mni=dict(
             model_label='main',
             preprocessing_label='main',
-            n_jobs=-1
+            smoothing_fwhm=4,
+            space='MNI152NLin2009cAsym',
+            estimator='nilearn',
+            drop_missing=True
+        ),
+        T1w=dict(
+            model_label='main',
+            preprocessing_label='main',
+            smoothing_fwhm=4,
+            space='T1w',
+            estimator='nilearn',
+            drop_missing=True
         )
     )
 )
+DEFAULTS['model']['anat'] = DEFAULTS['model']['T1w'].copy()
 
 PREPROCESS_DEFAULT_KEY = 'main'
 CLEAN_DEFAULT_KEY = 'fc'
-MODEL_DEFAULT_KEY = 'main'
+MODEL_DEFAULT_KEY = 'mni'
