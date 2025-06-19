@@ -53,11 +53,11 @@ if __name__ == '__main__':
         project_path,
         out_path,
         'participant',
-        f'-w {work_path}',
+        f'--work-dir {work_path}',
         f'--participant-label {participant}',
     ] + kwarg_strings
     cmd = f'fmriprep {" ".join(args)}'
-    cmd = f'''singularity exec {FMRIPREP_IMG} bash -c "{cmd}"'''
+    cmd = f'singularity exec {FMRIPREP_IMG} bash -c "{cmd}"'
 
     stderr(cmd + '\n')
     os.system(cmd)

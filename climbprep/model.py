@@ -52,12 +52,14 @@ if __name__ == '__main__':
                                             'Please provide a valid config file or keyword.'
     preprocessing_label = config.pop('preprocessing_label')
 
-    # Set session-agnostic paths
+    # Set paths
     project = args.project
     project_path = os.path.join(BIDS_PATH, project)
     assert os.path.exists(project_path), 'Path not found: %s' % project_path
     derivatives_path = os.path.join(project_path, 'derivatives')
     assert os.path.exists(derivatives_path), 'Path not found: %s' % derivatives_path
+    fmriprep_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label)
+    assert os.path.exists(fmriprep_path), 'Path not found: %s' % fmriprep_path
     modelfiles_path = MODELFILES_PATH
     model_library = set()
     task_to_models = {}
@@ -146,7 +148,8 @@ if __name__ == '__main__':
                    'participant',
                    f'--participant-label {participant}',
                    f'--model {modelfile}',
-                   f'-w {work_path}',
+                   f'--derivatives {fmriprep_path}',
+                   f'--work-dir {work_path}',
                ] + kwarg_strings
         cmd = " ".join(args)
         cmd = f'''singularity run {FITLINS_IMG} {cmd}'''
