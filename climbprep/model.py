@@ -113,7 +113,8 @@ if __name__ == '__main__':
                             models |= task_to_models[task]
     else:
         missing = models - model_library
-        stderr('The following models are not available in the model library: %s. Skipping.\n' % ', '.join(missing))
+        if missing:
+            stderr('The following models are not available in the model library: %s. Skipping.\n' % ', '.join(missing))
         models_ = models & model_library
         if not models_:
             stderr('No valid models specified. Exiting.\n')
