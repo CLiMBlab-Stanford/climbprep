@@ -175,19 +175,20 @@ a typical session)!
 ### clean
 
 The cleaning step simplifies and standardizes the lab's procedures for
-what can be thought of as the final stage of preprocessing, namely,
-removing unwanted confounds from the data and (optionally) censoring
-high-motion volumes. The cleaning step is intended to be run after
-fMRIprep preprocessing is complete. To clean a participant's data,
+standardizing/denoising preprocessed data, typically in preparation for
+subsequent functional connectivity analysis. The purpose of cleaning is
+to remove unwanted confounds from the data and (optionally) censoring
+high-motion volumes. The cleaning step can only be run after
+preprocessing is complete. To clean a participant's data,
 run:
 
     python -m climblab.clean <PARTICIPANT_ID> -p <PROJECT_ID> -c <CONFIG>
 
 (the `-p` option can be omitted if the project is `climblab`).
-The `-c` argument can be omitted (defaulting to firstlevels standard settings),
-or set to either `firstlevels` or `fc` to respectively use default
-settings for firstlevels estimation (no rescaling or scrubbing) or
-functional connectivity (rescaling and scrubbing), or set to a path
+The `-c` argument can be omitted (defaulting to FC standard settings),
+or set to either `fc` or `firstlevels_like` to respectively use default
+settings for functional connectivity (rescaling and scrubbing) or 
+firstlevels estimation (no rescaling or scrubbing), or set to a path
 containing a YAML configuration file. To view the available config options,
 see `DEFAULTS['clean']['firstlevels']` in `climbprep/constants.py`.
 
@@ -201,17 +202,36 @@ file for each cleaned run, which contains the indices of *retained* volumes
 under scrubbing (i.e., removal) of volumes with excessive head motion. These
 files will be produced regardless of whether scrubbing was applied during
 cleaning (this is a configurable setting), because some `nilearn` functions
-allow these sample masks to be passed as a parameter to functions (e.g., 
-firstlevel fitting) that take un-scrubbed data as input. If you choose to
-apply scrubbing, note that this will make any downstream computations that
-rely on unscrubbed data (e.g., bandpassing) invalid. By default, data for 
-firstlevels are not scrubbed, whereas data for connectivity analyses are
-scrubbed. If scrubbing is not applied, the file description will be
-`desc-clean`, whereas if scrubbing is applied, the file description will be
-`desc-clean_ses-scrubbed`.
+allow these sample masks to be passed as a parameter to functions.
 
 
 ### model
 
-TODO
+The modeling step generates first-level analyses (participant-specific
+statmaps) from task fMRI data. It can only be run after preprocessing
+is complete. o clean a participant's data,
+run:
 
+    python -m climblab.model <PARTICIPANT_ID> -p <PROJECT_ID>
+
+(the `-p` option can be omitted if the project is `climblab`).
+The `-c` argument can be omitted (defaulting to MNI standard settings),
+or set to either `mni` or `T1w` to respectively use standard
+settings for MNI space or native space, or set to a path containing
+a YAML configuration file. To view the available config options,
+see `DEFAULTS['model']['main']` in `climbprep/constants.py`.
+
+The lab maintains a library of model files conforming to
+the [BIDS Stats Models specification]
+(https://bids-standard.github.io/stats-models) at `/juice6/u/nlp/climblab/`.
+By default, `model` will use the set of tasks available from the participant
+to infer which models in the library are relevant and run them all, with
+outputs saved to:
+
+    derivatives/firstlevels/<MODEL_LABEL>/<MODEL_NAME>/sub-<PARTICIPANT_ID>
+
+where `MODEL_LABEL` refers to the configuration name (e.g., `mni`)
+and `MODEL_NAME` refers to the standard  name for the model (`PREFIX` 
+in `PREFIX_model.json` in the model's filename). To run
+a subset of available models, you can pass their names as a space-delimited
+list using the `-m` option.

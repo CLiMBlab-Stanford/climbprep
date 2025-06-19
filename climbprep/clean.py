@@ -205,11 +205,9 @@ if __name__ == '__main__':
                             high_pass=config['high_pass']
                         )
                         kwargs = dict(confounds=confounds)
+                        desc = 'desc-clean'
                         if config['scrub']:
                             kwargs['sample_mask'] = sample_mask[i]
-                            desc = 'desc-cleanscrubbed'
-                        else:
-                            desc = 'desc-clean'
                         run = masker.fit_transform(func_path, **kwargs)
                         run = masker.inverse_transform(run)
                         run_path = os.path.join(
@@ -236,11 +234,9 @@ if __name__ == '__main__':
                             high_pass=config['high_pass']
                         )
                         kwargs = dict(confounds=confounds)
+                        desc = 'desc-clean'
                         if config['scrub']:
                             kwargs['sample_mask'] = sample_mask
-                            desc = 'desc-cleanscrubbed'
-                        else:
-                            desc = 'desc-clean'
                         mesh = surface.PolyMesh(left=surf_L_path, right=surf_R_path)
                         data = surface.PolyData(left=func_path, right=func_path.replace('_hemi-L_', '_hemi-R_'))
                         img = surface.SurfaceImage(mesh, data)

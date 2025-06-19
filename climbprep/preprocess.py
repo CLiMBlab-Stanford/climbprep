@@ -3,6 +3,7 @@ import yaml
 import argparse
 
 from climbprep.constants import *
+from climbprep.util import *
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser('Run fMRIprep on a participant')
@@ -58,5 +59,5 @@ if __name__ == '__main__':
     cmd = f'fmriprep {" ".join(args)}'
     cmd = f'''singularity exec {FMRIPREP_IMG} bash -c "{cmd}"'''
 
-    print(cmd)
+    stderr(cmd + '\n')
     os.system(cmd)

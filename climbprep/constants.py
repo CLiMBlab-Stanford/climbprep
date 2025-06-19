@@ -73,7 +73,7 @@ DEFAULTS = dict(
     ),
     model=dict(
         mni=dict(
-            model_label='main',
+            model_label='mni',
             preprocessing_label='main',
             smoothing_fwhm=4,
             space='MNI152NLin2009cAsym',
@@ -81,7 +81,7 @@ DEFAULTS = dict(
             drop_missing=True
         ),
         T1w=dict(
-            model_label='main',
+            model_label='T1w',
             preprocessing_label='main',
             smoothing_fwhm=4,
             space='T1w',
