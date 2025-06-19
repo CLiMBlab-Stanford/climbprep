@@ -8,6 +8,7 @@ MODELFILES_PATH = os.path.join(LAB_PATH, 'modelfiles')
 FS_LICENSE_PATH = os.path.join(LAB_PATH, 'freesurfer', 'license.txt')
 DEFAULT_TASK = 'UnknownTask'
 FMRIPREP_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fmriprep.simg')
+FITLINS_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fitlins.simg')
 
 SPACE_RE = re.compile('.+_space-([a-zA-Z0-9]+)_')
 RUN_RE = re.compile('.+_run-([0-9]+)_')
