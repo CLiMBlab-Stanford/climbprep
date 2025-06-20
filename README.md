@@ -208,8 +208,9 @@ allow these sample masks to be passed as a parameter to functions.
 ### model
 
 The modeling step generates first-level analyses (participant-specific
-statmaps) from task fMRI data. It can only be run after preprocessing
-is complete. o clean a participant's data,
+statmaps) from task fMRI data. Modeling uses the 
+[fitlins](https://fitlins.readthedocs.io/en/latest/index.html) library.
+It can only be run after preprocessing is complete. To model a participant,
 run:
 
     python -m climblab.model <PARTICIPANT_ID> -p <PROJECT_ID>
@@ -235,3 +236,20 @@ and `MODEL_NAME` refers to the standard  name for the model (`PREFIX`
 in `PREFIX_model.json` in the model's filename). To run
 a subset of available models, you can pass their names as a space-delimited
 list using the `-m` option.
+
+How do you decide whether a model variant is a reparameterization of the
+same model (a different `MODEL_LABEL`) or a different model (a different
+`MODEL_NAME`)? The distinction is a bit arbitrarily determined by the
+BIDS Stats Models specification: any variation that requires a different
+`model.json` file is a different model (`MODEL_NAME`), whereas any variation
+that is just a different function call of `fitlins` on the same model file
+is a reparameterization (`MODEL_LABEL`). For example, the `mni` and `T1w`
+configurations are both reparameterizations of the same model, because
+they both use the same model file, but they differ in the space in which
+the model is fit (MNI vs. native space). In contrast, different sets of
+nuisance regressors (movement, physiological noise, etc.) must be
+specified in the `model.json` file, so they are different models
+(`MODEL_NAME`), even if they are fit in the same space (e.g., MNI)
+using the same task data and conditions. If you're not sure how to
+implement a variant, consult the docs for `fitlins` and `BIDS Stats Models`.
+
