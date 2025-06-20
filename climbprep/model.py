@@ -130,10 +130,13 @@ if __name__ == '__main__':
 
         kwarg_strings = []
         for key in config:
+            if key == 'smoothing_method':
+                continue
             val = config[key]
             if key == 'smoothing_fwhm':
                 key = 'smoothing'
-                val = f'{val}:run:iso'
+                method = config.get('smoothing_method', 'isoblurto')
+                val = f'{val}:run:{method}'
             if isinstance(val, list) or isinstance(val, tuple):
                 val = ' '.join(val)
             key_str = '--%s' % key.replace('_', '-')
