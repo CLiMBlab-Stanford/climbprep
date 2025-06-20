@@ -72,7 +72,18 @@ if __name__ == '__main__':
             if 'TaskName' in row:
                 run_map[ix]['TaskName'] = row['TaskName']
             if 'EventsFile' in row and row['EventsFile'] and not pd.isna(row['EventsFile']):
-                run_map[ix]['EventsFile'] = os.path.join(src_path, row['EventsFile'])
+                eventsfile_path = row['EventsFile']  # Look for exact match
+                if not os.path.exists(eventsfile_path):
+                    eventsfile_path = os.path.join(src_path, row['EventsFile'])  # Look in sourcedata
+                if not os.path.exists(eventsfile_path):
+                    eventsfile_path = os.path.join(EVENTFILES_PATH, row['EventsFile'])  # Look in central store
+                assert os.path.exists(eventsfile_path), ('Eventsfile %s does not exist in %s, %s, or %s.' % (
+                                                             row['EventsFile'],
+                                                             os.getcwd(),
+                                                             src_path,
+                                                             EVENTFILES_PATH
+                                                        ))
+                run_map[ix]['EventsFile'] = eventsfile_path
 
         with TemporaryDirectory() as tmp_dir:
             if tmp_dir_ is not None:
