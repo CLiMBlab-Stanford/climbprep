@@ -81,6 +81,7 @@ DEFAULTS = dict(
             smoothing_method='iso',
             space='MNI152NLin2009cAsym',
             estimator='nilearn',
+            drift_model='cosine',
             drop_missing=True
         ),
         T1w=dict(
@@ -90,6 +91,7 @@ DEFAULTS = dict(
             smoothing_method='iso',
             space='T1w',
             estimator='nilearn',
+            drift_model='cosine',
             drop_missing=True
         )
     )
