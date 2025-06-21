@@ -49,15 +49,18 @@ if __name__ == '__main__':
             val = ' '.join(val)
         kwarg_strings.append(f'{key_str} {val}')
 
+    pybids_db_path = os.path.join(project_path, PYBIDS_DB_RELPATH)
+
     args = [
         project_path,
         out_path,
         'participant',
         f'--work-dir {work_path}',
         f'--participant-label {participant}',
+        f'--bids-database-dir {pybids_db_path}',
     ] + kwarg_strings
     cmd = f'fmriprep {" ".join(args)}'
     cmd = f'singularity exec {FMRIPREP_IMG} bash -c "{cmd}"'
 
-    stderr(cmd + '\n')
+    print(cmd)
     os.system(cmd)
