@@ -61,6 +61,8 @@ if __name__ == '__main__':
     fmriprep_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label)
     assert os.path.exists(fmriprep_path), 'Path not found: %s' % fmriprep_path
     modelfiles_path = MODELFILES_PATH
+    assert os.path.exists(modelfiles_path), 'Path not found: %s' % modelfiles_path
+
     model_library = set()
     task_to_models = {}
     for model in os.listdir(modelfiles_path):
@@ -152,12 +154,12 @@ if __name__ == '__main__':
                    f'--participant-label {participant}',
                    f'--model {modelfile}',
                    f'--derivatives {fmriprep_path}',
-                   f'--work-dir {work_path}',
+                   f'--work-dir {work_path}'
                ] + kwarg_strings
         cmd = " ".join(args)
         cmd = f'''singularity run {FITLINS_IMG} {cmd}'''
 
-        stderr(cmd + '\n')
+        print(cmd)
         status = os.system(cmd)
         if status:
             stderr('Command failed with status %d. Exiting.\n' % status)

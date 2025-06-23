@@ -10,7 +10,6 @@ FS_LICENSE_PATH = os.path.join(LAB_PATH, 'freesurfer', 'license.txt')
 DEFAULT_TASK = 'UnknownTask'
 FMRIPREP_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fmriprep.simg')
 FITLINS_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fitlins.simg')
-PYBIDS_DB_RELPATH = os.path.join('code', 'pybids_db')
 
 SPACE_RE = re.compile('.+_space-([a-zA-Z0-9]+)_')
 RUN_RE = re.compile('.+_run-([0-9]+)_')
