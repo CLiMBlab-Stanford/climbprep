@@ -29,6 +29,7 @@ DEFAULTS = dict(
     clean=dict(
         fc=dict(
             cleaning_label='fc',
+            clean_surf=False,
             preprocessing_label='main',
             strategy=(
                 'global_signal',
@@ -51,6 +52,7 @@ DEFAULTS = dict(
         ),
         firstlevels_like=dict(
             cleaning_label='firstlevels',
+            clean_surf=False,
             preprocessing_label='main',
             strategy=(
                 'global_signal',

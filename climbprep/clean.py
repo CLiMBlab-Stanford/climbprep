@@ -45,6 +45,7 @@ if __name__ == '__main__':
     assert 'preprocessing_label' in config, 'Required field `preprocessing_label` not found in config. ' \
                                             'Please provide a valid config file or keyword.'
     preprocessing_label = config['preprocessing_label']
+    clean_surf = config['clean_surf']
 
     # Set session-agnostic paths
     project_path = os.path.join(BIDS_PATH, args.project)
@@ -116,7 +117,7 @@ if __name__ == '__main__':
                     datasets[space][task][run]['mask'] = mask
                     datasets[space][task][run]['confounds'] = confounds
                     datasets[space][task][run]['TR'] = TR
-            elif img_path.endswith('_bold.func.gii') and '_hemi-L_' in img_path:
+            elif clean_surf and img_path.endswith('_bold.func.gii') and '_hemi-L_' in img_path:
                 space = SPACE_RE.match(img_path)
                 run = RUN_RE.match(img_path)
                 task = TASK_RE.match(img_path)
@@ -182,7 +183,7 @@ if __name__ == '__main__':
 
                     _sample_mask = pd.DataFrame(dict(sample_mask=list(sample_mask)))
                     sample_mask_path = os.path.join(
-                        out_dir, func_file.replace('_bold.nii.gz', '_samplemask.tsv')
+                        out_dir, func_file.replace('_bold.nii.gz', '_samplemask.tsv').replace('_bold.func.gii', '_samplemask.tsv')
                     )
                     _sample_mask.to_csv(sample_mask_path, sep='\t', index=False)
 
@@ -207,14 +208,14 @@ if __name__ == '__main__':
                         kwargs = dict(confounds=confounds)
                         desc = 'desc-clean'
                         if config['scrub']:
-                            kwargs['sample_mask'] = sample_mask[i]
+                            kwargs['sample_mask'] = sample_mask
                         run = masker.fit_transform(func_path, **kwargs)
                         run = masker.inverse_transform(run)
                         run_path = os.path.join(
                             out_dir, func_file.replace('desc-preproc', desc)
                         )
                         run.to_filename(run_path)
-                    elif type_by_space[space] == 'surf':  # Surface data
+                    elif clean_surf and type_by_space[space] == 'surf':  # Surface data
                         mask_nii = None
                         if space == 'fsnative':
                             space_str = ''
