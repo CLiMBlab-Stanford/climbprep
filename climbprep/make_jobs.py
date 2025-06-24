@@ -57,15 +57,9 @@ if __name__ == '__main__':
     participants = args.participants
     project = args.project
     sourcedata_path = os.path.join(BIDS_PATH, project, 'sourcedata')
-    if os.path.exists(sourcedata_path):
-        skip_bidsify = False
-    else:
-        skip_bidsify = True
     if not participants:
-        if skip_bidsify:
-            participants = [x for x in os.listdir(os.path.join(BIDS_PATH, project)) if x.startswith('sub-')]
-        else:
-            participants = [x for x in os.listdir(sourcedata_path) if x.startswith('sub-')]
+        participants = set([x for x in os.listdir(os.path.join(BIDS_PATH, project)) if x.startswith('sub-')]) | \
+                set([x for x in os.listdir(sourcedata_path) if x.startswith('sub-')])
     participants = [x.replace('sub-', '') for x in participants]
     job_types = args.job_types
     time = args.time

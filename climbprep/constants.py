@@ -2,6 +2,8 @@ import re
 import os
 
 LAB_PATH = os.path.normpath(os.path.join('/', 'juice6', 'u', 'nlp', 'climblab'))
+APPTAINER_PATH = os.path.normpath(os.path.join(LAB_PATH, 'apptainer'))
+CODE_PATH = os.path.normpath(os.path.join(LAB_PATH, 'code'))
 BIDS_PATH = os.path.join(LAB_PATH, 'BIDS')
 WORK_PATH = os.path.join(LAB_PATH, 'work')
 EVENTFILES_PATH = os.path.join(LAB_PATH, 'eventfiles')
@@ -123,12 +125,12 @@ if [ -d "$HOME/bin" ] ; then
     PATH="$HOME/bin:$PATH"
 fi'''
 
-BASHRC = r'''export APPTAINER_BIND=/juice6/u/nlp/climblab,/juice6/u/{{USER}},/juice6/scr6/{{USER}},/afs/cs.stanford.edu/u/{{USER}}/BIDS,/afs/cs.stanford.edu/u/{{USER}}/{{USER}},/afs/cs.stanford.edu/u/{{USER}}/code
+BASHRC = r'''export APPTAINER_BIND={{LAB_PATH}},/juice6/u/{{USER}},/juice6/scr6/{{USER}},/afs/cs.stanford.edu/u/{{USER}}/BIDS,/afs/cs.stanford.edu/u/{{USER}}/{{USER}},/afs/cs.stanford.edu/u/{{USER}}/code
 export APPTAINER_CACHEDIR=/juice6/u/{{USER}}/.apptainer/cache
-export FREESURFER_HOME=/juice6/u/nlp/climblab/freesurfer
-export PATH=$PATH:/u/nlp/bin:/usr/local/cuda:/juice6/u/nlp/climblab/apptainer/bin
-export PYTHONPATH='.'
-export TMPDIR=/juice6/u/nlp/climblab/tmp
+export FREESURFER_HOME={{LAB_PATH}}/freesurfer
+export PATH=$PATH:/u/nlp/bin:/usr/local/cuda:{{APPTAINER_PATH}}/bin:{{CODE_PATH}}/climbprep
+export PYTHONPATH=$PYTHONPATH:{{CODE_PATH}}/climbprep
+export TMPDIR={{LAB_PATH}}/tmp
 
 export SQUEUE_FORMAT="%.10i %9P %35j %.8u %.2t %.12M %.12L %.5C %.7m %.4D %b %R"
 
