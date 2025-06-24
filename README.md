@@ -73,7 +73,11 @@ project. This codebase provides a utility for doing so
 ## Usage: Core Functions
 
 Full help strings for all the utilities below can be obtained by running
-the command with the `-h` argument.
+the command with the `-h` argument. Note that when you are on the cluster,
+as long as you have run `quickstart`, `climbprep` will be in your `PATH`
+and available anywhere, and you can actually run all the commands below
+without the `python -m climbprep.` (i.e., `python -m climbprep.preprocess`
+will be equivalent to `preprocess`).
 
 ### bidsify
 
