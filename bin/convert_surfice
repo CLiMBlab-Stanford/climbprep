@@ -1,0 +1,2 @@
+args="$@"
+python -m climbprep.convert_surfice $args

@@ -276,7 +276,7 @@ umask 002
 BASHRC_CLIMBLAB = r'''export APPTAINER_BIND={{LAB_PATH}},/juice6/u/{{USER}},/juice6/scr6/{{USER}},/afs/cs.stanford.edu/u/{{USER}}/BIDS,/afs/cs.stanford.edu/u/{{USER}}/{{USER}},/afs/cs.stanford.edu/u/{{USER}}/code
 export APPTAINER_CACHEDIR=/juice6/u/{{USER}}/.apptainer/cache
 export FREESURFER_HOME={{LAB_PATH}}/freesurfer
-export PATH=$PATH:/u/nlp/bin:/usr/local/cuda:{{APPTAINER_PATH}}/bin:{{CODE_PATH}}/climbprep
+export PATH=$PATH:/u/nlp/bin:/usr/local/cuda:{{APPTAINER_PATH}}/bin:{{CODE_PATH}}/climbprep/bin
 export PYTHONPATH=$PYTHONPATH:{{CODE_PATH}}/climbprep
 export TMPDIR={{LAB_PATH}}/tmp
 '''

@@ -1,0 +1,2 @@
+args="$@"
+python -m climbprep.preprocess $args
