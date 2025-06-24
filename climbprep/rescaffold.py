@@ -23,6 +23,8 @@ if __name__ ==  '__main__':
     args = argparser.parse_args()
 
     project = args.project
+
+    # Infer relevant participants and sessions
     participants = set(args.participants) or None
     if participants:
         participants_ = set()
@@ -115,6 +117,7 @@ if __name__ ==  '__main__':
         stderr('No matching sessions found. Exiting.\n')
         exit()
 
+    # Minimally update new project's metadata to pass validation
     project_path = os.path.join(BIDS_PATH, project)
     if not os.path.exists(project_path):
         stderr(f'Project path {project_path} not found, automatically scaffolding.\n')
@@ -141,19 +144,21 @@ if __name__ ==  '__main__':
         with open(os.path.join(BIDS_PATH, project, 'README'), 'w') as f:
             f.write(readme_str)
 
+    # Add symlinks to sourcedata
     for participant in participants:
-        participant_path = os.path.join(project_path, f'sub-{participant}')
+        participant_path = os.path.join(project_path, 'sourcedata', f'sub-{participant}')
         if not os.path.exists(participant_path):
             stderr(f'Participant path {participant_path} not found, creating.\n')
             os.makedirs(participant_path)
 
         for session in id_to_sessions[participant]:
             session_path = os.path.join(participant_path, f'ses-{session}')
-            source_path = os.path.join(climblab_project_path, f'sub-{session}')
+            source_path = os.path.join(climblab_project_path, 'sourcedata', f'sub-{session}')
             if not os.path.exists(session_path):
                 stderr(f'Session path {session_path} not found, creating.\n')
                 os.symlink(source_path, session_path, target_is_directory=True)
 
+    # Clear incorrect BIDSified data
     for participant_path in os.listdir(project_path):
         if participant_path.startswith('sub-'):
             participant = participant_path[4:]
@@ -163,4 +168,17 @@ if __name__ ==  '__main__':
                 for session_path in os.listdir(os.path.join(project_path, participant_path)):
                     session = session_path[4:]
                     if session not in sessions:
-                        os.remove(os.path.join(project_path, participant_path, session_path))
+                        shutil.rmtree(os.path.join(project_path, participant_path, session_path))
+
+    # Clear incorrect sourcedata links
+    sourcedata_path = os.path.join(project_path, 'sourcedata')
+    for participant_path in os.listdir(sourcedata_path):
+        if participant_path.startswith('sub-'):
+            participant = participant_path[4:]
+            if participant not in participants:
+                shutil.rmtree(os.path.join(sourcedata_path, participant_path))
+            else:
+                for session_path in os.listdir(os.path.join(sourcedata_path, participant_path)):
+                    session = session_path[4:]
+                    if session not in sessions:
+                        os.remove(os.path.join(sourcedata_path, participant_path, session_path))

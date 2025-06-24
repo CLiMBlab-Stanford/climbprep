@@ -109,9 +109,8 @@ if __name__ == '__main__':
                 if job_type not in job_types:
                     continue
                 if job_type.lower() == 'bidsify':
-                    if not skip_bidsify:
-                        job_str = wrapper % ('python -m climbprep.bidsify %s -p %s%s\n' %
-                                             (participant, project, bidsify_config_str))
+                    job_str = wrapper % ('python -m climbprep.bidsify %s -p %s%s\n' %
+                                         (participant, project, bidsify_config_str))
                 elif job_type.lower() == 'preprocess':
                     job_str = wrapper % ('python -m climbprep.preprocess %s -p %s%s\n' %
                                          (participant, project, preprocess_config_str))
