@@ -63,7 +63,6 @@ if __name__ == '__main__':
     modelfiles_path = MODELFILES_PATH
     assert os.path.exists(modelfiles_path), 'Path not found: %s' % modelfiles_path
 
-    model_library = set()
     task_to_models = {}
     for model in os.listdir(modelfiles_path):
         ix = max(0, len(model) - 11)
@@ -71,7 +70,6 @@ if __name__ == '__main__':
         suffix = model[ix:]
         assert suffix == '_model.json', 'Bad model file: %s (does not end with `_model.json`)' % model
         assert name.isidentifier(), 'Bad model file: %s (%s is not a valid Python identifier)' % (model, name)
-        model_library.add(name)
         with open(os.path.join(modelfiles_path, model), 'r') as f:
             model_config = json.load(f)
         key1 = 'Input'
@@ -90,36 +88,38 @@ if __name__ == '__main__':
                 task_to_models[task] = set()
             task_to_models[task].add(name)
 
-    if infer_models:
-        sessions = set()
-        for subdir in os.listdir(os.path.join(project_path, 'sub-%s' % participant)):
-            if subdir.startswith('ses-') and os.path.isdir(os.path.join(project_path, 'sub-%s' % participant, subdir)):
-                sessions.add(subdir[4:])
-        if not sessions:
-            sessions = {None}
-        for session in sessions:
-            # Set session-dependent paths
-            subdir = 'sub-%s' % participant
-            if session:
-                subdir = os.path.join(subdir, 'ses-%s' % session)
-                session_str = '_ses-%s' % session
-            else:
-                session_str = ''
-            raw_path = os.path.join(project_path, subdir, 'func')
-            assert os.path.exists(raw_path), 'Path not found: %s' % raw_path
+    available_models = set()
+    sessions = set()
+    for subdir in os.listdir(os.path.join(project_path, 'sub-%s' % participant)):
+        if subdir.startswith('ses-') and os.path.isdir(os.path.join(project_path, 'sub-%s' % participant, subdir)):
+            sessions.add(subdir[4:])
+    if not sessions:
+        sessions = {None}
+    for session in sessions:
+        # Set session-dependent paths
+        subdir = 'sub-%s' % participant
+        if session:
+            subdir = os.path.join(subdir, 'ses-%s' % session)
+            session_str = '_ses-%s' % session
+        else:
+            session_str = ''
+        raw_path = os.path.join(project_path, subdir, 'func')
+        assert os.path.exists(raw_path), 'Path not found: %s' % raw_path
 
-            for path in os.listdir(raw_path):
-                if path.endswith('_bold.nii.gz'):
-                    task = TASK_RE.match(path)
-                    if task:
-                        task = task.group(1)
-                        if task in task_to_models:
-                            models |= task_to_models[task]
+        for path in os.listdir(raw_path):
+            if path.endswith('_bold.nii.gz'):
+                task = TASK_RE.match(path)
+                if task:
+                    task = task.group(1)
+                    if task in task_to_models:
+                        available_models |= task_to_models[task]
+    if infer_models:
+        models = available_models
     else:
-        missing = models - model_library
+        missing = models - available_models
         if missing:
             stderr('The following models are not available in the model library: %s. Skipping.\n' % ', '.join(missing))
-        models_ = models & model_library
+        models_ = models & available_models
         if not models_:
             stderr('No valid models specified. Exiting.\n')
             exit()

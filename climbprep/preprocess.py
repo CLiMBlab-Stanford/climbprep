@@ -8,8 +8,8 @@ from climbprep.util import *
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser('Run fMRIprep on a participant')
     argparser.add_argument('participant', help='BIDS participant ID')
-    argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", "evlab", '
-                                                                        'etc.). Default: "climblab"'))
+    argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", '
+                                                                        '"evlab", etc.). Default: "climblab"'))
     argparser.add_argument('-c', '--config', default='main', help=('Keyword (currently `main`) '
         'or YAML config file to used to parameterize preprocessing. If a keyword is provided, will '
         'the default settings for associated with that keyword. '

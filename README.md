@@ -1,14 +1,29 @@
 # climbprep
 
 An in-house repository to streamline and standardize preprocessing and analysis
-of fMRI data in Stanford's CLiMB Lab.
+of fMRI data in Stanford's CLiMB Lab. This codebase based is designed
+to be run on the lab's cluster and will only work there, because it uses/enforces
+assumptions about the organization of our central data store. However,
+external users are welcome to fork the codebase and adjust the underlying paths
+(`climbprep/constants.py`) to suit their own needs.
 
 
-## Installation
+## Getting Started
 
-Installation is just a matter of setting up an [Anaconda](https://www.anaconda.com/) environment
-with the right software dependencies. Once you have Anaconda installed, you can create the
-environment by running the following command in the terminal:
+New lab members can get everything initialized in one go by running:
+
+    python -m climbprep.quickstart
+
+Note that this script is interactive and your responses will be required at points.
+QUICKSTART NOT YET IMPLEMENTED!
+
+Alternatively, you can set manually. This will involve setting up your `~/.profile` and 
+`~/.bashrc` files following the instructions in the 
+[cluster onboarding docs](https://docs.google.com/document/d/1nlpqFCRX4wo-gqa84rA9X0DaYYIPNFjB9dgFl3RUjlQ/edit),
+adding the environment variables from the `BASHRC` constant in 
+`climbprep/constants.py`, installing [Anaconda](https://www.anaconda.com/) to
+`/nlp/scr/USERNAME/miniconda3/bin/conda`, and installing the `climbprep` environment
+like so:
 
 ```bash
 conda env create -f conda.yml
@@ -22,77 +37,43 @@ conda activate climbprep
 ```
 
 
-## Modifying the pipeline
+## Preliminaries
 
-Contributions to this codebase from lab members are welcome! Just please make sure
-to work in a branch/fork and submit a pull request for review before merging
-any changes to the main branch.
+Our general BIDS super-directory is found at `/juice6/u/nlp/climblab/BIDS`.
+Each subdirectory is a BIDS project. New projects can be created as needed.
+The lab's main project is `climblab`, which contains all the non-development
+data that we have collected on site. Development data (data collected on
+development hours at the CNI) cannot be used in published research and must
+be put in the `dev` project.
 
-One probably frequent modification scenario is if there's some new configuration
-for one of these steps that is likely to be generally useful to the lab, and you
-want to make it conveniently available lab-wide by keyword rather than having
-to pass around config files. The codebase is set up to facilitate these kinds of
-changes by placing all constants, including default configurations, in the
-`climbprep/constants.py` file, allowing them to be easily changed or expanded
-without affecting core functionality. If you want to expand existing keyword-
-accessible configurations, you can freely add configurations to `constants.py`.
+The `climblab` project has a somewhat unusual organization: although we
+often collect multiple sessions from an individual, the project does
+not have a multisession structure. Instead, the `participant` level of
+the project indexes the session based on its `flywheel` ID, irrespective
+of whether other data from that participant exists in the project.
+There are two reasons for this:
+1. The mapping from sessions to projects is often many-to-many
+2. We want to avoid multisession aggregation by fMRIprep, which can change published results
+
+Instead, the identity of the participant is tracked via the `climblab_id`
+field of `participants.tsv`, which is a unique identifier for each
+individual. This lets you easily find all sessions from a participant.
+The `climblab_id` can only be maintained by core lab members with access
+to the high-risk database, since we need identifiers to link
+sessions to participants. You can contact the core team as needed if
+you are unable to find the ID for a participant (e.g., for newly-collected
+data).
+
+If you want to do multisession analyses, the correct approach is to
+"rescaffold" the relevant subset of `climblab` data into a new BIDS
+project. This codebase provides a utility for doing so
+(see `rescaffold` below).
 
 
-## Usage
+## Usage: Core Functions
 
 Full help strings for all the utilities below can be obtained by running
 the command with the `-h` argument.
-
-
-### make_jobs
-
-Many of the utilities in this repository are compute/memory intensive and are
-thus intended to be run in parallel on the cluster. For convenience, you can
-generate batch scripts for different types of jobs and submit them to the
-scheduler. To do this, run:
-
-    python -m climbprep.make_jobs <PARTICIPANT_ID>( <PARTICIPANT_ID>)* -p <PROJECT_ID>
-
-(the `-p` option can be omitted if the project is `climblab`).
-By default, this will run the participant (and if relevant any component sessions)
-sequentially through the entire climbprep pipeline, from bidsification through cleaning.
-If you have a subset of steps you want to run, you can specify them as a space-delimited
-list using the `-j` option.
-
-Run the above with `-h` to see all available command line options.
-
-The result will be a collection of files with the suffix `*.pbs` (in the
-current working directory by default, although this can be configured),
-each containing a batch script for the SLURM scheduler. You can submit
-these individually using the standard SLURM interface:
-
-    sbatch <FILE>.pbs
-
-Or you can use the `sbatch.sh` script to submit many at once:
-
-    ./sbatch.sh *.pbs
-
-Logs from stdin/err for each script will be written to a matching file
-in the current working directory with the suffix `*.out`.
-
-
-### repair
-
-Much of the global repository metadata, especially `participants.tsv`, can
-be automatically generated from the project data itself, so a utility is
-provided to do this. Currently, repair only updates `participants.tsv`,
-and it does so by removing any participants who don't have a subdirectory
-and adding any missing participants who do have a subdirectory. It also
-automatically generates a column `tasks` containing a comma-delimited
-list of all tasks in the participant's `func` folder(s), to enable easy
-searching for specific tasks. To perform repair, run:
-
-    python -m climbprep.repair
-
-Because `repair` modifies global files, *it should not be run in parallel*.
-Only run it if you are confident that no one else in the group is running
-`repair` or editing a `participants.tsv` file.
-
 
 ### bidsify
 
@@ -104,9 +85,8 @@ facilitate secondary analyses. The current set of projects are:
 - `climblab` (the main project)
 - `evlab` (data from the Fedorenko Lab)
 
-Our general BIDS directory is found at `/juice6/u/nlp/climblab/BIDS`.
-Each project is a subdirectory. To BIDSify new fMRI source data,
-first copy the new source directory (in any format supported by dcm2bids)
+To BIDSify new fMRI source data,
+first copy the new source directory (in any format supported by `dcm2bids`)
 to `/juice6/u/nlp/climblab/BIDS/<project>/sourcedata/sub-<subjectID>`,
 replacing all bracketed variables with appropriate values. Subject
 IDs must follow BIDS naming conventions.
@@ -252,4 +232,92 @@ specified in the `model.json` file, so they are different models
 (`MODEL_NAME`), even if they are fit in the same space (e.g., MNI)
 using the same task data and conditions. If you're not sure how to
 implement a variant, consult the docs for `fitlins` and `BIDS Stats Models`.
+
+
+## Usage: Helper Functions
+
+
+### make_jobs
+
+Many of the utilities in this repository are compute/memory intensive and are
+thus intended to be run in parallel on the cluster. For convenience, you can
+generate batch scripts for different types of jobs and submit them to the
+scheduler. To do this, run:
+
+    python -m climbprep.make_jobs <PARTICIPANT_ID>( <PARTICIPANT_ID>)* -p <PROJECT_ID>
+
+(the `-p` option can be omitted if the project is `climblab`).
+By default, this will run the participant (and if relevant any component sessions)
+sequentially through the entire climbprep pipeline, from bidsification through cleaning.
+If you have a subset of steps you want to run, you can specify them as a space-delimited
+list using the `-j` option.
+
+Run the above with `-h` to see all available command line options.
+
+The result will be a collection of files with the suffix `*.pbs` (in the
+current working directory by default, although this can be configured),
+each containing a batch script for the SLURM scheduler. You can submit
+these individually using the standard SLURM interface:
+
+    sbatch <FILE>.pbs
+
+Or you can use the `sbatch.sh` script to submit many at once:
+
+    ./sbatch.sh *.pbs
+
+Logs from stdin/err for each script will be written to a matching file
+in the current working directory with the suffix `*.out`.
+
+
+### repair
+
+Much of the global repository metadata, especially `participants.tsv`, can
+be automatically generated from the project data itself, so a utility is
+provided to do this. Currently, repair only updates `participants.tsv`,
+and it does so by removing any participants who don't have a subdirectory
+and adding any missing participants who do have a subdirectory. It also
+automatically generates a column `tasks` containing a comma-delimited
+list of all tasks in the participant's `func` folder(s), to enable easy
+searching for specific tasks. To perform repair, run:
+
+    python -m climbprep.repair
+
+Because `repair` modifies global files, *it should not be run in parallel*.
+Only run it if you are confident that no one else in the group is running
+`repair` or editing a `participants.tsv` file.
+
+
+### rescaffold
+
+If you want to run multisession analyses, you need to "rescaffold" the
+relevant subset of `climblab` data into a new BIDS project so that fMRIprep
+can correctly transform the multisession data into a shared anatomical space.
+You can rescaffold the entire dataset, which will produce a copy of `climblab`
+in which sessions are organized by subject. You can also provide a set
+of `climblab_id`'s or task names (either space-delimited in the command line
+or a path to a textfile containing the list, one item per line) to rescaffold 
+only a subset of the data. To rescaffold, run:
+
+    python -m climbprep.rescaffold <OUTPUT_PROJECT_ID> [<CLIMBLAB_ID> ...]
+
+This tool will provide minimal BIDS metadata to the new project to pass
+validation, but it is strongly recommended to enrich the metadata before
+publication/release.
+
+
+## Modifying the pipeline
+
+Contributions to this codebase from lab members are welcome! Just please make sure
+to work in a branch/fork and submit a pull request for review before merging
+any changes to the main branch.
+
+One probably frequent modification scenario is if there's some new configuration
+for one of these steps that is likely to be generally useful to the lab, and you
+want to make it conveniently available lab-wide by keyword rather than having
+to pass around config files. The codebase is set up to facilitate these kinds of
+changes by placing all constants, including default configurations, in the
+`climbprep/constants.py` file, allowing them to be easily changed or expanded
+without affecting core functionality. If you want to expand existing keyword-
+accessible configurations, you can freely add configurations to `constants.py`.
+
 
