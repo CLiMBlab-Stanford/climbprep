@@ -14,7 +14,8 @@ FITLINS_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fitlins.simg')
 SPACE_RE = re.compile('.+_space-([a-zA-Z0-9]+)_')
 RUN_RE = re.compile('.+_run-([0-9]+)_')
 TASK_RE = re.compile('.+_task-([a-zA-Z0-9]+)_')
-HEMI_RE = re.compile('.+_task-([a-zA-Z0-9]+)_')
+CONTRAST_RE = re.compile('.+_contrast-([a-zA-Z0-9]+)_')
+HEMI_RE = re.compile('.+_hemi-([a-zA-Z0-9]+)_')
 
 DEFAULTS = dict(
     preprocess=dict(
