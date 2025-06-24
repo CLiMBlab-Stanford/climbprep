@@ -125,13 +125,14 @@ if [ -d "$HOME/bin" ] ; then
     PATH="$HOME/bin:$PATH"
 fi'''
 
-BASHRC = r'''export APPTAINER_BIND={{LAB_PATH}},/juice6/u/{{USER}},/juice6/scr6/{{USER}},/afs/cs.stanford.edu/u/{{USER}}/BIDS,/afs/cs.stanford.edu/u/{{USER}}/{{USER}},/afs/cs.stanford.edu/u/{{USER}}/code
-export APPTAINER_CACHEDIR=/juice6/u/{{USER}}/.apptainer/cache
-export FREESURFER_HOME={{LAB_PATH}}/freesurfer
-export PATH=$PATH:/u/nlp/bin:/usr/local/cuda:{{APPTAINER_PATH}}/bin:{{CODE_PATH}}/climbprep
-export PYTHONPATH=$PYTHONPATH:{{CODE_PATH}}/climbprep
-export TMPDIR={{LAB_PATH}}/tmp
+PROFILE_CLIMBLAB = '''
+if [ -n "$BASH_VERSION" ]; then
+    if [ -f "$HOME/.bashrc_climblab" ]; then
+        . "$HOME/.bashrc_climblab"
+    fi
+fi'''
 
+BASHRC = r'''
 export SQUEUE_FORMAT="%.10i %9P %35j %.8u %.2t %.12M %.12L %.5C %.7m %.4D %b %R"
 
 # ~/.bashrc: executed by bash(1) for non-login shells.
@@ -270,4 +271,12 @@ if [ ! $ANACONDA_ENV == '' ]; then
 fi
 
 umask 002
+'''
+
+BASHRC_CLIMBLAB = r'''export APPTAINER_BIND={{LAB_PATH}},/juice6/u/{{USER}},/juice6/scr6/{{USER}},/afs/cs.stanford.edu/u/{{USER}}/BIDS,/afs/cs.stanford.edu/u/{{USER}}/{{USER}},/afs/cs.stanford.edu/u/{{USER}}/code
+export APPTAINER_CACHEDIR=/juice6/u/{{USER}}/.apptainer/cache
+export FREESURFER_HOME={{LAB_PATH}}/freesurfer
+export PATH=$PATH:/u/nlp/bin:/usr/local/cuda:{{APPTAINER_PATH}}/bin:{{CODE_PATH}}/climbprep
+export PYTHONPATH=$PYTHONPATH:{{CODE_PATH}}/climbprep
+export TMPDIR={{LAB_PATH}}/tmp
 '''
