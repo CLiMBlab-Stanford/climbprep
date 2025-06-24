@@ -26,7 +26,7 @@ adding the environment variables from the `BASHRC` constant in
 like so:
 
 ```bash
-conda env create -f conda.yml
+conda env create -f climbprep/resources/conda.yml
 ```
 
 This will create a new environment called `climbprep` with all the necessary dependencies,
