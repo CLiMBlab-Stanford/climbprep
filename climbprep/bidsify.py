@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     sessions = set()
     for subdir in os.listdir(os.path.join(sourcedata_path, 'sub-%s' % participant)):
-        if subdir.startswith('ses-') and os.path.isdir(os.path.join(project_path, 'sub-%s' % participant, subdir)):
+        if subdir.startswith('ses-') and os.path.isdir(os.path.join(sourcedata_path, 'sub-%s' % participant, subdir)):
             sessions.add(subdir[4:])
     if not sessions:
         sessions = {None}
