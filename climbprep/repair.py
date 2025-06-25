@@ -24,8 +24,8 @@ if __name__ == '__main__':
         project_path = os.path.join(BIDS_PATH, project)
         participants_path = os.path.join(project_path, 'participants.tsv')
         participants = pd.read_csv(participants_path, sep='\t')
-        participants.participant_id = participants.participant_id.str.replace('^sub-', '', regex=True)
-        participants_BIDS = [x[4:] for x in os.listdir(project_path) if x.startswith('sub-')]
+        participants.participant_id = participants.participant_id.apply(lambda x: x if x.startswith('sub-') else f'sub-{x}')
+        participants_BIDS = [x for x in os.listdir(project_path) if x.startswith('sub-')]
         participants = participants[participants.participant_id.isin(participants_BIDS)]
         participants_found = set(participants.participant_id.tolist())
         participants_missing = pd.DataFrame(dict(participant_id=list(set(participants_BIDS) - participants_found)))
@@ -36,7 +36,7 @@ if __name__ == '__main__':
                 participants[col] = participants[col].astype('Int64')
         tasks = []
         for participant in participants.participant_id.tolist():
-            path = os.path.join(project_path, f'sub-{participant}')
+            path = os.path.join(project_path, participant)
             sessions = []
             for _path in os.listdir(path):
                 if _path.startswith('ses-'):
