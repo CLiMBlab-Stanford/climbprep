@@ -11,7 +11,7 @@ MODELFILES_PATH = os.path.join(LAB_PATH, 'modelfiles')
 FS_LICENSE_PATH = os.path.join(LAB_PATH, 'freesurfer', 'license.txt')
 DEFAULT_TASK = 'UnknownTask'
 FMRIPREP_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fmriprep.simg')
-FITLINS_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fitlins.simg')
+FITLINS_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fitlins-climbprep.sif')
 
 SPACE_RE = re.compile('.+_space-([a-zA-Z0-9]+)_')
 RUN_RE = re.compile('.+_run-([0-9]+)_')
@@ -276,7 +276,7 @@ umask 002
 BASHRC_CLIMBLAB = r'''export APPTAINER_BIND={{LAB_PATH}},/juice6/u/{{USER}},/juice6/scr6/{{USER}},/afs/cs.stanford.edu/u/{{USER}}/BIDS,/afs/cs.stanford.edu/u/{{USER}}/{{USER}},/afs/cs.stanford.edu/u/{{USER}}/code
 export APPTAINER_CACHEDIR=/juice6/u/{{USER}}/.apptainer/cache
 export FREESURFER_HOME={{LAB_PATH}}/freesurfer
-export PATH=$PATH:/u/nlp/bin:/usr/local/cuda:{{APPTAINER_PATH}}/bin:{{CODE_PATH}}/climbprep/bin
+export PATH=$PATH:/u/nlp/bin:/usr/local/cuda:{{APPTAINER_PATH}}/bin:{{CODE_PATH}}/climbprep/bin:{{LAB_PATH}}/bin
 export PYTHONPATH=$PYTHONPATH:{{CODE_PATH}}/climbprep
 export TMPDIR={{LAB_PATH}}/tmp
 '''

@@ -68,7 +68,8 @@ if __name__ == '__main__':
         ix = max(0, len(model) - 11)
         name = model[:ix]
         suffix = model[ix:]
-        assert suffix == '_model.json', 'Bad model file: %s (does not end with `_model.json`)' % model
+        if not suffix == '_model.json':
+            continue
         assert name.isidentifier(), 'Bad model file: %s (%s is not a valid Python identifier)' % (model, name)
         with open(os.path.join(modelfiles_path, model), 'r') as f:
             model_config = json.load(f)

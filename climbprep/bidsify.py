@@ -7,6 +7,7 @@ import pandas as pd
 import argparse
 
 from climbprep.constants import *
+from climbprep.util import *
 
 
 if __name__ == '__main__':
@@ -38,6 +39,10 @@ if __name__ == '__main__':
     participant = args.participant.replace('sub-', '')
     tmp_dir_ = args.tmp_dir
     config_path = args.config
+    if config_path:
+        user_config = True
+    else:
+        user_config = False
     overwrite = args.overwrite
 
     # Set session-agnostic paths
@@ -88,7 +93,12 @@ if __name__ == '__main__':
         with TemporaryDirectory() as tmp_dir:
             if tmp_dir_ is not None:
                 tmp_dir = tmp_dir_
-            os.system('dcm2bids_helper -d %s -o %s' % (src_path, tmp_dir))
+            cmd = 'dcm2bids_helper -d %s -o %s' % (src_path, tmp_dir)
+            print(cmd)
+            status = os.system(cmd)
+            if status:
+                stderr('Error during dcm2bids. Exiting\n.')
+                exit(status)
             descriptions = []
             for jsonpath in sorted(
                     [x for x in os.listdir(os.path.join(tmp_dir, 'tmp_dcm2bids', 'helper')) if x.endswith('.json')]
@@ -126,9 +136,7 @@ if __name__ == '__main__':
 
             descriptions = dict(descriptions=descriptions)
 
-            if config_path:
-                config_path = config_path
-            else:
+            if not user_config:
                 config_path = os.path.join(src_path, 'dcm2bids_config.json')
                 with open(config_path, 'w') as f:
                     json.dump(descriptions, f, indent=2)
@@ -141,9 +149,14 @@ if __name__ == '__main__':
                 session_str = ' -s %s' % session
             else:
                 session_str = ''
-            os.system('dcm2bids -d %s -p %s%s -c %s -o %s --auto_extract_entities%s --skip_dcm2niix --force_dcm2bids' %
-                      (os.path.join(tmp_dir, 'tmp_dcm2bids', 'helper'), participant, session_str, config_path,
-                       project_path, overwrite_str))
+            cmd = ('dcm2bids -d %s -p %s%s -c %s -o %s --auto_extract_entities%s --skip_dcm2niix --force_dcm2bids' %
+                   (os.path.join(tmp_dir, 'tmp_dcm2bids', 'helper'), participant, session_str, config_path,
+                    project_path, overwrite_str))
+            print(cmd)
+            status = os.system(cmd)
+            if status:
+                stderr('Error during dcm2bids. Exiting\n.')
+                exit(status)
 
             dirnames = ('anat', 'func', 'derived')
             for dirname in dirnames:
@@ -170,5 +183,5 @@ if __name__ == '__main__':
                             with open(filepath, 'w') as f:
                                 json.dump(sidecar, f, indent=2)
 
-            os.system('bids-validator %s' % project_path)
+    os.system('bids-validator %s' % project_path)
 

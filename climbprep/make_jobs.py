@@ -24,7 +24,7 @@ JOB_ORDER = [
     'bidsify',
     'preprocess',
     'clean',
-    'firstlevels'
+    'model'
 ]
 
 
