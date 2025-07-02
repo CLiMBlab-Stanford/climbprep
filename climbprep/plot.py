@@ -73,7 +73,7 @@ if __name__ == '__main__':
             dataset_description['PipelineDescription']['Parameters']['derivatives'][0]
         )
         space = dataset_description['PipelineDescription']['Parameters']['space']
-        if not 'mni' in space.lower() or space == 'T1w' or space == 'anat':
+        if not ('mni' in space.lower() or space == 'T1w' or space == 'anat'):
             raise ValueError(f'Plotting not supported for space {space}')
         if 'mni' in space.lower():
             mni_space = True
