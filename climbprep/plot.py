@@ -230,6 +230,6 @@ if __name__ == '__main__':
                     img_path = os.path.join(plot_path, out_path_base + '.png')
                     if not os.path.exists(plot_path):
                         os.makedirs(plot_path)
-                    new_im.save('%s.png' % img_path)
+                    new_im.save(img_path)
 
 
