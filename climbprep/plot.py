@@ -204,7 +204,6 @@ if __name__ == '__main__':
                                 l, t, r, b = w * 5 / 6, h * PLOT_VTRIM , w, h * (1 - PLOT_VTRIM)
                                 cbar_img = cbar_img.crop((l, t, r, b))
                             fig.data = fig.data[:1]
-                            fig.show()
                             fig_path = (tmp_dir + out_path_base + f'_hemi-{hemi}_view-{view}.png')
                             fig.write_image(
                                 fig_path,
