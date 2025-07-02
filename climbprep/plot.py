@@ -228,6 +228,8 @@ if __name__ == '__main__':
                         new_im.paste(im, (x_offset, 0))
                         x_offset += im.size[0]
                     img_path = (plot_path + out_path_base + '.png')
+                    if not os.path.exists(plot_path):
+                        os.makedirs(plot_path)
                     new_im.save('%s.png' % img_path)
 
 
