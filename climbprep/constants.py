@@ -17,7 +17,8 @@ FITLINS_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fitlins-climbprep.s
 DEFAULT_TASK = 'UnknownTask'
 PREPROCESS_DEFAULT_KEY = 'main'
 CLEAN_DEFAULT_KEY = 'fc'
-MODEL_DEFAULT_KEY = 'mni'
+MODEL_DEFAULT_KEY = 'T1w'
+PLOT_DEFAULT_KEY = MODEL_DEFAULT_KEY
 
 # Regex
 SPACE_RE = re.compile('.+_space-([a-zA-Z0-9]+)_')
@@ -25,6 +26,7 @@ RUN_RE = re.compile('.+_run-([0-9]+)_')
 TASK_RE = re.compile('.+_task-([a-zA-Z0-9]+)_')
 CONTRAST_RE = re.compile('.+_contrast-([a-zA-Z0-9]+)_')
 HEMI_RE = re.compile('.+_hemi-([a-zA-Z0-9]+)_')
+STAT_RE = re.compile('.+_stat-([a-zA-Z0-9]+)_')
 
 # Plotting
 PLOT_BOUNDS = dict(
@@ -35,6 +37,24 @@ PLOT_SCALE=1.5
 PLOT_IMG_ORDER = [0, 1, 3, 2]
 PLOT_VTRIM = 0.1
 PLOT_HTRIM = 0.08
+PLOT_LIGHTING = {
+    'ambient': 0.65,
+    'diffuse': 0.5,
+    'fresnel': 0.25,
+    'specular': 0.25,
+    'roughness': 0.25,
+    'facenormalsepsilon': 0,
+    'vertexnormalsepsilon': 0
+}
+PLOT_LIGHTPOSITION = dict(x=100,
+                          y=200,
+                          z=100)
+PLOT_VIEWS = {
+    ('left', 'lateral'): (0, -90),
+    ('left', 'medial'): (0, 90),
+    ('right', 'lateral'): (0, 90),
+    ('right', 'medial'): (0, -90),
+}
 
 # Configurations
 CONFIG = dict(
@@ -129,9 +149,13 @@ CONFIG = dict(
             drift_model='cosine',
             drop_missing=True
         )
-    )
+    ),
+    plot=dict()
 )
-CONFIG['model']['anat'] = CONFIG['model']['T1w'].copy()
+for key in CONFIG['model']:
+    CONFIG['plot'][key] = dict(
+        model_label=key,
+    )
 
 
 # Quickstart
