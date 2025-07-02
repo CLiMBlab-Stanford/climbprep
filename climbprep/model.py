@@ -35,9 +35,9 @@ if __name__ == '__main__':
         infer_models = True
 
     config = args.config
-    if config in DEFAULTS['model']:
+    if config in CONFIG['model']:
         model_label = config
-        config_default = DEFAULTS['model'][config]
+        config_default = CONFIG['model'][config]
         config = {}
     else:
         assert config.endswith('_model.yml'), 'config must either be a known keyword or a file ending in ' \
@@ -45,7 +45,7 @@ if __name__ == '__main__':
         assert os.path.exists(config), ('Provided config (%s) does not match any known keyword or any existing '
                                         'filepath. Please provide a valid config.' % config)
         model_label = config[:-10]
-        config_default = DEFAULTS['model'][MODEL_DEFAULT_KEY]
+        config_default = CONFIG['model'][MODEL_DEFAULT_KEY]
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
     config = {x: config.get(x, config_default[x]) for x in config_default}

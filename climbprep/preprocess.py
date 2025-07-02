@@ -22,9 +22,9 @@ if __name__ == '__main__':
     project_path = os.path.join(BIDS_PATH, project)
 
     config = args.config
-    if config in DEFAULTS['preprocess']:
+    if config in CONFIG['preprocess']:
         preprocessing_label = config
-        config_default = DEFAULTS['preprocess'][config]
+        config_default = CONFIG['preprocess'][config]
         config = {}
     else:
         assert config.endswith('_preprocess.yml') , \
@@ -32,7 +32,7 @@ if __name__ == '__main__':
         assert os.path.exists(config), ('Provided config (%s) does not match any known keyword or any existing '
                                         'filepath. Please provide a valid config.' % config)
         preprocessing_label = config[:-15]
-        config_default = DEFAULTS['preprocess'][PREPROCESS_DEFAULT_KEY]
+        config_default = CONFIG['preprocess'][PREPROCESS_DEFAULT_KEY]
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
     for key in config_default:

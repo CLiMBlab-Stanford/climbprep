@@ -13,6 +13,12 @@ FS_LICENSE_PATH = os.path.join(LAB_PATH, 'freesurfer', 'license.txt')
 FMRIPREP_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fmriprep.simg')
 FITLINS_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fitlins-climbprep.sif')
 
+# Defaults
+DEFAULT_TASK = 'UnknownTask'
+PREPROCESS_DEFAULT_KEY = 'main'
+CLEAN_DEFAULT_KEY = 'fc'
+MODEL_DEFAULT_KEY = 'mni'
+
 # Regex
 SPACE_RE = re.compile('.+_space-([a-zA-Z0-9]+)_')
 RUN_RE = re.compile('.+_run-([0-9]+)_')
@@ -31,7 +37,7 @@ PLOT_VTRIM = 0.1
 PLOT_HTRIM = 0.08
 
 # Configurations
-DEFAULTS = dict(
+CONFIG = dict(
     preprocess=dict(
         main=dict(
             fs_license_file=FS_LICENSE_PATH,
@@ -125,15 +131,10 @@ DEFAULTS = dict(
         )
     )
 )
-DEFAULTS['model']['anat'] = DEFAULTS['model']['T1w'].copy()
-
-DEFAULT_TASK = 'UnknownTask'
-PREPROCESS_DEFAULT_KEY = 'main'
-CLEAN_DEFAULT_KEY = 'fc'
-MODEL_DEFAULT_KEY = 'mni'
+CONFIG['model']['anat'] = CONFIG['model']['T1w'].copy()
 
 
-
+# Quickstart
 PROFILE = '''# ~/.profile: executed by the command interpreter for login shells.
 # This file is not read by bash(1), if ~/.bash_profile or ~/.bash_login
 # exists.

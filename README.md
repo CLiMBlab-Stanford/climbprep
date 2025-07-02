@@ -149,6 +149,8 @@ location relative to the BIDS project's root:
 By default, `<PREPROCESSING_LABEL>` is `main`, but this can be changed in the
 config. The use of a label for preprocessing is designed to enable multiple
 preprocessing configurations for the same data, as required by different analyses.
+To view the available config options, see `CONFIG['preprocess']` in 
+`climbprep/constants.py`.
 
 This utility will also place fMRIprep's working directory in a standard
 location that will support resumption if preprocessing gets interrupted.
@@ -174,7 +176,7 @@ or set to either `fc` or `firstlevels_like` to respectively use default
 settings for functional connectivity (rescaling and scrubbing) or 
 firstlevels estimation (no rescaling or scrubbing), or set to a path
 containing a YAML configuration file. To view the available config options,
-see `DEFAULTS['clean']['firstlevels']` in `climbprep/constants.py`.
+see `CONFIG['clean']` in `climbprep/constants.py`.
 
 Cleaning will result in cleaned derivatives stored at the following
 location relative to the BIDS project's root:
@@ -204,7 +206,7 @@ The `-c` argument can be omitted (defaulting to MNI standard settings),
 or set to either `mni` or `T1w` to respectively use standard
 settings for MNI space or native space, or set to a path containing
 a YAML configuration file. To view the available config options,
-see `DEFAULTS['model']['main']` in `climbprep/constants.py`.
+see `CONFIG['model']` in `climbprep/constants.py`.
 
 The lab maintains a library of model files conforming to
 the [BIDS Stats Models specification]
