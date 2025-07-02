@@ -270,7 +270,7 @@ if __name__ == '__main__':
                         midthickness=midthickness,
                         sulc=sulc
                     )
-                    _plot(**kwargs)
+                    _plot(kwargs)
                     kwargs_all.append(kwargs)
 
     pool = multiprocessing.Pool(ncpus)
