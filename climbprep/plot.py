@@ -68,7 +68,7 @@ def plot(
                 if colorbar:
                     cbar = go.Figure(fig)
                     cbar.data = cbar.data[1:]
-                    cbar_path = (tmp_dir, out_path_base + f'_cbar.png')
+                    cbar_path = os.path.join(tmp_dir, out_path_base + f'_cbar.png')
                     cbar.write_image(
                         cbar_path,
                         scale=PLOT_SCALE
@@ -78,7 +78,7 @@ def plot(
                     l, t, r, b = w * 5 / 6, h * PLOT_VTRIM, w, h * (1 - PLOT_VTRIM)
                     cbar_img = cbar_img.crop((l, t, r, b))
                 fig.data = fig.data[:1]
-                fig_path = (tmp_dir, out_path_base + f'_hemi-{hemi}_view-{view}.png')
+                fig_path = os.path.join(tmp_dir, out_path_base + f'_hemi-{hemi}_view-{view}.png')
                 fig.write_image(
                     fig_path,
                     scale=PLOT_SCALE
