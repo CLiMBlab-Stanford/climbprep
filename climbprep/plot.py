@@ -272,5 +272,5 @@ if __name__ == '__main__':
                 kwargs_all.append(kwargs)
                 plotstar(kwargs)
 
-    # pool = multiprocessing.Pool(ncpus)
-    # pool.map(plotstar, kwargs_all)
+    pool = multiprocessing.Pool(ncpus)
+    pool.map(plotstar, kwargs_all)
