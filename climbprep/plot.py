@@ -108,6 +108,9 @@ def plot(
         stderr(f'Error plotting statmap {statmap_path}:\n {str(e)}\n')
         raise e
 
+def _plot(kwargs):
+    return plot(**kwargs)
+
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser('Plot firstlevels for a participant')
@@ -277,4 +280,4 @@ if __name__ == '__main__':
                         kwargs_all.append(kwargs)
 
     pool = multiprocessing.Pool(ncpus)
-    pool.map(lambda x: plot(**x), kwargs_all)
+    pool.map(_plot, kwargs_all)
