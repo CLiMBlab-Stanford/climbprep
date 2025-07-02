@@ -1,14 +1,10 @@
-import os
-import multiprocessing
-import traceback
 import json
 import yaml
 import numpy as np
 import matplotlib
 matplotlib.use("Agg", force=True)
 from plotly import graph_objects as go
-import kaleido
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import TemporaryDirectory
 from PIL import Image
 from nilearn import image, surface, plotting, datasets
 import argparse
@@ -26,93 +22,85 @@ def plot(
         midthickness,
         sulc
 ):
-    try:
-        with TemporaryDirectory() as tmp_dir:
-            stat = STAT_RE.match(statmap_path)
-            if not stat:
-                return
-            stat = stat.group(1)
-            stderr(f'  Plotting statmap {statmap_path}\n')
-            statmap_nii = image.load_img(os.path.join(contrast_path, statmap_path))
+    with TemporaryDirectory() as tmp_dir:
+        stat = STAT_RE.match(statmap_path)
+        if not stat:
+            return
+        stat = stat.group(1)
+        stderr(f'  Plotting statmap {statmap_path}\n')
+        statmap_nii = image.load_img(os.path.join(contrast_path, statmap_path))
 
-            cbar_img = None
-            imgs = [None] * 4
-            i = 0
-            out_path_base = os.path.basename(statmap_path)[:-len(PLOT_STATMAP_SUFFIX)]
-            for hemi in ('left', 'right'):
-                statmap = surface.vol_to_surf(
-                    statmap_nii,
-                    mesh.parts[hemi],
-                    inner_mesh=white.parts[hemi],
-                    depth=np.linspace(0.0, 1.0, 10)
-                )
-                for view in ('lateral', 'medial'):
-                    colorbar = hemi == 'right' and view == 'lateral'
-                    fig = plotting.plot_surf(
-                        surf_mesh=midthickness,
-                        surf_map=statmap,
-                        bg_map=sulc.parts[hemi],
-                        hemi=hemi,
-                        bg_on_data=True,
-                        threshold=PLOT_BOUNDS[stat][0],
-                        vmax=PLOT_BOUNDS[stat][1],
-                        colorbar=True,
-                        cmap='coolwarm',
-                        symmetric_cmap=True,
-                        engine='plotly'
-                    ).figure
-                    fig.update_traces(lighting=PLOT_LIGHTING, lightposition=PLOT_LIGHTPOSITION)
-                    camera = fig.layout.scene.camera
-                    if view == 'medial':
-                        camera.eye.x = -camera.eye.x * 1.2
-                    else:
-                        camera.eye.x = camera.eye.x * 1.05
-                    if colorbar:
-                        cbar = go.Figure(fig)
-                        cbar.data = cbar.data[1:]
-                        cbar_path = os.path.join(tmp_dir, out_path_base + f'_cbar.png')
-                        cbar.write_image(
-                            cbar_path,
-                            scale=PLOT_SCALE
-                        )
-                        cbar_img = Image.open(cbar_path)
-                        w, h = cbar_img.size
-                        l, t, r, b = w * 5 / 6, h * PLOT_VTRIM, w, h * (1 - PLOT_VTRIM)
-                        cbar_img = cbar_img.crop((l, t, r, b))
-                    fig.data = fig.data[:1]
-                    fig_path = os.path.join(tmp_dir, out_path_base + f'_hemi-{hemi}_view-{view}.png')
-                    kaleido.write_fig_sync(
-                        fig,
-                        path=fig_path,
+        cbar_img = None
+        imgs = [None] * 4
+        i = 0
+        out_path_base = os.path.basename(statmap_path)[:-len(PLOT_STATMAP_SUFFIX)]
+        for hemi in ('left', 'right'):
+            statmap = surface.vol_to_surf(
+                statmap_nii,
+                mesh.parts[hemi],
+                inner_mesh=white.parts[hemi],
+                depth=np.linspace(0.0, 1.0, 10)
+            )
+            for view in ('lateral', 'medial'):
+                colorbar = hemi == 'right' and view == 'lateral'
+                fig = plotting.plot_surf(
+                    surf_mesh=midthickness,
+                    surf_map=statmap,
+                    bg_map=sulc.parts[hemi],
+                    hemi=hemi,
+                    bg_on_data=True,
+                    threshold=PLOT_BOUNDS[stat][0],
+                    vmax=PLOT_BOUNDS[stat][1],
+                    colorbar=True,
+                    cmap='coolwarm',
+                    symmetric_cmap=True,
+                    engine='plotly'
+                ).figure
+                fig.update_traces(lighting=PLOT_LIGHTING, lightposition=PLOT_LIGHTPOSITION)
+                camera = fig.layout.scene.camera
+                if view == 'medial':
+                    camera.eye.x = -camera.eye.x * 1.2
+                else:
+                    camera.eye.x = camera.eye.x * 1.05
+                if colorbar:
+                    cbar = go.Figure(fig)
+                    cbar.data = cbar.data[1:]
+                    cbar_path = os.path.join(tmp_dir, out_path_base + f'_cbar.png')
+                    cbar.write_image(
+                        cbar_path,
                         scale=PLOT_SCALE
                     )
-                    img = Image.open(fig_path)
-                    w, h = img.size
-                    l, t, r, b = w * PLOT_HTRIM, h * PLOT_VTRIM, \
-                                 w * (1 - PLOT_HTRIM), h * (1 - PLOT_VTRIM)
-                    img = img.crop((l, t, r, b))
-                    imgs[PLOT_IMG_ORDER[i]] = img
-                    i += 1
+                    cbar_img = Image.open(cbar_path)
+                    w, h = cbar_img.size
+                    l, t, r, b = w * 5 / 6, h * PLOT_VTRIM, w, h * (1 - PLOT_VTRIM)
+                    cbar_img = cbar_img.crop((l, t, r, b))
+                fig.data = fig.data[:1]
+                fig_path = os.path.join(tmp_dir, out_path_base + f'_hemi-{hemi}_view-{view}.png')
+                fig.write_img(
+                    fig_path,
+                    scale=PLOT_SCALE
+                )
+                img = Image.open(fig_path)
+                w, h = img.size
+                l, t, r, b = w * PLOT_HTRIM, h * PLOT_VTRIM, \
+                             w * (1 - PLOT_HTRIM), h * (1 - PLOT_VTRIM)
+                img = img.crop((l, t, r, b))
+                imgs[PLOT_IMG_ORDER[i]] = img
+                i += 1
 
-            if cbar_img:
-                imgs.append(cbar_img)
-            widths, heights = zip(*(i.size for i in imgs))
-            total_width = sum(widths)
-            max_height = max(heights)
-            new_im = Image.new('RGB', (total_width, max_height))
-            x_offset = 0
-            for im in imgs:
-                new_im.paste(im, (x_offset, 0))
-                x_offset += im.size[0]
-            img_path = os.path.join(plot_path, out_path_base + '.png')
-            new_im.save(img_path)
-            stderr(f'    Finished plotting statmap {statmap_path}\n')
-    except Exception as e:
-        stderr(f'Error plotting statmap {statmap_path}:\n {traceback.format_exc()}\n')
-        raise e
-
-def _plot(kwargs):
-    return plot(**kwargs)
+        if cbar_img:
+            imgs.append(cbar_img)
+        widths, heights = zip(*(i.size for i in imgs))
+        total_width = sum(widths)
+        max_height = max(heights)
+        new_im = Image.new('RGB', (total_width, max_height))
+        x_offset = 0
+        for im in imgs:
+            new_im.paste(im, (x_offset, 0))
+            x_offset += im.size[0]
+        img_path = os.path.join(plot_path, out_path_base + '.png')
+        new_im.save(img_path)
+        stderr(f'    Finished plotting statmap {statmap_path}\n')
 
 
 if __name__ == '__main__':
@@ -270,8 +258,4 @@ if __name__ == '__main__':
                         midthickness=midthickness,
                         sulc=sulc
                     )
-                    _plot(kwargs)
-                    kwargs_all.append(kwargs)
-
-    pool = multiprocessing.Pool(ncpus)
-    pool.map(_plot, kwargs_all)
+                    plot(**kwargs)
