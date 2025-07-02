@@ -1,7 +1,7 @@
 import json
 import yaml
 import pandas as pd
-from nilearn import image, surface, maskers, signal, interfaces
+from nilearn import image, surface, maskers, signal, interfaces, glm
 import argparse
 
 from climbprep.constants import *
@@ -191,6 +191,11 @@ if __name__ == '__main__':
                     if type_by_space[space] == 'vol':  # Volumetric data
                         mask_nii = load_img(mask)
                         func = load_img(func_path)
+
+                        model = glm.first_level.FirstLevelModel(
+                            t_r=TR,
+                        )
+
                         mask_nii = image.math_img(
                             'img > 0.5',
                             img=image.resample_to_img(
