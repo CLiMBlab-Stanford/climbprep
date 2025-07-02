@@ -68,7 +68,7 @@ def plot(
                 if colorbar:
                     cbar = go.Figure(fig)
                     cbar.data = cbar.data[1:]
-                    cbar_path = (tmp_dir + out_path_base + f'_cbar.png')
+                    cbar_path = (tmp_dir, out_path_base + f'_cbar.png')
                     cbar.write_image(
                         cbar_path,
                         scale=PLOT_SCALE
@@ -78,7 +78,7 @@ def plot(
                     l, t, r, b = w * 5 / 6, h * PLOT_VTRIM, w, h * (1 - PLOT_VTRIM)
                     cbar_img = cbar_img.crop((l, t, r, b))
                 fig.data = fig.data[:1]
-                fig_path = (tmp_dir + out_path_base + f'_hemi-{hemi}_view-{view}.png')
+                fig_path = (tmp_dir, out_path_base + f'_hemi-{hemi}_view-{view}.png')
                 fig.write_image(
                     fig_path,
                     scale=PLOT_SCALE
@@ -103,15 +103,10 @@ def plot(
             x_offset += im.size[0]
         img_path = os.path.join(plot_path, out_path_base + '.png')
         new_im.save(img_path)
-
         stderr(f'    Finished plotting statmap {statmap_path}\n')
     except Exception as e:
-        stderr(f'Error plotting statmap {statmap_path}:\n {e}\n')
+        stderr(f'Error plotting statmap {statmap_path}:\n {str(e)}\n')
         raise e
-
-
-def plotstar(kwargs):
-    return plot(**kwargs)
 
 
 if __name__ == '__main__':
@@ -149,7 +144,6 @@ if __name__ == '__main__':
     assert 'model_label' in config, 'Required field `model_label` not found in config. ' \
                                     'Please provide a valid config file or keyword.'
     model_label = config.pop('model_label')
-
 
     # Set paths
     project = args.project
@@ -268,7 +262,7 @@ if __name__ == '__main__':
                             f'node-{node}',
                             subdir_
                         )
-                        if not os.path.exists(tmp_dir):
+                        if not os.path.exists(tmp_dir_):
                             os.makedirs(tmp_dir_)
                         kwargs = dict(
                             statmap_path=statmap_path,
@@ -283,4 +277,4 @@ if __name__ == '__main__':
                         kwargs_all.append(kwargs)
 
     pool = multiprocessing.Pool(ncpus)
-    pool.map(plotstar, kwargs_all)
+    pool.map(lambda x: plot(**x), kwargs_all)
