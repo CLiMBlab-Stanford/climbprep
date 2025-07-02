@@ -1,6 +1,7 @@
 import re
 import os
 
+# Paths
 LAB_PATH = os.path.normpath(os.path.join('/', 'juice6', 'u', 'nlp', 'climblab'))
 APPTAINER_PATH = os.path.normpath(os.path.join(LAB_PATH, 'apptainer'))
 CODE_PATH = os.path.normpath(os.path.join(LAB_PATH, 'code'))
@@ -9,16 +10,27 @@ WORK_PATH = os.path.join(LAB_PATH, 'work')
 EVENTFILES_PATH = os.path.join(LAB_PATH, 'eventfiles')
 MODELFILES_PATH = os.path.join(LAB_PATH, 'modelfiles')
 FS_LICENSE_PATH = os.path.join(LAB_PATH, 'freesurfer', 'license.txt')
-DEFAULT_TASK = 'UnknownTask'
 FMRIPREP_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fmriprep.simg')
 FITLINS_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fitlins-climbprep.sif')
 
+# Regex
 SPACE_RE = re.compile('.+_space-([a-zA-Z0-9]+)_')
 RUN_RE = re.compile('.+_run-([0-9]+)_')
 TASK_RE = re.compile('.+_task-([a-zA-Z0-9]+)_')
 CONTRAST_RE = re.compile('.+_contrast-([a-zA-Z0-9]+)_')
 HEMI_RE = re.compile('.+_hemi-([a-zA-Z0-9]+)_')
 
+# Plotting
+PLOT_BOUNDS = dict(
+    z=(0, 2),
+    t=(0, 5)
+)
+PLOT_SCALE=1.5
+PLOT_IMG_ORDER = [0, 1, 3, 2]
+PLOT_VTRIM = 0.1
+PLOT_HTRIM = 0.08
+
+# Configurations
 DEFAULTS = dict(
     preprocess=dict(
         main=dict(
@@ -102,9 +114,12 @@ DEFAULTS = dict(
 )
 DEFAULTS['model']['anat'] = DEFAULTS['model']['T1w'].copy()
 
+DEFAULT_TASK = 'UnknownTask'
 PREPROCESS_DEFAULT_KEY = 'main'
 CLEAN_DEFAULT_KEY = 'fc'
 MODEL_DEFAULT_KEY = 'mni'
+
+
 
 PROFILE = '''# ~/.profile: executed by the command interpreter for login shells.
 # This file is not read by bash(1), if ~/.bash_profile or ~/.bash_login
