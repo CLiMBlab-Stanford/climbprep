@@ -54,6 +54,8 @@ if __name__ == '__main__':
                                                                  'specified, the default config will be used.'))
     argparser.add_argument('--model-config', default=None, help=('Modeling config (path or keyword). If not '
                                                                  'specified, the default config will be used.'))
+    argparser.add_argument('--plot-config', default=None, help=('Plotting config (path or keyword). If not '
+                                                                'specified, the default config will be used.'))
     args = argparser.parse_args()
 
     participants = args.participants
