@@ -36,18 +36,19 @@ if __name__ == '__main__':
 
     config = args.config
     if config in DEFAULTS['model']:
+        model_label = config
         config_default = DEFAULTS['model'][config]
         config = {}
     else:
+        assert config.endswith('_model.yml'), 'config must either be a known keyword or a file ending in ' \
+                '_model.yml'
         assert os.path.exists(config), ('Provided config (%s) does not match any known keyword or any existing '
                                         'filepath. Please provide a valid config.' % config)
+        model_label = config[:-10]
         config_default = DEFAULTS['model'][MODEL_DEFAULT_KEY]
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
     config = {x: config.get(x, config_default[x]) for x in config_default}
-    assert 'model_label' in config, 'Required field `model_label` not found in config. ' \
-                                    'Please provide a valid config file or keyword.'
-    model_label = config.pop('model_label')
     assert 'preprocessing_label' in config, 'Required field `preprocessing_label` not found in config. ' \
                                             'Please provide a valid config file or keyword.'
     preprocessing_label = config.pop('preprocessing_label')
@@ -115,7 +116,7 @@ if __name__ == '__main__':
                     if task in task_to_models:
                         available_models |= task_to_models[task]
     if infer_models:
-        models = available_models
+        models = available_models & set(task_to_models.keys())  # Run models whose names exactly match an available task
     else:
         missing = models - available_models
         if missing:
@@ -157,6 +158,9 @@ if __name__ == '__main__':
                    f'--derivatives {fmriprep_path}',
                    f'--work-dir {work_path}'
                ] + kwarg_strings
+        # database_path = os.path.join(project_path, 'code', 'pybids_dbcache')
+        # if os.path.exists(database_path):
+        #     args.append(f'--database-path {database_path}')
         cmd = " ".join(args)
         cmd = f'''singularity run {FITLINS_IMG} {cmd}'''
 

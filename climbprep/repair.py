@@ -4,9 +4,12 @@ import sys
 import shutil
 from tempfile import TemporaryDirectory
 import pandas as pd
+import bids
+from bids.modeling import BIDSStatsModelsGraph
 import argparse
 
 from climbprep.constants import *
+from climbprep.util import *
 
 
 if __name__ == '__main__':
@@ -21,7 +24,9 @@ if __name__ == '__main__':
     else:
         projects = args.projects
     for project in projects:
+        stderr('Repairing project %s\n' % project)
         project_path = os.path.join(BIDS_PATH, project)
+        stderr('  Updating participants.tsv\n')
         participants_path = os.path.join(project_path, 'participants.tsv')
         participants = pd.read_csv(participants_path, sep='\t')
         participants.participant_id = participants.participant_id.apply(lambda x: x if x.startswith('sub-') else f'sub-{x}')
@@ -57,4 +62,19 @@ if __name__ == '__main__':
             tasks.append(','.join(sorted(list(_tasks))))
         participants['tasks'] = tasks
         participants.to_csv(participants_path, index=False, sep='\t')
+
+        stderr('  Updating pybids index\n')
+        database_path = os.path.join(project_path, 'code', 'pybids_dbcache')
+        indexer = bids.BIDSLayoutIndexer()
+        derivatives_path = os.path.join(project_path, 'derivatives', 'fmriprep')
+        derivatives = [
+            os.path.join(derivatives_path, x) for x in os.listdir(derivatives_path) if not x.startswith('.') and os.path.isdir(x)
+        ]
+        layout = bids.BIDSLayout(
+            project_path,
+            derivatives=derivatives,
+            database_path=database_path,
+            reset_database=True,
+            indexer=indexer
+        )
 
