@@ -124,7 +124,7 @@ if __name__ == '__main__':
         'the default settings for associated with that keyword. '
         'The possible config fields and values are just the `fmriprep` command-line arguments and their possible'
         'values. For details, see the `fmriprep` documentation.'))
-    argparser.add_argument('--ncpus', dtype=int, default=8, help='Number of parallel processes to use.')
+    argparser.add_argument('--ncpus', type=int, default=8, help='Number of parallel processes to use.')
     args = argparser.parse_args()
 
     participant = args.participant
