@@ -38,7 +38,7 @@ def plot(
             i = 0
             out_path_base = os.path.basename(statmap_path)[:-len(PLOT_STATMAP_SUFFIX)]
             for hemi in ('left', 'right'):
-                statmap_path = surface.vol_to_surf(
+                statmap = surface.vol_to_surf(
                     statmap_nii,
                     mesh.parts[hemi],
                     inner_mesh=white.parts[hemi],
@@ -48,7 +48,7 @@ def plot(
                     colorbar = hemi == 'right' and view == 'lateral'
                     fig = plotting.plot_surf(
                         surf_mesh=midthickness,
-                        surf_map=statmap_path,
+                        surf_map=statmap,
                         bg_map=sulc.parts[hemi],
                         hemi=hemi,
                         bg_on_data=True,
@@ -107,6 +107,7 @@ def plot(
             stderr(f'    Finished plotting statmap {statmap_path}\n')
     except Exception as e:
         stderr(f'Error plotting statmap {statmap_path}:\n {e}\n')
+        raise e
 
 
 def plotstar(kwargs):
@@ -123,9 +124,11 @@ if __name__ == '__main__':
         'the default settings for associated with that keyword. '
         'The possible config fields and values are just the `fmriprep` command-line arguments and their possible'
         'values. For details, see the `fmriprep` documentation.'))
+    argparser.add_argument('--ncpus', dtype=int, default=8, help='Number of parallel processes to use.')
     args = argparser.parse_args()
 
     participant = args.participant
+    ncpus = args.ncpus
 
     config = args.config
     if config in CONFIG['plot']:
@@ -256,18 +259,17 @@ if __name__ == '__main__':
                 if x.endswith('stat-t_statmap.nii.gz') or x.endswith(f'stat-z_statmap{PLOT_STATMAP_SUFFIX}'):
                     statmap_paths.append(os.path.join(contrast_path, x))
 
-            with TemporaryDirectory() as tmp_dir:
-                for statmap_path in statmap_paths:
-                    kwargs = dict(
-                        statmap_path=statmap_path,
-                        contrast_path=contrast_path,
-                        plot_path=plot_path,
-                        mesh=mesh,
-                        white=white,
-                        midthickness=midthickness,
-                        sulc=sulc
-                    )
-                    kwargs_all.append(kwargs)
+            for statmap_path in statmap_paths:
+                kwargs = dict(
+                    statmap_path=statmap_path,
+                    contrast_path=contrast_path,
+                    plot_path=plot_path,
+                    mesh=mesh,
+                    white=white,
+                    midthickness=midthickness,
+                    sulc=sulc
+                )
+                kwargs_all.append(kwargs)
 
-    pool = multiprocessing.Pool()
+    pool = multiprocessing.Pool(ncpus)
     pool.map(plotstar, kwargs_all)
