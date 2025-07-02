@@ -34,7 +34,6 @@ PLOT_HTRIM = 0.08
 DEFAULTS = dict(
     preprocess=dict(
         main=dict(
-            preprocessing_label='main',
             fs_license_file=FS_LICENSE_PATH,
             output_space=['MNI152NLin2009cAsym', 'T1w', 'fsnative'],
             skull_strip_t1w='skip',
@@ -43,7 +42,6 @@ DEFAULTS = dict(
     ),
     clean=dict(
         fc=dict(
-            cleaning_label='fc',
             clean_surf=False,
             preprocessing_label='main',
             strategy=(
@@ -66,7 +64,6 @@ DEFAULTS = dict(
             n_jobs=-1
         ),
         firstlevels_like=dict(
-            cleaning_label='firstlevels',
             clean_surf=False,
             preprocessing_label='main',
             strategy=(
@@ -91,7 +88,6 @@ DEFAULTS = dict(
     ),
     model=dict(
         mni=dict(
-            model_label='mni',
             preprocessing_label='main',
             smoothing_fwhm=4,
             smoothing_method='iso',
@@ -100,13 +96,30 @@ DEFAULTS = dict(
             drift_model='cosine',
             drop_missing=True
         ),
+        mni_afni=dict(
+            preprocessing_label='main',
+            smoothing_fwhm=4,
+            smoothing_method='iso',
+            space='MNI152NLin2009cAsym',
+            estimator='afni',
+            drift_model='cosine',
+            drop_missing=True
+        ),
         T1w=dict(
-            model_label='T1w',
             preprocessing_label='main',
             smoothing_fwhm=4,
             smoothing_method='iso',
             space='T1w',
             estimator='nilearn',
+            drift_model='cosine',
+            drop_missing=True
+        ),
+        T1w_afni=dict(
+            preprocessing_label='main',
+            smoothing_fwhm=4,
+            smoothing_method='iso',
+            space='T1w',
+            estimator='afni',
             drift_model='cosine',
             drop_missing=True
         )
