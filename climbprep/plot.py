@@ -57,7 +57,7 @@ if __name__ == '__main__':
     derivatives_path = os.path.join(project_path, 'derivatives')
     assert os.path.exists(derivatives_path), 'Path not found: %s' % derivatives_path
     models_path = os.path.join(derivatives_path, 'firstlevels', model_label)
-    os.path.exists(models_path), 'Path not found: %s' % models_path
+    assert os.path.exists(models_path), 'Path not found: %s' % models_path
 
     for model_subdir in os.listdir(models_path):
         model_path = os.path.join(models_path, model_subdir)
@@ -101,7 +101,7 @@ if __name__ == '__main__':
                 else:
                     contrast_path = participant_dir
 
-            plot_path = os.path.join(derivatives_path, 'plots', plot_label, subdir)
+            plot_path = os.path.join(derivatives_path, 'plots', plot_label, f'node-{node}', subdir)
 
             if mni_space:
                 fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage')
@@ -227,7 +227,7 @@ if __name__ == '__main__':
                     for im in imgs:
                         new_im.paste(im, (x_offset, 0))
                         x_offset += im.size[0]
-                    img_path = (plot_path + out_path_base + '.png')
+                    img_path = os.path.join(plot_path, out_path_base + '.png')
                     if not os.path.exists(plot_path):
                         os.makedirs(plot_path)
                     new_im.save('%s.png' % img_path)
