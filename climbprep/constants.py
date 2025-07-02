@@ -33,7 +33,7 @@ PLOT_BOUNDS = dict(
     z=(0, 2),
     t=(0, 5)
 )
-PLOT_SCALE=1.5
+PLOT_SCALE = 1
 PLOT_IMG_ORDER = [0, 1, 3, 2]
 PLOT_VTRIM = 0.1
 PLOT_HTRIM = 0.08
