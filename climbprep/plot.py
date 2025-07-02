@@ -101,7 +101,14 @@ if __name__ == '__main__':
                 else:
                     contrast_path = participant_dir
 
-            plot_path = os.path.join(derivatives_path, 'plots', plot_label, f'node-{node}', subdir)
+            plot_path = os.path.join(
+                derivatives_path,
+                'firstlevel_plots',
+                plot_label,
+                model_subdir,
+                f'node-{node}',
+                subdir
+            )
 
             if mni_space:
                 fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage')
