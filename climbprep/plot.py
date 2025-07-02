@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg", force=True)
 from plotly import graph_objects as go
+import kaleido
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from PIL import Image
 from nilearn import image, surface, plotting, datasets
@@ -80,8 +81,9 @@ def plot(
                         cbar_img = cbar_img.crop((l, t, r, b))
                     fig.data = fig.data[:1]
                     fig_path = os.path.join(tmp_dir, out_path_base + f'_hemi-{hemi}_view-{view}.png')
-                    fig.write_image(
-                        fig_path,
+                    kaleido.write_fig_sync(
+                        fig,
+                        path=fig_path,
                         scale=PLOT_SCALE
                     )
                     img = Image.open(fig_path)
@@ -268,6 +270,7 @@ if __name__ == '__main__':
                         midthickness=midthickness,
                         sulc=sulc
                     )
+                    _plot(**kwargs)
                     kwargs_all.append(kwargs)
 
     pool = multiprocessing.Pool(ncpus)
