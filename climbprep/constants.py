@@ -29,6 +29,7 @@ HEMI_RE = re.compile('.+_hemi-([a-zA-Z0-9]+)_')
 STAT_RE = re.compile('.+_stat-([a-zA-Z0-9]+)_')
 
 # Plotting
+PLOT_STATMAP_SUFFIX = '.nii.gz'
 PLOT_BOUNDS = dict(
     z=(0, 2),
     t=(0, 5)

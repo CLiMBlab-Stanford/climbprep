@@ -16,95 +16,97 @@ from climbprep.util import *
 
 
 def plot(
-        statmap,
+        statmap_path,
         contrast_path,
-        suffix,
+        plot_path,
         mesh,
         white,
         midthickness,
-        sulc,
-        plot_path
+        sulc
 ):
-    with TemporaryDirectory() as tmp_dir:
-        stat = STAT_RE.match(statmap)
-        if not stat:
-            return
-        stat = stat.group(1)
-        stderr(f'  Plotting statmap {statmap}\n')
-        statmap_nii = image.load_img(os.path.join(contrast_path, statmap))
+    try:
+        with TemporaryDirectory() as tmp_dir:
+            stat = STAT_RE.match(statmap_path)
+            if not stat:
+                return
+            stat = stat.group(1)
+            stderr(f'  Plotting statmap {statmap_path}\n')
+            statmap_nii = image.load_img(os.path.join(contrast_path, statmap_path))
 
-        cbar_img = None
-        imgs = [None] * 4
-        i = 0
-        out_path_base = os.path.basename(statmap)[:-len(suffix)]
-        for hemi in ('left', 'right'):
-            statmap = surface.vol_to_surf(
-                statmap_nii,
-                mesh.parts[hemi],
-                inner_mesh=white.parts[hemi],
-                depth=np.linspace(0.0, 1.0, 10)
-            )
-            for view in ('lateral', 'medial'):
-                colorbar = hemi == 'right' and view == 'lateral'
-                fig = plotting.plot_surf(
-                    surf_mesh=midthickness,
-                    surf_map=statmap,
-                    bg_map=sulc.parts[hemi],
-                    hemi=hemi,
-                    bg_on_data=True,
-                    threshold=PLOT_BOUNDS[stat][0],
-                    vmax=PLOT_BOUNDS[stat][1],
-                    colorbar=True,
-                    cmap='coolwarm',
-                    symmetric_cmap=True,
-                    engine='plotly'
-                ).figure
-                fig.update_traces(lighting=PLOT_LIGHTING, lightposition=PLOT_LIGHTPOSITION)
-                camera = fig.layout.scene.camera
-                if view == 'medial':
-                    camera.eye.x = -camera.eye.x * 1.2
-                else:
-                    camera.eye.x = camera.eye.x * 1.05
-                if colorbar:
-                    cbar = go.Figure(fig)
-                    cbar.data = cbar.data[1:]
-                    cbar_path = (tmp_dir + out_path_base + f'_cbar.png')
-                    cbar.write_image(
-                        cbar_path,
+            cbar_img = None
+            imgs = [None] * 4
+            i = 0
+            out_path_base = os.path.basename(statmap_path)[:-len(PLOT_STATMAP_SUFFIX)]
+            for hemi in ('left', 'right'):
+                statmap_path = surface.vol_to_surf(
+                    statmap_nii,
+                    mesh.parts[hemi],
+                    inner_mesh=white.parts[hemi],
+                    depth=np.linspace(0.0, 1.0, 10)
+                )
+                for view in ('lateral', 'medial'):
+                    colorbar = hemi == 'right' and view == 'lateral'
+                    fig = plotting.plot_surf(
+                        surf_mesh=midthickness,
+                        surf_map=statmap_path,
+                        bg_map=sulc.parts[hemi],
+                        hemi=hemi,
+                        bg_on_data=True,
+                        threshold=PLOT_BOUNDS[stat][0],
+                        vmax=PLOT_BOUNDS[stat][1],
+                        colorbar=True,
+                        cmap='coolwarm',
+                        symmetric_cmap=True,
+                        engine='plotly'
+                    ).figure
+                    fig.update_traces(lighting=PLOT_LIGHTING, lightposition=PLOT_LIGHTPOSITION)
+                    camera = fig.layout.scene.camera
+                    if view == 'medial':
+                        camera.eye.x = -camera.eye.x * 1.2
+                    else:
+                        camera.eye.x = camera.eye.x * 1.05
+                    if colorbar:
+                        cbar = go.Figure(fig)
+                        cbar.data = cbar.data[1:]
+                        cbar_path = (tmp_dir + out_path_base + f'_cbar.png')
+                        cbar.write_image(
+                            cbar_path,
+                            scale=PLOT_SCALE
+                        )
+                        cbar_img = Image.open(cbar_path)
+                        w, h = cbar_img.size
+                        l, t, r, b = w * 5 / 6, h * PLOT_VTRIM, w, h * (1 - PLOT_VTRIM)
+                        cbar_img = cbar_img.crop((l, t, r, b))
+                    fig.data = fig.data[:1]
+                    fig_path = (tmp_dir + out_path_base + f'_hemi-{hemi}_view-{view}.png')
+                    fig.write_image(
+                        fig_path,
                         scale=PLOT_SCALE
                     )
-                    cbar_img = Image.open(cbar_path)
-                    w, h = cbar_img.size
-                    l, t, r, b = w * 5 / 6, h * PLOT_VTRIM, w, h * (1 - PLOT_VTRIM)
-                    cbar_img = cbar_img.crop((l, t, r, b))
-                fig.data = fig.data[:1]
-                fig_path = (tmp_dir + out_path_base + f'_hemi-{hemi}_view-{view}.png')
-                fig.write_image(
-                    fig_path,
-                    scale=PLOT_SCALE
-                )
-                img = Image.open(fig_path)
-                w, h = img.size
-                l, t, r, b = w * PLOT_HTRIM, h * PLOT_VTRIM, \
-                             w * (1 - PLOT_HTRIM), h * (1 - PLOT_VTRIM)
-                img = img.crop((l, t, r, b))
-                imgs[PLOT_IMG_ORDER[i]] = img
-                i += 1
+                    img = Image.open(fig_path)
+                    w, h = img.size
+                    l, t, r, b = w * PLOT_HTRIM, h * PLOT_VTRIM, \
+                                 w * (1 - PLOT_HTRIM), h * (1 - PLOT_VTRIM)
+                    img = img.crop((l, t, r, b))
+                    imgs[PLOT_IMG_ORDER[i]] = img
+                    i += 1
 
-        if cbar_img:
-            imgs.append(cbar_img)
-        widths, heights = zip(*(i.size for i in imgs))
-        total_width = sum(widths)
-        max_height = max(heights)
-        new_im = Image.new('RGB', (total_width, max_height))
-        x_offset = 0
-        for im in imgs:
-            new_im.paste(im, (x_offset, 0))
-            x_offset += im.size[0]
-        img_path = os.path.join(plot_path, out_path_base + '.png')
-        if not os.path.exists(plot_path):
-            os.makedirs(plot_path)
-        new_im.save(img_path)
+            if cbar_img:
+                imgs.append(cbar_img)
+            widths, heights = zip(*(i.size for i in imgs))
+            total_width = sum(widths)
+            max_height = max(heights)
+            new_im = Image.new('RGB', (total_width, max_height))
+            x_offset = 0
+            for im in imgs:
+                new_im.paste(im, (x_offset, 0))
+                x_offset += im.size[0]
+            img_path = os.path.join(plot_path, out_path_base + '.png')
+            new_im.save(img_path)
+
+            stderr(f'    Finished plotting statmap {statmap_path}\n')
+    except Exception as e:
+        stderr(f'Error plotting statmap {statmap_path}:\n {e}\n')
 
 
 def plotstar(kwargs):
@@ -131,10 +133,9 @@ if __name__ == '__main__':
         config_default = CONFIG['plot'][config]
         config = {}
     else:
-        suffix = '_plot.yml'
-        n = len(suffix)
-        assert config.endswith(suffix), 'config must either be a known keyword or a file ending in ' \
-                f'{suffix}'
+        n = len(PLOT_STATMAP_SUFFIX)
+        assert config.endswith(PLOT_STATMAP_SUFFIX), 'config must either be a known keyword or a file ending in ' \
+                f'{PLOT_STATMAP_SUFFIX}'
         assert os.path.exists(config), ('Provided config (%s) does not match any known keyword or any existing '
                                         'filepath. Please provide a valid config.' % config)
         plot_label = config[:-n]
@@ -206,6 +207,8 @@ if __name__ == '__main__':
                 f'node-{node}',
                 subdir
             )
+            if not os.path.exists(plot_path):
+                os.makedirs(plot_path)
 
             if mni_space:
                 fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage')
@@ -248,23 +251,21 @@ if __name__ == '__main__':
             white = surface.PolyMesh(*white_in)
             sulc = surface.PolyData(*sulc_in)
 
-            statmaps = []
-            suffix = '.nii.gz'
+            statmap_paths = []
             for x in os.listdir(contrast_path):
-                if x.endswith('stat-t_statmap.nii.gz') or x.endswith(f'stat-z_statmap{suffix}'):
-                    statmaps.append(os.path.join(contrast_path, x))
+                if x.endswith('stat-t_statmap.nii.gz') or x.endswith(f'stat-z_statmap{PLOT_STATMAP_SUFFIX}'):
+                    statmap_paths.append(os.path.join(contrast_path, x))
 
             with TemporaryDirectory() as tmp_dir:
-                for statmap in statmaps:
+                for statmap_path in statmap_paths:
                     kwargs = dict(
-                        statmap=statmap,
+                        statmap_path=statmap_path,
                         contrast_path=contrast_path,
-                        suffix=suffix,
+                        plot_path=plot_path,
                         mesh=mesh,
                         white=white,
                         midthickness=midthickness,
-                        sulc=sulc,
-                        plot_path=plot_path
+                        sulc=sulc
                     )
                     kwargs_all.append(kwargs)
 
