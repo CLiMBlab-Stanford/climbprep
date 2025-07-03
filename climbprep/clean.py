@@ -168,7 +168,7 @@ if __name__ == '__main__':
                     func_file = os.path.basename(func_path)
                     TR = datasets[space][task][run]['TR']
 
-                    confounds = pd.read_csv(confounds, sep='\t')
+                    confounds = pd.read_csv(os.path.join(func_path, confounds), sep='\t')
                     confounds = confounds.filter(
                         regex=(r'^(global_signal|csf|white|trans|rot|motion_outlier).*')
                     )
