@@ -159,7 +159,7 @@ for key in CONFIG['model']:
         ),
         engine='matplotlib',
         vtrim=0.2,
-        htrim=0.2
+        htrim=0.125
     )
 
 
