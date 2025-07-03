@@ -202,7 +202,7 @@ run:
     python -m climblab.model <PARTICIPANT_ID> -p <PROJECT_ID>
 
 (the `-p` option can be omitted if the project is `climblab`).
-The `-c` argument can be omitted (defaulting to MNI standard settings),
+The `-c` argument can be omitted (defaulting to `T1w` standard settings),
 or set to either `mni` or `T1w` to respectively use standard
 settings for MNI space or native space, or set to a path containing
 a YAML configuration file. To view the available config options,
@@ -238,6 +238,20 @@ specified in the `model.json` file, so they are different models
 (`MODEL_NAME`), even if they are fit in the same space (e.g., MNI)
 using the same task data and conditions. If you're not sure how to
 implement a variant, consult the docs for `fitlins` and `BIDS Stats Models`.
+
+
+### plot
+The plotting step generates surface plots of the results of the modeling
+step. It can only be run after modeling is complete. To plot a participant's
+data, run:
+
+    python -m climblab.plot <PARTICIPANT_ID> -p <PROJECT_ID>
+
+(the `-p` option can be omitted if the project is `climblab`).
+The `-c` argument can optionally be used to specify plotting configuration
+parameters, including which model type to plot (defaults to `T1w`).
+To view the available config options, see `CONFIG['plot']` in
+`climbprep/constants.py`.
 
 
 ## Usage: Helper Functions

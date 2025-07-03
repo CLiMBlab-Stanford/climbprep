@@ -28,6 +28,22 @@ CONTRAST_RE = re.compile('.+_contrast-([a-zA-Z0-9]+)_')
 HEMI_RE = re.compile('.+_hemi-([a-zA-Z0-9]+)_')
 STAT_RE = re.compile('.+_stat-([a-zA-Z0-9]+)_')
 
+# Modeling
+MODEL_CONFOUNDS = [
+    "trial_type.*",
+    "global_signal*",
+    "csf*",
+    "white_matter*",
+    "rot_x*",
+    "rot_y*",
+    "rot_z*",
+    "trans_x*",
+    "trans_y*",
+    "trans_z*",
+    "motion_outlier*",
+    1
+]
+
 # Plotting
 PLOT_STATMAP_SUFFIX = '.nii.gz'
 PLOT_IMG_ORDER = [0, 1, 3, 2]
