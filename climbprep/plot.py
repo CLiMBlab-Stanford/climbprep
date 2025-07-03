@@ -20,7 +20,8 @@ def plot(
         mesh,
         white,
         midthickness,
-        sulc
+        sulc,
+        engine='plotly'
 ):
     with TemporaryDirectory() as tmp_dir:
         stat = STAT_RE.match(statmap_path)
@@ -54,17 +55,20 @@ def plot(
                     colorbar=True,
                     cmap='coolwarm',
                     symmetric_cmap=True,
-                    engine='plotly'
-                ).figure
-                fig.update_traces(lighting=PLOT_LIGHTING, lightposition=PLOT_LIGHTPOSITION)
-                camera = fig.layout.scene.camera
-                if view == 'medial':
-                    camera.eye.x = -camera.eye.x * 1.2
-                else:
-                    camera.eye.x = camera.eye.x * 1.05
+                    engine=engine
+                )
+                if engine == 'plotly':
+                    fig = fig.figure
+                    fig.update_traces(lighting=PLOT_LIGHTING, lightposition=PLOT_LIGHTPOSITION)
+                    camera = fig.layout.scene.camera
+                    if view == 'medial':
+                        camera.eye.x = -camera.eye.x * 1.2
+                    else:
+                        camera.eye.x = camera.eye.x * 1.05
                 if colorbar:
-                    cbar = go.Figure(fig)
-                    cbar.data = cbar.data[1:]
+                    if engine == 'plotly':
+                        cbar = go.Figure(fig)
+                        cbar.data = cbar.data[1:]
                     cbar_path = os.path.join(tmp_dir, out_path_base + f'_cbar.png')
                     cbar.write_image(
                         cbar_path,
