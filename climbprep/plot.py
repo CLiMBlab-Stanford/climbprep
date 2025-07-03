@@ -53,7 +53,7 @@ def plot(
                     surf_map=statmap,
                     bg_map=sulc.parts[hemi],
                     hemi=hemi,
-                    view=view if engine == 'matplotlib' else None,
+                    view=view if engine == 'matplotlib' else 'lateral',
                     bg_on_data=True,
                     threshold=threshold,
                     vmax=vmax,
