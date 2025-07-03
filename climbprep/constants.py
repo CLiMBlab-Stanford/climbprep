@@ -42,6 +42,64 @@ MODEL_CONFOUNDS = [
     "motion_outlier*",
     1
 ]
+MODEL_TEMPLATE = {
+    "Name": None,
+    "BIDSModelVersion": "1.0.0",
+    "Description": None,
+    "Input": {
+        "task": []
+    },
+    "Nodes": [
+        {
+            "Level": "Run",
+            "Name": "run",
+            "GroupBy": ["run", "task", "session", "subject"],
+            "Transformations": {
+                "Transformer": "pybids-transforms-v1",
+                "Instructions": [
+                    {
+                        "Name": "Factor",
+                        "Input": "trial_type"
+                    },
+                    {
+                        "Name": "Convolve",
+                        "Input": [
+                            "trial_type.*"
+                        ]
+                    }
+                ]
+            },
+            "Model": {
+                "X": MODEL_CONFOUNDS
+            },
+            "Contrasts": []
+        },
+        {
+            "Level": "Session",
+            "Name": "session",
+            "GroupBy": ["session", "subject"],
+            "Model": {
+                "X": [],
+                "Type": "meta"
+            },
+            "DummyContrasts": {"Test": "t"}
+        },
+        {
+            "Level": "Subject",
+            "Name": "subject",
+            "GroupBy": ["subject"],
+            "Model": {
+                "X": [],
+                "Type": "meta"
+            },
+            "DummyContrasts": {"Test": "t"}
+        }
+    ],
+    "Edges": [
+        {"Source": "run", "Destination": "session"},
+        {"Source": "run", "Destination": "subject"}
+    ]
+}
 
 # Plotting
 PLOT_STATMAP_SUFFIX = '.nii.gz'

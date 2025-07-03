@@ -108,66 +108,77 @@ if __name__ == '__main__':
 
     second_level_in = conditions | set(config.get('run', {}).keys())
 
-    model = {
-        "Name": name,
-        "BIDSModelVersion": "1.0.0",
-        "Description": name,
-        "Input": {
-            "task": sorted(list(tasks))
-        },
-        "Nodes": [
-            {
-                "Level": "Run",
-                "Name": "run",
-                "GroupBy": ["run", "task", "session", "subject"],
-                "Transformations": {
-                    "Transformer": "pybids-transforms-v1",
-                    "Instructions": [
-                        {
-                            "Name": "Factor",
-                            "Input": "trial_type"
-                        },
-                        {
-                            "Name": "Convolve",
-                            "Input": [
-                                "trial_type.*"
-                            ]
-                        }
-                    ]
-                },
-                "Model": {
-                    "X": ['trial_type.*'] + MODEL_CONFOUNDS
-                },
-                "Contrasts": [
-                    get_contrast_spec(condition, {f"trial_type.{condition}": 1}) for condition in conditions
-                ]
-            },
-            {
-                "Level": "Session",
-                "Name": "session",
-                "GroupBy": ["session", "subject"],
-                "Model": {
-                    "X": sorted(list(second_level_in)),
-                    "Type": "meta"
-                },
-                "DummyContrasts": {"Test": "t"}
-            },
-            {
-                "Level": "Subject",
-                "Name": "subject",
-                "GroupBy": ["subject"],
-                "Model": {
-                    "X": sorted(list(second_level_in)),
-                    "Type": "meta"
-                },
-                "DummyContrasts": {"Test": "t"}
-            }
-        ],
-        "Edges": [
-            {"Source": "run", "Destination": "session"},
-            {"Source": "run", "Destination": "subject"}
-        ]
-    }
+    # model = {
+    #     "Name": name,
+    #     "BIDSModelVersion": "1.0.0",
+    #     "Description": name,
+    #     "Input": {
+    #         "task": sorted(list(tasks))
+    #     },
+    #     "Nodes": [
+    #         {
+    #             "Level": "Run",
+    #             "Name": "run",
+    #             "GroupBy": ["run", "task", "session", "subject"],
+    #             "Transformations": {
+    #                 "Transformer": "pybids-transforms-v1",
+    #                 "Instructions": [
+    #                     {
+    #                         "Name": "Factor",
+    #                         "Input": "trial_type"
+    #                     },
+    #                     {
+    #                         "Name": "Convolve",
+    #                         "Input": [
+    #                             "trial_type.*"
+    #                         ]
+    #                     }
+    #                 ]
+    #             },
+    #             "Model": {
+    #                 "X": ['trial_type.*'] + MODEL_CONFOUNDS
+    #             },
+    #             "Contrasts": [
+    #                 get_contrast_spec(condition, {f"trial_type.{condition}": 1}) for condition in conditions
+    #             ]
+    #         },
+    #         {
+    #             "Level": "Session",
+    #             "Name": "session",
+    #             "GroupBy": ["session", "subject"],
+    #             "Model": {
+    #                 "X": sorted(list(second_level_in)),
+    #                 "Type": "meta"
+    #             },
+    #             "DummyContrasts": {"Test": "t"}
+    #         },
+    #         {
+    #             "Level": "Subject",
+    #             "Name": "subject",
+    #             "GroupBy": ["subject"],
+    #             "Model": {
+    #                 "X": sorted(list(second_level_in)),
+    #                 "Type": "meta"
+    #             },
+    #             "DummyContrasts": {"Test": "t"}
+    #         }
+    #     ],
+    #     "Edges": [
+    #         {"Source": "run", "Destination": "session"},
+    #         {"Source": "run", "Destination": "subject"}
+    #     ]
+    # }
+
+    model = MODEL_TEMPLATE.copy()
+    model['Name'] = name
+    model['Description'] = name
+    model['Input']['task'] = sorted(list(tasks))
+    model['Nodes'][0]['Model']['X'].insert(0, 'trial_type.*')
+    model['Nodes'][0]['Contrasts'] = [
+        get_contrast_spec(condition, {f"trial_type.{condition}": 1}) for condition in conditions
+    ]
+    model['Nodes'][1]['Model']['X'] = sorted(list(second_level_in))
+    model['Nodes'][2]['Model']['X'] = sorted(list(second_level_in))
 
     for level in config:
         if level not in ['run', 'session', 'subject']:
