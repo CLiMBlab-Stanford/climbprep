@@ -30,7 +30,6 @@ STAT_RE = re.compile('.+_stat-([a-zA-Z0-9]+)_')
 
 # Modeling
 MODEL_CONFOUNDS = [
-    "trial_type.*",
     "global_signal*",
     "csf*",
     "white_matter*",

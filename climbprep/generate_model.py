@@ -59,13 +59,14 @@ if __name__ == '__main__':
     args = argparser.parse_args()
 
     participant = args.participant
-    tasks = set(args.tasks)
+    tasks = args.tasks
     name = args.name
     if not name:
         if len(tasks) == 1:
             name = tasks[0]
         else:
             raise ValueError('Must provide a name for the model if more than one task is included.')
+    tasks = set(tasks)
     project = args.project
     config = args.config
     if config:
@@ -101,17 +102,18 @@ if __name__ == '__main__':
                 if task:
                     task = task.group(1)
                     if task in tasks:
-                        df = pd.read_csv(event_file, sep='\t')
+                        df = pd.read_csv(os.path.join(func_path, event_file), sep='\t')
                         conditions_ = set(df.trial_type.unique() if 'trial_type' in df.columns else [])
                         conditions |= conditions_
 
+    second_level_in = conditions | set(config.get('run', {}).keys())
 
     model = {
-        "Name": "langlocAUD",
+        "Name": name,
         "BIDSModelVersion": "1.0.0",
-        "Description": "Intact vs. degraded speech.",
+        "Description": name,
         "Input": {
-            "task": ["langlocAUD"]
+            "task": sorted(list(tasks))
         },
         "Nodes": [
             {
@@ -145,7 +147,7 @@ if __name__ == '__main__':
                 "Name": "session",
                 "GroupBy": ["session", "subject"],
                 "Model": {
-                    "X": sorted(list(conditions)),
+                    "X": sorted(list(second_level_in)),
                     "Type": "meta"
                 },
                 "DummyContrasts": {"Test": "t"}
@@ -155,7 +157,7 @@ if __name__ == '__main__':
                 "Name": "subject",
                 "GroupBy": ["subject"],
                 "Model": {
-                    "X": sorted(list(conditions)),
+                    "X": sorted(list(second_level_in)),
                     "Type": "meta"
                 },
                 "DummyContrasts": {"Test": "t"}
@@ -177,15 +179,15 @@ if __name__ == '__main__':
         else:
             node = model['Nodes'][2]
 
-        for contrast_name in config[node]:
-            contrast_weights = config[node][contrast_name]
+        for contrast_name in config[level]:
+            contrast_weights = config[level][contrast_name]
             if not isinstance(contrast_weights, dict):
                 raise ValueError(f'Invalid contrast weights for {level} {contrast_name}: {contrast_weights}. '
                                  'Must be a dictionary mapping condition names to weights.')
             contrast_spec = get_contrast_spec(contrast_name, contrast_weights)
             if 'Contrasts' not in node:
                 node['Contrasts'] = []
-            node['Contrasts'] = contrast_spec
+            node['Contrasts'].append(contrast_spec)
 
     out_path = os.path.join(os.getcwd(), f'{name}_model.json')
     with open(out_path, 'w') as f:
