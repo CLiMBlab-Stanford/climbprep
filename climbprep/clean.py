@@ -198,19 +198,15 @@ if __name__ == '__main__':
                         cols = [x for x in events.columns if x.startswith('trial_type')]
                         frame_times = np.arange(len(confounds)) * TR + StartTime
                         for col in cols:
-                            convolved = glm.first_level.compute_regressor(
+                            convolved, convolved_names = glm.first_level.compute_regressor(
                                 events[[col, 'onset', 'duration']],
                                 'spm',
                                 frame_times
                             )
                             print(frame_times)
                             print(convolved)
+                            print(convolved_names)
                             input()
-                        events = events.filter(regex='^(trial_type|onset|duration|response_time)$')
-                        if 'trial_type' in events.columns:
-                            confounds = interfaces.fmriprep.regress_out_task(
-                                confounds, events, TR=TR, StartTime=StartTime
-                            )
                     print(confounds)
                     print(confounds.columns)
                     input()
