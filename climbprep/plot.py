@@ -1,5 +1,7 @@
 import json
 import yaml
+import multiprocessing
+import traceback
 import numpy as np
 import matplotlib
 matplotlib.use("Agg", force=True)
@@ -51,6 +53,7 @@ def plot(
                     surf_map=statmap,
                     bg_map=sulc.parts[hemi],
                     hemi=hemi,
+                    view=view if engine == 'matplotlib' else None,
                     bg_on_data=True,
                     threshold=threshold,
                     vmax=vmax,
@@ -140,6 +143,15 @@ def plot(
         img_path = os.path.join(plot_path, out_path_base + '.png')
         new_im.save(img_path)
         stderr(f'    Finished plotting statmap {statmap_path}\n')
+
+
+def _plot(kwargs):
+    try:
+        plot(**kwargs)
+    except Exception as e:
+        stderr(f'Error plotting statmap {kwargs["statmap_path"]}\n')
+        traceback.print_exc()
+        raise e
 
 
 if __name__ == '__main__':
@@ -306,3 +318,7 @@ if __name__ == '__main__':
                         vtrim=config['vtrim']
                     )
                     plot(**kwargs)
+                    kwargs_all.append(kwargs)
+
+    pool = multiprocessing.Pool(ncpus)
+    pool.map(_plot, kwargs_all)
