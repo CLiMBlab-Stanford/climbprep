@@ -21,14 +21,14 @@ def plot(
         white,
         midthickness,
         sulc,
-        engine='plotly'
+        engine='matplotlib'
 ):
     with TemporaryDirectory() as tmp_dir:
         stat = STAT_RE.match(statmap_path)
         if not stat:
             return
         stat = stat.group(1)
-        stderr(f'  Plotting statmap {statmap_path}\n')
+        stderr(f'Plotting statmap {statmap_path}\n')
         statmap_nii = image.load_img(os.path.join(contrast_path, statmap_path))
 
         cbar_img = None
@@ -183,7 +183,6 @@ if __name__ == '__main__':
     assert os.path.exists(models_path), 'Path not found: %s' % models_path
 
     kwargs_all = []
-    stderr('Initializing worker pool\n')
     for model_subdir in os.listdir(models_path):
         model_path = os.path.join(models_path, model_subdir)
         if not os.path.isdir(model_path):
