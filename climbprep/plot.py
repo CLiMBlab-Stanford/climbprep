@@ -76,7 +76,7 @@ def plot(
                     cbar_img = cbar_img.crop((l, t, r, b))
                 fig.data = fig.data[:1]
                 fig_path = os.path.join(tmp_dir, out_path_base + f'_hemi-{hemi}_view-{view}.png')
-                fig.write_img(
+                fig.write_image(
                     fig_path,
                     scale=PLOT_SCALE
                 )
