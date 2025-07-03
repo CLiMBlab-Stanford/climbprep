@@ -210,7 +210,8 @@ see `CONFIG['model']` in `climbprep/constants.py`.
 
 The lab maintains a library of model files conforming to
 the [BIDS Stats Models specification]
-(https://bids-standard.github.io/stats-models) at `/juice6/u/nlp/climblab/`.
+(https://bids-standard.github.io/stats-models) at 
+`/juice6/u/nlp/climblab/modelfiles`.
 By default, `model` will use the set of tasks available from the participant
 to infer which models in the library are relevant and run them all, with
 outputs saved to:
@@ -221,7 +222,10 @@ where `MODEL_LABEL` refers to the configuration name (e.g., `mni`)
 and `MODEL_NAME` refers to the standard  name for the model (`PREFIX` 
 in `PREFIX_model.json` in the model's filename). To run
 a subset of available models, you can pass their names as a space-delimited
-list using the `-m` option.
+list using the `-m` option. If you need to make a new modelfile (e.g.,
+you designed and ran a new experiment), you can either write your own
+BIDS-conformant modelfile by hand, or use the `generate_model`
+utility (see below).
 
 How do you decide whether a model variant is a reparameterization of the
 same model (a different `MODEL_LABEL`) or a different model (a different
@@ -287,6 +291,46 @@ Or you can use the `sbatch.sh` script to submit many at once:
 
 Logs from stdin/err for each script will be written to a matching file
 in the current working directory with the suffix `*.out`.
+
+
+### generate_model
+
+The lab uses the BIDS Stats Models specification to control first-level models,
+where each model written as a JSON file in `/juice6/u/nlp/climblab/modelfiles`.
+For new experiments or analyses, you may need to make a new model file.
+You're welcome to do this by hand following the BIDS specification, but
+this can be pretty error-prone. For typical experiments, most of the model-
+writing can be automated by the `generate_model` utility, which will
+generate a model file based on a set of task names and conditions inferred
+from an example participant, along with any novel contrasts you want, which you
+specify in a YAML file.
+
+To generate a new model, run:
+
+    python -m climbprep.generate_model <PARTICIPANT_ID> <TASK>(<TASK>)* -c <CONFIG>
+
+Where `<PARTICIPANT_ID>` is the ID of a BIDSified participant whose events files you
+want to use to populate the model's conditions. The `-c` argument is the path
+to a YAML file with the following structure:
+```
+LEVEL:
+  CONTRAST:
+    CONDITION1: WEIGHT
+    CONDITION2: WEIGHT
+    ...
+```
+where `LEVEL` is the level of the model (one of `run`, `session`, or `subject`).
+For example, to specify a sentences vs. nonwords contrast at the run level,
+you would write:
+```
+run:
+  SvN:
+    S: 0.5
+    N: -0.5
+```
+Note that the weight magnitudes should sum to one, to facilitate comparison
+across contrasts.
+
 
 
 ### repair
