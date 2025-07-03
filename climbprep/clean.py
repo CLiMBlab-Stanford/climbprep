@@ -191,7 +191,7 @@ if __name__ == '__main__':
                     )
                     if 'csf_wm' in confounds:
                         del confounds['csf_wm']
-                    if config['regress_out_task'] and eventfile_path:
+                    if config['regress_out_task'] and os.path.exists(eventfile_path):
                         events = pd.read_csv(eventfile_path, sep='\t')['trial_type', 'onset', 'duration']
                         dummies = pd.get_dummies(events.trial_type, prefix='trial_type', sep='.')
                         events = pd.concat([dummies, events[['onset', 'duration']]], axis=1)
