@@ -30,14 +30,7 @@ STAT_RE = re.compile('.+_stat-([a-zA-Z0-9]+)_')
 
 # Plotting
 PLOT_STATMAP_SUFFIX = '.nii.gz'
-PLOT_BOUNDS = dict(
-    z=(0, 2),
-    t=(0, 5)
-)
-PLOT_SCALE = 1
 PLOT_IMG_ORDER = [0, 1, 3, 2]
-PLOT_VTRIM = 0.1
-PLOT_HTRIM = 0.08
 PLOT_LIGHTING = {
     'ambient': 0.65,
     'diffuse': 0.5,
@@ -156,6 +149,17 @@ CONFIG = dict(
 for key in CONFIG['model']:
     CONFIG['plot'][key] = dict(
         model_label=key,
+        vmax=dict(
+            t=5,
+            z=2,
+        ),
+        threshold=dict(
+            t=0,
+            z=0
+        ),
+        engine='matplotlib',
+        vtrim=0.2,
+        htrim=0.2
     )
 
 

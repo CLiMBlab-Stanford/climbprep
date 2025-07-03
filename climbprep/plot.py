@@ -21,13 +21,14 @@ def plot(
         white,
         midthickness,
         sulc,
-        engine='matplotlib'
+        threshold=None,
+        vmax=None,
+        engine='matplotlib',
+        scale=1.5,
+        htrim=0.1,
+        vtrim=0.1
 ):
     with TemporaryDirectory() as tmp_dir:
-        stat = STAT_RE.match(statmap_path)
-        if not stat:
-            return
-        stat = stat.group(1)
         stderr(f'Plotting statmap {statmap_path}\n')
         statmap_nii = image.load_img(os.path.join(contrast_path, statmap_path))
 
@@ -50,8 +51,8 @@ def plot(
                     bg_map=sulc.parts[hemi],
                     hemi=hemi,
                     bg_on_data=True,
-                    threshold=PLOT_BOUNDS[stat][0],
-                    vmax=PLOT_BOUNDS[stat][1],
+                    threshold=threshold,
+                    vmax=vmax,
                     colorbar=True,
                     cmap='coolwarm',
                     symmetric_cmap=True,
@@ -72,7 +73,7 @@ def plot(
                         cbar.data = cbar.data[1:]
                         cbar.write_image(
                             cbar_path,
-                            scale=PLOT_SCALE
+                            scale=scale
                         )
                     elif engine == 'matplotlib':
                         cbar = plotting.plot_surf(
@@ -82,8 +83,8 @@ def plot(
                             hemi=hemi,
                             view=view if engine == 'matplotlib' else None,
                             bg_on_data=True,
-                            threshold=PLOT_BOUNDS[stat][0],
-                            vmax=PLOT_BOUNDS[stat][1],
+                            threshold=threshold,
+                            vmax=vmax,
                             colorbar=True,
                             cmap='coolwarm',
                             symmetric_cmap=True,
@@ -92,33 +93,35 @@ def plot(
                         cbar.axes[0].remove()
                         cbar.savefig(
                             cbar_path,
-                            dpi=300 * PLOT_SCALE
+                            dpi=300 * scale
                         )
+                        cbar.close()
                     else:
                         raise ValueError(f'Unknown plotting engine: {engine}')
                     cbar_img = Image.open(cbar_path)
                     w, h = cbar_img.size
-                    l, t, r, b = w * 5 / 6, h * PLOT_VTRIM, w, h * (1 - PLOT_VTRIM)
+                    l, t, r, b = w * 5 / 6, h * vtrim, w, h * (1 - vtrim)
                     cbar_img = cbar_img.crop((l, t, r, b))
                 fig_path = os.path.join(tmp_dir, out_path_base + f'_hemi-{hemi}_view-{view}.png')
                 if engine == 'plotly':
                     fig.data = fig.data[:1]
                     fig.write_image(
                         fig_path,
-                        scale=PLOT_SCALE
+                        scale=scale
                     )
                 elif engine == 'matplotlib':
                     fig.axes[1].remove()
                     fig.savefig(
                         fig_path,
-                        dpi=300 * PLOT_SCALE
+                        dpi=300 * scale
                     )
+                    fig.close()
                 else:
                     raise ValueError(f'Unknown plotting engine: {engine}')
                 img = Image.open(fig_path)
                 w, h = img.size
-                l, t, r, b = w * PLOT_HTRIM, h * PLOT_VTRIM, \
-                             w * (1 - PLOT_HTRIM), h * (1 - PLOT_VTRIM)
+                l, t, r, b = w * htrim, h * vtrim, \
+                             w * (1 - htrim), h * (1 - vtrim)
                 img = img.crop((l, t, r, b))
                 imgs[PLOT_IMG_ORDER[i]] = img
                 i += 1
@@ -283,6 +286,10 @@ if __name__ == '__main__':
                         statmap_paths.append(os.path.join(contrast_path, x))
 
                 for statmap_path in statmap_paths:
+                    stat = STAT_RE.match(statmap_path)
+                    if not stat:
+                        continue
+                    stat = stat.group(1)
                     kwargs = dict(
                         statmap_path=statmap_path,
                         contrast_path=contrast_path,
@@ -290,6 +297,11 @@ if __name__ == '__main__':
                         mesh=mesh,
                         white=white,
                         midthickness=midthickness,
-                        sulc=sulc
+                        sulc=sulc,
+                        vmax=config['vmax'][stat],
+                        threshold=config['threshold'][stat],
+                        engine=config['engine'],
+                        htrim=config['htrim'],
+                        vtrim=config['vtrim']
                     )
                     plot(**kwargs)
