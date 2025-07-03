@@ -317,7 +317,6 @@ if __name__ == '__main__':
                         htrim=config['htrim'],
                         vtrim=config['vtrim']
                     )
-                    plot(**kwargs)
                     kwargs_all.append(kwargs)
 
     pool = multiprocessing.Pool(ncpus)
