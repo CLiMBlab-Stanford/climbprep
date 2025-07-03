@@ -31,7 +31,8 @@ def get_contrast_spec(name, weights):
 
 
 if __name__ == '__main__':
-    argparser = argparse.ArgumentParser('Generate a model configuration file for fMRI analysis.')
+    argparser = argparse.ArgumentParser(('Generate a model configuration file for fMRI analysis. Writes a file to '
+                                         'the current working directory named `name`_model.json.'))
     argparser.add_argument('participant', help=('BIDS participant ID from which to initialize the model configuration '
                                                 '(i.e., load *events.tsv to extract condition names).'))
     argparser.add_argument('tasks', nargs='+', help='List of tasks to include in the model.')
@@ -108,67 +109,6 @@ if __name__ == '__main__':
 
     second_level_in = conditions | set(config.get('run', {}).keys())
 
-    # model = {
-    #     "Name": name,
-    #     "BIDSModelVersion": "1.0.0",
-    #     "Description": name,
-    #     "Input": {
-    #         "task": sorted(list(tasks))
-    #     },
-    #     "Nodes": [
-    #         {
-    #             "Level": "Run",
-    #             "Name": "run",
-    #             "GroupBy": ["run", "task", "session", "subject"],
-    #             "Transformations": {
-    #                 "Transformer": "pybids-transforms-v1",
-    #                 "Instructions": [
-    #                     {
-    #                         "Name": "Factor",
-    #                         "Input": "trial_type"
-    #                     },
-    #                     {
-    #                         "Name": "Convolve",
-    #                         "Input": [
-    #                             "trial_type.*"
-    #                         ]
-    #                     }
-    #                 ]
-    #             },
-    #             "Model": {
-    #                 "X": ['trial_type.*'] + MODEL_CONFOUNDS
-    #             },
-    #             "Contrasts": [
-    #                 get_contrast_spec(condition, {f"trial_type.{condition}": 1}) for condition in conditions
-    #             ]
-    #         },
-    #         {
-    #             "Level": "Session",
-    #             "Name": "session",
-    #             "GroupBy": ["session", "subject"],
-    #             "Model": {
-    #                 "X": sorted(list(second_level_in)),
-    #                 "Type": "meta"
-    #             },
-    #             "DummyContrasts": {"Test": "t"}
-    #         },
-    #         {
-    #             "Level": "Subject",
-    #             "Name": "subject",
-    #             "GroupBy": ["subject"],
-    #             "Model": {
-    #                 "X": sorted(list(second_level_in)),
-    #                 "Type": "meta"
-    #             },
-    #             "DummyContrasts": {"Test": "t"}
-    #         }
-    #     ],
-    #     "Edges": [
-    #         {"Source": "run", "Destination": "session"},
-    #         {"Source": "run", "Destination": "subject"}
-    #     ]
-    # }
-
     model = MODEL_TEMPLATE.copy()
     model['Name'] = name
     model['Description'] = name
@@ -203,10 +143,3 @@ if __name__ == '__main__':
     out_path = os.path.join(os.getcwd(), f'{name}_model.json')
     with open(out_path, 'w') as f:
         json.dump(model, f, indent=2)
-
-
-
-
-
-
-
