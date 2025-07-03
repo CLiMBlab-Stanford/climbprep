@@ -3,6 +3,7 @@ import yaml
 import numpy as np
 import matplotlib
 matplotlib.use("Agg", force=True)
+from matplotlib import pyplot as plt
 from plotly import graph_objects as go
 from tempfile import TemporaryDirectory
 from PIL import Image
@@ -95,7 +96,7 @@ def plot(
                             cbar_path,
                             dpi=300 * scale
                         )
-                        cbar.close()
+                        plt.close(cbar)
                     else:
                         raise ValueError(f'Unknown plotting engine: {engine}')
                     cbar_img = Image.open(cbar_path)
@@ -115,7 +116,7 @@ def plot(
                         fig_path,
                         dpi=300 * scale
                     )
-                    fig.close()
+                    plt.close(fig)
                 else:
                     raise ValueError(f'Unknown plotting engine: {engine}')
                 img = Image.open(fig_path)
