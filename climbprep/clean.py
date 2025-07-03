@@ -1,5 +1,6 @@
 import json
 import yaml
+import numpy as np
 import pandas as pd
 from nilearn import image, surface, maskers, signal, interfaces, glm
 import argparse
@@ -63,6 +64,7 @@ if __name__ == '__main__':
     for session in sessions:
         # Set session-dependent paths
         subdir = 'sub-%s' % participant
+        participant_dir = subdir
         if session:
             subdir = os.path.join(subdir, 'ses-%s' % session)
         fmriprep_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label, subdir)
@@ -71,7 +73,7 @@ if __name__ == '__main__':
         assert os.path.exists(raw_path), 'Path not found: %s' % raw_path
         func_path = os.path.join(fmriprep_path, 'func')
         assert os.path.exists(func_path), 'Path not found: %s' % func_path
-        anat_path = os.path.join(fmriprep_path, 'anat')
+        anat_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label, participant_dir, 'anat')
         assert os.path.exists(anat_path), 'Path not found: %s' % anat_path
 
         if session:
@@ -108,6 +110,7 @@ if __name__ == '__main__':
                     assert os.path.exists(raw_sidecar_path), 'Path not found: %s' % raw_sidecar_path
                     with open(raw_sidecar_path, 'r') as f:
                         raw_sidecar = json.load(f)
+                    eventfile_path = raw_sidecar_path.replace('_bold.json', '_events.tsv')
                     TR = raw_sidecar.get('RepetitionTime', None)
                     StartTime = raw_sidecar.get('StartTime', None)
                     assert TR, 'RepetitionTime information not found in raw sidecar: %s' % raw_sidecar_path
@@ -120,6 +123,7 @@ if __name__ == '__main__':
                     datasets[space][task][run]['func'] = func
                     datasets[space][task][run]['mask'] = mask
                     datasets[space][task][run]['confounds'] = confounds
+                    datasets[space][task][run]['eventfile_path'] = eventfile_path
                     datasets[space][task][run]['TR'] = TR
                     datasets[space][task][run]['StartTime'] = StartTime
             elif clean_surf and img_path.endswith('_bold.func.gii') and '_hemi-L_' in img_path:
@@ -143,6 +147,7 @@ if __name__ == '__main__':
                     assert os.path.exists(raw_sidecar_path), 'Path not found: %s' % raw_sidecar_path
                     with open(raw_sidecar_path, 'r') as f:
                         raw_sidecar = json.load(f)
+                    eventfile_path = raw_sidecar_path.replace('_bold.json', '_events.tsv')
                     TR = raw_sidecar.get('RepetitionTime', None)
                     StartTime = raw_sidecar.get('StartTime', None)
                     assert TR, 'RepetitionTime information not found in raw sidecar: %s' % raw_sidecar_path
@@ -155,6 +160,7 @@ if __name__ == '__main__':
                     datasets[space][task][run]['func'] = func
                     datasets[space][task][run]['mask'] = None
                     datasets[space][task][run]['confounds'] = confounds
+                    datasets[space][task][run]['eventfile_path'] = eventfile_path
                     datasets[space][task][run]['TR'] = TR
                     datasets[space][task][run]['StartTime'] = StartTime
 
@@ -172,10 +178,12 @@ if __name__ == '__main__':
             for task in datasets[space]:
                 for run in datasets[space][task]:
                     confounds = datasets[space][task][run]['confounds']
+                    eventfile_path = datasets[space][task][run]['eventfile_path']
                     mask = datasets[space][task][run]['mask']
                     func_path = datasets[space][task][run]['func']
                     func_file = os.path.basename(func_path)
                     TR = datasets[space][task][run]['TR']
+                    StartTime = datasets[space][task][run]['StartTime']
 
                     confounds = pd.read_csv(confounds, sep='\t')
                     confounds = confounds.filter(
@@ -183,6 +191,26 @@ if __name__ == '__main__':
                     )
                     if 'csf_wm' in confounds:
                         del confounds['csf_wm']
+                    if config['regress_out_task'] and eventfile_path:
+                        events = pd.read_csv(eventfile_path, sep='\t')['trial_type', 'onset', 'duration']
+                        dummies = pd.get_dummies(events.trial_type, prefix='trial_type', sep='.')
+                        events = pd.concat([dummies, events[['onset', 'duration']]], axis=1)
+                        cols = [x for x in events.columns if x.startswith('trial_type')]
+                        frame_times = np.arange(len(confounds)) * TR + StartTime
+                        for col in cols:
+                            convolved = glm.first_level.compute_regressor(
+                                events[[col, 'onset', 'duration']],
+                                'spm',
+                                frame_times
+                            )
+                            print(frame_times)
+                            print(convolved)
+                            input()
+                        events = events.filter(regex='^(trial_type|onset|duration|response_time)$')
+                        if 'trial_type' in events.columns:
+                            confounds = interfaces.fmriprep.regress_out_task(
+                                confounds, events, TR=TR, StartTime=StartTime
+                            )
                     print(confounds)
                     print(confounds.columns)
                     input()
