@@ -80,6 +80,7 @@ def plot(
                             surf_map=statmap,
                             bg_map=sulc.parts[hemi],
                             hemi=hemi,
+                            view=view if engine == 'matplotlib' else None,
                             bg_on_data=True,
                             threshold=PLOT_BOUNDS[stat][0],
                             vmax=PLOT_BOUNDS[stat][1],
@@ -91,7 +92,7 @@ def plot(
                         cbar.axes[0].remove()
                         cbar.savefig(
                             cbar_path,
-                            dpi=100 * PLOT_SCALE
+                            dpi=300 * PLOT_SCALE
                         )
                     else:
                         raise ValueError(f'Unknown plotting engine: {engine}')
@@ -110,7 +111,7 @@ def plot(
                     fig.axes[1].remove()
                     fig.savefig(
                         fig_path,
-                        dpi=100 * PLOT_SCALE
+                        dpi=300 * PLOT_SCALE
                     )
                 else:
                     raise ValueError(f'Unknown plotting engine: {engine}')
