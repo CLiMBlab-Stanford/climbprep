@@ -35,6 +35,8 @@ if __name__ == '__main__':
     argparser.add_argument('participant', help=('BIDS participant ID from which to initialize the model configuration '
                                                 '(i.e., load *events.tsv to extract condition names).'))
     argparser.add_argument('tasks', nargs='+', help='List of tasks to include in the model.')
+    argparser.add_argument('-n', '--name', help=('Name of the model configuration file to generate. Required if '
+                                                 '`len(tasks) > `1, otherwise can be inferred as the task name.'))
     argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", '
                                                                         '"evlab", etc.). Default: "climblab"'))
     argparser.add_argument('-c', '--config', help=('Path to YAML file containing any additional contrasts '
@@ -58,6 +60,12 @@ if __name__ == '__main__':
 
     participant = args.participant
     tasks = set(args.tasks)
+    name = args.name
+    if not name:
+        if len(tasks) == 1:
+            name = tasks[0]
+        else:
+            raise ValueError('Must provide a name for the model if more than one task is included.')
     project = args.project
     config = args.config
     if config:
@@ -178,6 +186,10 @@ if __name__ == '__main__':
             if 'Contrasts' not in node:
                 node['Contrasts'] = []
             node['Contrasts'] = contrast_spec
+
+    out_path = os.path.join(os.getcwd(), f'{name}_model.json')
+    with open(out_path, 'w') as f:
+        json.dump(model, f, indent=2)
 
 
 
