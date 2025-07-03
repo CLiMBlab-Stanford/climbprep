@@ -107,6 +107,7 @@ if __name__ == '__main__':
                     with open(raw_sidecar_path, 'r') as f:
                         raw_sidecar = json.load(f)
                     TR = raw_sidecar.get('RepetitionTime', None)
+                    StartTime = raw_sidecar.get('StartTime', None)
                     assert TR, 'RepetitionTime information not found in raw sidecar: %s' % raw_sidecar_path
                     if space not in datasets:
                         datasets[space] = {}
@@ -118,6 +119,7 @@ if __name__ == '__main__':
                     datasets[space][task][run]['mask'] = mask
                     datasets[space][task][run]['confounds'] = confounds
                     datasets[space][task][run]['TR'] = TR
+                    datasets[space][task][run]['StartTime'] = StartTime
             elif clean_surf and img_path.endswith('_bold.func.gii') and '_hemi-L_' in img_path:
                 space = SPACE_RE.match(img_path)
                 run = RUN_RE.match(img_path)
@@ -137,6 +139,7 @@ if __name__ == '__main__':
                     with open(raw_sidecar_path, 'r') as f:
                         raw_sidecar = json.load(f)
                     TR = raw_sidecar.get('RepetitionTime', None)
+                    StartTime = raw_sidecar.get('StartTime', None)
                     assert TR, 'RepetitionTime information not found in raw sidecar: %s' % raw_sidecar_path
                     if space not in datasets:
                         datasets[space] = {}
@@ -148,6 +151,7 @@ if __name__ == '__main__':
                     datasets[space][task][run]['mask'] = None
                     datasets[space][task][run]['confounds'] = confounds
                     datasets[space][task][run]['TR'] = TR
+                    datasets[space][task][run]['StartTime'] = StartTime
 
 
         out_dir = os.path.join(derivatives_path, 'cleaned', cleaning_label, subdir)
