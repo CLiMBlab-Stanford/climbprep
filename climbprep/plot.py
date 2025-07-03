@@ -159,6 +159,10 @@ if __name__ == '__main__':
     argparser.add_argument('participant', help='BIDS participant ID')
     argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", '
                                                                         '"evlab", etc.). Default: "climblab"'))
+    argparser.add_argument('-m', '--models', default=[], nargs='*', help=('List of models to plot. '
+                                                                          '(see `climbprep.constants.MODELFILES_PATH` '
+                                                                          'If not specified, will plot all models '
+                                                                          'available for the participant.'))
     argparser.add_argument('-c', '--config', default=PLOT_DEFAULT_KEY, help=('Keyword (currently `main`) '
         'or YAML config file to used to parameterize preprocessing. If a keyword is provided, will '
         'the default settings for associated with that keyword. '
@@ -168,9 +172,11 @@ if __name__ == '__main__':
     args = argparser.parse_args()
 
     participant = args.participant
+    project = args.project
+    models = args.models
+    config = args.config
     ncpus = args.ncpus
 
-    config = args.config
     if config in CONFIG['plot']:
         plot_label = config
         config_default = CONFIG['plot'][config]
@@ -191,7 +197,6 @@ if __name__ == '__main__':
     model_label = config.pop('model_label')
 
     # Set paths
-    project = args.project
     project_path = os.path.join(BIDS_PATH, project)
     assert os.path.exists(project_path), 'Path not found: %s' % project_path
     derivatives_path = os.path.join(project_path, 'derivatives')
@@ -201,6 +206,8 @@ if __name__ == '__main__':
 
     kwargs_all = []
     for model_subdir in os.listdir(models_path):
+        if models and model_subdir not in models:
+            continue
         model_path = os.path.join(models_path, model_subdir)
         if not os.path.isdir(model_path):
             continue
