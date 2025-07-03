@@ -96,8 +96,7 @@ if __name__ == '__main__':
                     else:
                         mask = f'sub-{participant}{ses_str}_space-{space}_label-GM_probseg.nii.gz'
                     mask = os.path.join(anat_path, mask)
-                    # confounds = f'sub-{participant}{ses_str}_task-{task}_run-{run}_desc-confounds_timeseries.tsv'
-                    confounds = os.path.join(func_path, img_path)
+                    confounds = f'sub-{participant}{ses_str}_task-{task}_run-{run}_desc-confounds_timeseries.tsv'
                     assert os.path.exists(confounds), 'Confounds file not found: %s' % confounds
                     func = os.path.join(func_path, img_path)
                     raw_sidecar_path = os.path.join(
@@ -127,8 +126,7 @@ if __name__ == '__main__':
                     type_by_space[space] = 'surf'
                     run = run.group(1)
                     task = task.group(1)
-                    # confounds = f'sub-{participant}{ses_str}_task-{task}_run-{run}_desc-confounds_timeseries.tsv'
-                    confounds = os.path.join(func_path, img_path)
+                    confounds = f'sub-{participant}{ses_str}_task-{task}_run-{run}_desc-confounds_timeseries.tsv'
                     assert os.path.exists(confounds), 'Confounds file not found: %s' % confounds
                     func = os.path.join(func_path, img_path)
                     raw_sidecar_path = os.path.join(
@@ -168,6 +166,16 @@ if __name__ == '__main__':
                     func_path = datasets[space][task][run]['func']
                     func_file = os.path.basename(func_path)
                     TR = datasets[space][task][run]['TR']
+
+                    confounds = pd.read_csv(confounds, sep='\t')
+                    confounds = confounds.filter(
+                        regex=(r'^(global_signal|csf|white|trans|rot|motion_outlier).*')
+                    )
+                    if 'csf_wm' in confounds:
+                        del confounds['csf_wm']
+                    print(confounds)
+                    print(confounds.columns)
+                    input()
 
                     confounds, sample_mask = interfaces.fmriprep.load_confounds(
                         confounds,

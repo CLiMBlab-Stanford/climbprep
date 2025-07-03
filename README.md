@@ -299,8 +299,8 @@ The lab uses the BIDS Stats Models specification to control first-level models,
 where each model written as a JSON file in `/juice6/u/nlp/climblab/modelfiles`.
 For new experiments or analyses, you may need to make a new model file.
 You're welcome to do this by hand following the BIDS specification, but
-this can be pretty error-prone. For typical experiments, most of the model-
-writing can be automated by the `generate_model` utility, which will
+this can be pretty error-prone. For typical experiments, most of the 
+model-writing can be automated by the `generate_model` utility, which will
 generate a model file based on a set of task names and conditions inferred
 from an example participant, along with any novel contrasts you want, which you
 specify in a YAML file.
@@ -328,6 +328,14 @@ run:
     S: 0.5
     N: -0.5
 ```
+Some contrasts may compare conditions that do not appear in all runs,
+in which case it would not be possible to compute them at the run level
+and you need to specify them at the session and/or subject level.
+Somewhat counterintuitively, the session and subject levels are computed
+independently from the run level, so new contrasts at the session level
+do not propagate to the subject level. If you want the contrast to exist
+at both levels, you must specify it at both levels.
+
 Note that the weight magnitudes should sum to one, to facilitate comparison
 across contrasts.
 
