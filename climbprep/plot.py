@@ -27,7 +27,7 @@ def plot(
         threshold=None,
         vmax=None,
         engine='matplotlib',
-        scale=1.5,
+        scale=1,
         htrim=0.1,
         vtrim=0.1
 ):
@@ -314,10 +314,12 @@ if __name__ == '__main__':
                         vmax=config['vmax'][stat],
                         threshold=config['threshold'][stat],
                         engine=config['engine'],
+                        scale= config['scale'],
                         htrim=config['htrim'],
                         vtrim=config['vtrim']
                     )
+                    plot(**kwargs)
                     kwargs_all.append(kwargs)
 
-    pool = multiprocessing.Pool(ncpus)
-    pool.map(_plot, kwargs_all)
+    # pool = multiprocessing.Pool(ncpus)
+    # pool.map(_plot, kwargs_all)

@@ -150,16 +150,17 @@ for key in CONFIG['model']:
     CONFIG['plot'][key] = dict(
         model_label=key,
         vmax=dict(
-            t=5,
-            z=2,
+            t=3,
+            z=3,
         ),
         threshold=dict(
             t=0,
             z=0
         ),
-        engine='matplotlib',
-        vtrim=0.2,
-        htrim=0.125
+        engine='plotly',
+        vtrim=0.1,
+        htrim=0.1,
+        scale=1
     )
 
 
