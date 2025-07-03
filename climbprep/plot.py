@@ -66,24 +66,54 @@ def plot(
                     else:
                         camera.eye.x = camera.eye.x * 1.05
                 if colorbar:
+                    cbar_path = os.path.join(tmp_dir, out_path_base + f'_cbar.png')
                     if engine == 'plotly':
                         cbar = go.Figure(fig)
                         cbar.data = cbar.data[1:]
-                    cbar_path = os.path.join(tmp_dir, out_path_base + f'_cbar.png')
-                    cbar.write_image(
-                        cbar_path,
-                        scale=PLOT_SCALE
-                    )
+                        cbar.write_image(
+                            cbar_path,
+                            scale=PLOT_SCALE
+                        )
+                    elif engine == 'matplotlib':
+                        cbar = plotting.plot_surf(
+                            surf_mesh=midthickness,
+                            surf_map=statmap,
+                            bg_map=sulc.parts[hemi],
+                            hemi=hemi,
+                            bg_on_data=True,
+                            threshold=PLOT_BOUNDS[stat][0],
+                            vmax=PLOT_BOUNDS[stat][1],
+                            colorbar=True,
+                            cmap='coolwarm',
+                            symmetric_cmap=True,
+                            engine=engine
+                        )
+                        cbar.axes[0].remove()
+                        cbar.savefig(
+                            cbar_path,
+                            dpi=100 * PLOT_SCALE
+                        )
+                    else:
+                        raise ValueError(f'Unknown plotting engine: {engine}')
                     cbar_img = Image.open(cbar_path)
                     w, h = cbar_img.size
                     l, t, r, b = w * 5 / 6, h * PLOT_VTRIM, w, h * (1 - PLOT_VTRIM)
                     cbar_img = cbar_img.crop((l, t, r, b))
-                fig.data = fig.data[:1]
                 fig_path = os.path.join(tmp_dir, out_path_base + f'_hemi-{hemi}_view-{view}.png')
-                fig.write_image(
-                    fig_path,
-                    scale=PLOT_SCALE
-                )
+                if engine == 'plotly':
+                    fig.data = fig.data[:1]
+                    fig.write_image(
+                        fig_path,
+                        scale=PLOT_SCALE
+                    )
+                elif engine == 'matplotlib':
+                    fig.axes[1].remove()
+                    fig.savefig(
+                        fig_path,
+                        dpi=100 * PLOT_SCALE
+                    )
+                else:
+                    raise ValueError(f'Unknown plotting engine: {engine}')
                 img = Image.open(fig_path)
                 w, h = img.size
                 l, t, r, b = w * PLOT_HTRIM, h * PLOT_VTRIM, \
