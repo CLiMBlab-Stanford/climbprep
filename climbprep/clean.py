@@ -234,7 +234,7 @@ if __name__ == '__main__':
                             low_pass=config['smoothing_fwhm'],
                             high_pass=config['high_pass']
                         )
-                        kwargs = dict(confounds=confounds)
+                        kwargs = dict(confounds=confounds.fillna(0))
                         desc = 'desc-clean'
                         run = masker.fit_transform(func_path, **kwargs)
                         run = masker.inverse_transform(run)
