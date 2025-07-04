@@ -18,7 +18,8 @@ JOB_TYPES = [
     'preprocess',
     'clean',
     'model',
-    'plot'
+    'plot',
+    'parcellate'
 ]
 
 JOB_ORDER = [
@@ -26,7 +27,8 @@ JOB_ORDER = [
     'preprocess',
     'clean',
     'model',
-    'plot'
+    'plot',
+    'parcellate'
 ]
 
 
@@ -37,7 +39,7 @@ if __name__ == '__main__':
     argparser.add_argument('participants', nargs='*', help='ID(s) of participant(s).')
     argparser.add_argument('-p', '--project', default='climblab', help='BIDS project name (default `climblab`)')
     argparser.add_argument('-j', '--job-types', nargs='+', default=JOB_TYPES, help=('Type(s) of job to run. One or '
-        'more of ``["bidsify", "preprocess", "clean", "model", "plot"]``'))
+        'more of ``["bidsify", "preprocess", "clean", "model", "plot", "parcellate"]``'))
     argparser.add_argument('-t', '--time', type=int, default=72, help='Maximum number of hours to train models')
     argparser.add_argument('-n', '--n-cores', type=int, default=8, help='Number of cores to request')
     argparser.add_argument('-m', '--memory', type=int, default=64, help='Number of GB of memory to request')
@@ -56,6 +58,8 @@ if __name__ == '__main__':
                                                                  'specified, the default config will be used.'))
     argparser.add_argument('--plot-config', default=None, help=('Plotting config (path or keyword). If not '
                                                                 'specified, the default config will be used.'))
+    argparser.add_argument('--parcellate-config', default=None, help=('Parcellation config (path or keyword). If not '
+                                                                      'specified, the default config will be used.'))
     args = argparser.parse_args()
 
     participants = args.participants
@@ -96,6 +100,10 @@ if __name__ == '__main__':
         plot_config_str = ' -c %s' % args.plot_config
     else:
         plot_config_str = ''
+    if args.parcellate_config:
+        parcellate_config_str = ' -c %s' % args.parcellate_config
+    else:
+        parcellate_config_str = ''
 
     if not os.path.exists(outdir):
         os.makedirs(outdir)
@@ -131,6 +139,9 @@ if __name__ == '__main__':
                 elif job_type.lower() == 'plot':
                     job_str = wrapper % ('python -m climbprep.plot %s -p %s%s\n' %
                                          (participant, project, plot_config_str))
+                elif job_type.lower() == 'parcellate':
+                    job_str = wrapper % ('python -m climbprep.parcellate %s -p %s%s\n' %
+                                         (participant, project, parcellate_config_str))
                 else:
                     raise ValueError('Unrecognized job type: %s.' % job_type)
                 f.write(job_str)
