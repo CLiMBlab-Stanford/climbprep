@@ -207,36 +207,17 @@ if __name__ == '__main__':
                             print(convolved)
                             print(convolved_names)
                             input()
+                    confounds_outpath = os.path.join(
+                        out_dir, func_file.replace('desc-preproc_bold.nii.gz', 'desc-confounds_timeseries.tsv')
+                    )
+
                     print(confounds)
                     print(confounds.columns)
                     input()
 
-                    confounds, sample_mask = interfaces.fmriprep.load_confounds(
-                        confounds,
-                        strategy=config['strategy'],
-                        std_dvars_threshold=config['std_dvars_threshold'],
-                        fd_threshold=config['fd_threshold']
-                    )
-                    confounds_path = os.path.join(
-                        out_dir, func_file.replace('_bold.nii.gz', '_confounds.tsv')
-                    )
-                    confounds.to_csv(confounds_path, sep='\t', index=False)
-                    if sample_mask is None:
-                        sample_mask = []
-
-                    _sample_mask = pd.DataFrame(dict(sample_mask=list(sample_mask)))
-                    sample_mask_path = os.path.join(
-                        out_dir, func_file.replace('_bold.nii.gz', '_samplemask.tsv').replace('_bold.func.gii', '_samplemask.tsv')
-                    )
-                    _sample_mask.to_csv(sample_mask_path, sep='\t', index=False)
-
                     if type_by_space[space] == 'vol':  # Volumetric data
                         mask_nii = load_img(mask)
                         func = load_img(func_path)
-
-                        model = glm.first_level.FirstLevelModel(
-                            t_r=TR,
-                        )
 
                         mask_nii = image.math_img(
                             'img > 0.5',
@@ -255,8 +236,6 @@ if __name__ == '__main__':
                         )
                         kwargs = dict(confounds=confounds)
                         desc = 'desc-clean'
-                        if config['scrub']:
-                            kwargs['sample_mask'] = sample_mask
                         run = masker.fit_transform(func_path, **kwargs)
                         run = masker.inverse_transform(run)
                         run_path = os.path.join(
@@ -284,8 +263,6 @@ if __name__ == '__main__':
                         )
                         kwargs = dict(confounds=confounds)
                         desc = 'desc-clean'
-                        if config['scrub']:
-                            kwargs['sample_mask'] = sample_mask
                         mesh = surface.PolyMesh(left=surf_L_path, right=surf_R_path)
                         data = surface.PolyData(left=func_path, right=func_path.replace('_hemi-L_', '_hemi-R_'))
                         img = surface.SurfaceImage(mesh, data)
