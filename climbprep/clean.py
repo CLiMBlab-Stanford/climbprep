@@ -101,6 +101,13 @@ if __name__ == '__main__':
                     else:
                         mask = f'sub-{participant}{ses_str}_space-{space}_label-GM_probseg.nii.gz'
                     mask = os.path.join(anat_path, mask)
+                    if not os.path.exists(mask):
+                        if space == 'T1w':
+                            mask = f'sub-{participant}_label-GM_probseg.nii.gz'
+                        else:
+                            mask = f'sub-{participant}_space-{space}_label-GM_probseg.nii.gz'
+                        mask = os.path.join(anat_path, mask)
+                    assert os.path.exists(mask), 'Mask file not found: %s' % mask
                     confounds = os.path.join(
                         func_path,
                         f'sub-{participant}{ses_str}_task-{task}_run-{run}_desc-confounds_timeseries.tsv'
