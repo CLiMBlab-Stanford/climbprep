@@ -203,7 +203,7 @@ if __name__ == '__main__':
                         frame_times = np.arange(len(confounds)) * TR + StartTime
                         for col in cols:
                             convolved_, convolved_names = glm.first_level.compute_regressor(
-                                (events[col], events['onset'], events['duration']),
+                                (events['onset'], events['duration'], events[col]),
                                 'spm',
                                 frame_times
                             )
