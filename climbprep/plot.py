@@ -16,29 +16,33 @@ from climbprep.constants import *
 from climbprep.util import *
 
 
-def plot(
+def plot_surface(
         statmap_path,
-        contrast_path,
-        plot_path,
         mesh,
         white,
         midthickness,
         sulc,
+        plot_path=None,
         threshold=None,
         vmax=None,
-        engine='matplotlib',
+        engine='plotly',
+        cmap='coolwarm',
         scale=1,
         htrim=0.1,
         vtrim=0.1
 ):
+    assert plot_path or engine == 'plotly', 'Plotting engine must be "plotly" if no plot_path is provided.'
     with TemporaryDirectory() as tmp_dir:
         stderr(f'Plotting statmap {statmap_path}\n')
-        statmap_nii = image.load_img(os.path.join(contrast_path, statmap_path))
+        statmap_nii = image.load_img(statmap_path)
 
+        cbar_data = None
         cbar_img = None
         imgs = [None] * 4
         i = 0
         out_path_base = os.path.basename(statmap_path)[:-len(PLOT_STATMAP_SUFFIX)]
+        fig_left = None
+        fig_right = None
         for hemi in ('left', 'right'):
             statmap = surface.vol_to_surf(
                 statmap_nii,
@@ -47,7 +51,9 @@ def plot(
                 depth=np.linspace(0.0, 1.0, 10)
             )
             for view in ('lateral', 'medial'):
-                colorbar = hemi == 'right' and view == 'lateral'
+                if not plot_path and view == 'medial':
+                    continue
+                colorbar = hemi == 'right' and view == 'lateral' and plot_path
                 fig = plotting.plot_surf(
                     surf_mesh=midthickness,
                     surf_map=statmap,
@@ -58,7 +64,7 @@ def plot(
                     threshold=threshold,
                     vmax=vmax,
                     colorbar=True,
-                    cmap='coolwarm',
+                    cmap=cmap,
                     symmetric_cmap=True,
                     engine=engine
                 )
@@ -108,11 +114,18 @@ def plot(
                     cbar_img = cbar_img.crop((l, t, r, b))
                 fig_path = os.path.join(tmp_dir, out_path_base + f'_hemi-{hemi}_view-{view}.png')
                 if engine == 'plotly':
+                    if cbar_data is None:
+                        cbar_data = fig.data[1]
                     fig.data = fig.data[:1]
-                    fig.write_image(
-                        fig_path,
-                        scale=scale
-                    )
+                    if hemi == 'left':
+                        fig_left = fig
+                    else:
+                        fig_right = fig
+                    if plot_path:
+                        fig.write_image(
+                            fig_path,
+                            scale=scale
+                        )
                 elif engine == 'matplotlib':
                     fig.axes[1].remove()
                     fig.savefig(
@@ -122,32 +135,42 @@ def plot(
                     plt.close(fig)
                 else:
                     raise ValueError(f'Unknown plotting engine: {engine}')
-                img = Image.open(fig_path)
-                w, h = img.size
-                l, t, r, b = w * htrim, h * vtrim, \
-                             w * (1 - htrim), h * (1 - vtrim)
-                img = img.crop((l, t, r, b))
-                imgs[PLOT_IMG_ORDER[i]] = img
+                if plot_path:
+                    img = Image.open(fig_path)
+                    w, h = img.size
+                    l, t, r, b = w * htrim, h * vtrim, \
+                                 w * (1 - htrim), h * (1 - vtrim)
+                    img = img.crop((l, t, r, b))
+                    imgs[PLOT_IMG_ORDER[i]] = img
                 i += 1
 
-        if cbar_img:
-            imgs.append(cbar_img)
-        widths, heights = zip(*(i.size for i in imgs))
-        total_width = sum(widths)
-        max_height = max(heights)
-        new_im = Image.new('RGB', (total_width, max_height))
-        x_offset = 0
-        for im in imgs:
-            new_im.paste(im, (x_offset, 0))
-            x_offset += im.size[0]
-        img_path = os.path.join(plot_path, out_path_base + '.png')
-        new_im.save(img_path)
+        if plot_path:
+            if cbar_img:
+                imgs.append(cbar_img)
+            widths, heights = zip(*(i.size for i in imgs))
+            total_width = sum(widths)
+            max_height = max(heights)
+            new_im = Image.new('RGB', (total_width, max_height))
+            x_offset = 0
+            for im in imgs:
+                new_im.paste(im, (x_offset, 0))
+                x_offset += im.size[0]
+            img_path = os.path.join(plot_path, out_path_base + '.png')
+            new_im.save(img_path)
+        else:
+            assert fig_left, 'No left hemisphere figure generated.'
+            assert fig_right, 'No right hemisphere figure generated.'
+            fig_left.add_trace(fig_right.data[0])
+            fig_left.add_trace(cbar_data)
+
         stderr(f'    Finished plotting statmap {statmap_path}\n')
+
+        return fig_left
 
 
 def _plot(kwargs):
     try:
-        plot(**kwargs)
+        plot_surface(**kwargs)
     except Exception as e:
         stderr(f'Error plotting statmap {kwargs["statmap_path"]}\n')
         traceback.print_exc()
@@ -311,8 +334,7 @@ if __name__ == '__main__':
                         continue
                     stat = stat.group(1)
                     kwargs = dict(
-                        statmap_path=statmap_path,
-                        contrast_path=contrast_path,
+                        statmap_path=os.path.join(contrast_path, statmap_path),
                         plot_path=plot_path,
                         mesh=mesh,
                         white=white,
@@ -325,7 +347,7 @@ if __name__ == '__main__':
                         htrim=config['htrim'],
                         vtrim=config['vtrim']
                     )
-                    plot(**kwargs)
+                    plot_surface(**kwargs)
                     kwargs_all.append(kwargs)
 
     # pool = multiprocessing.Pool(ncpus)
