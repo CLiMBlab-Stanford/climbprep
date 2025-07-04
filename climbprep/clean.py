@@ -75,6 +75,8 @@ if __name__ == '__main__':
         func_path = os.path.join(fmriprep_path, 'func')
         assert os.path.exists(func_path), 'Path not found: %s' % func_path
         anat_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label, participant_dir, 'anat')
+        if not os.path.exists(anat_path):
+            anat_path = os.path.join(fmriprep_path, 'anat')
         assert os.path.exists(anat_path), 'Path not found: %s' % anat_path
 
         if session:
