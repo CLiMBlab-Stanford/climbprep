@@ -19,10 +19,9 @@ if __name__ == '__main__':
                                                                           '(see `climbprep.constants.MODELFILES_PATH` '
                                                                           'If not specified, will run all models '
                                                                           'available for the participant.'))
-    argparser.add_argument('-c', '--config', default=MODEL_DEFAULT_KEY, help=('Keyword (currently `main`) '
-        'or YAML config file to used to parameterize firstlevels. If a keyword is provided, will use the default '
-        'settings for that keyword. If not provided, will use default settings. '
-        'To view the available config options, see `DEFAULTS["model"]["main"]` in `climbprep/constants.py`. '))
+    argparser.add_argument('-c', '--config', default=MODEL_DEFAULT_KEY, help=('Config name (default `T1w`) '
+        'or YAML config file to used to parameterize model. '
+        'See `climbprep.constants.CONFIG["model"]` for available config names and their settings. '))
     args = argparser.parse_args()
 
     participant = args.participant.replace('sub-', '')

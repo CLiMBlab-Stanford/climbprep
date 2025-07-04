@@ -19,6 +19,7 @@ PREPROCESS_DEFAULT_KEY = 'main'
 CLEAN_DEFAULT_KEY = 'fc'
 MODEL_DEFAULT_KEY = 'T1w'
 PLOT_DEFAULT_KEY = MODEL_DEFAULT_KEY
+PARCELLATE_DEFAULT_KEY = 'T1w'
 
 # Regex
 SPACE_RE = re.compile('.+_space-([a-zA-Z0-9]+)_')
@@ -27,6 +28,8 @@ TASK_RE = re.compile('.+_task-([a-zA-Z0-9]+)_')
 CONTRAST_RE = re.compile('.+_contrast-([a-zA-Z0-9]+)_')
 HEMI_RE = re.compile('.+_hemi-([a-zA-Z0-9]+)_')
 STAT_RE = re.compile('.+_stat-([a-zA-Z0-9]+)_')
+FROM_RE = re.compile('.+_from-([a-zA-Z0-9]+)_')
+TO_RE = re.compile('.+_to-([a-zA-Z0-9]+)_')
 
 # Modeling
 MODEL_CONFOUNDS = [
@@ -123,6 +126,9 @@ PLOT_VIEWS = {
     ('right', 'medial'): (0, -90),
 }
 
+# Parcellation
+
+
 # Configurations
 CONFIG = dict(
     preprocess=dict(
@@ -198,7 +204,31 @@ CONFIG = dict(
             drop_missing=True
         )
     ),
-    plot=dict()
+    plot=dict(
+        T1w=dict(),
+        mni=dict()
+    ),
+    parcellate=dict(
+        T1w=dict(
+            cleaning_label='T1w',
+            space='T1w',
+            sample=dict(
+                main=dict(
+                    n_networks=100,
+                    n_samples=1000,
+                    low_pass=None,
+                    high_pass=None,
+                    fwhm=None
+                )
+            ),
+            align=dict(
+                main=dict(
+                    prealign=True,
+                    minmax_normalize=False
+                )
+            )
+        )
+    )
 )
 for key in CONFIG['model']:
     CONFIG['plot'][key] = dict(

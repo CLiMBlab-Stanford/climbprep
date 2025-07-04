@@ -23,10 +23,9 @@ if __name__ == '__main__':
     argparser.add_argument('participant', help='BIDS participant ID')
     argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", '
                                                                         '"evlab", etc.). Default: "climblab"'))
-    argparser.add_argument('-c', '--config', default=CLEAN_DEFAULT_KEY, help=('Keyword (currently `firstlevels` or '
-        '`fc`) or YAML config file to used to parameterize cleaning. If a keyword is provided, will use the default '
-        'settings for that type of downstream analysis. If not provided, will use default settings. '
-        'To view the available config options, see `DEFAULTS["clean"]["firstlevels"]` in `climbprep/constants.py`.'))
+    argparser.add_argument('-c', '--config', default=CLEAN_DEFAULT_KEY, help=('Config name (default `fc`) '
+        'or YAML config file to used to parameterize cleaning. '
+        'See `climbprep.constants.CONFIG["clean"]` for available config names and their settings. '))
     args = argparser.parse_args()
 
     participant = args.participant.replace('sub-', '')
