@@ -6,6 +6,7 @@ from nilearn import image, surface, maskers, signal, interfaces, glm
 import argparse
 
 from climbprep.constants import *
+from climbprep.util import *
 
 IMG_CACHE = {}
 
@@ -104,16 +105,17 @@ if __name__ == '__main__':
                     )
                     assert os.path.exists(confounds), 'Confounds file not found: %s' % confounds
                     func = os.path.join(func_path, img_path)
-                    raw_sidecar_path = os.path.join(
-                        raw_path, 'func', img_path.split('_run-')[0] + '_run-' + run + '_bold.json'
+                    sidecar_path = func.replace('.nii.gz', '.json')
+                    assert os.path.exists(sidecar_path), 'Path not found: %s' % sidecar_path
+                    with open(sidecar_path, 'r') as f:
+                        sidecar = json.load(f)
+                    eventfile_path = os.path.join(
+                        raw_path, 'func', img_path.split('_run-')[0] + '_run-' + run + '_events.tsv'
                     )
-                    assert os.path.exists(raw_sidecar_path), 'Path not found: %s' % raw_sidecar_path
-                    with open(raw_sidecar_path, 'r') as f:
-                        raw_sidecar = json.load(f)
-                    eventfile_path = raw_sidecar_path.replace('_bold.json', '_events.tsv')
-                    TR = raw_sidecar.get('RepetitionTime', None)
-                    StartTime = raw_sidecar.get('StartTime', None)
-                    assert TR, 'RepetitionTime information not found in raw sidecar: %s' % raw_sidecar_path
+                    TR = sidecar.get('RepetitionTime', None)
+                    StartTime = sidecar.get('StartTime', None)
+                    assert TR, 'RepetitionTime information not found in sidecar: %s' % sidecar_path
+                    assert StartTime, 'StartTime information not found in sidecar: %s' % sidecar_path
                     if space not in datasets:
                         datasets[space] = {}
                     if task not in datasets[space]:
@@ -141,16 +143,17 @@ if __name__ == '__main__':
                     )
                     assert os.path.exists(confounds), 'Confounds file not found: %s' % confounds
                     func = os.path.join(func_path, img_path)
-                    raw_sidecar_path = os.path.join(
-                        raw_path, 'func', img_path.split('_run-')[0] + '_run-' + run + '_bold.json'
+                    sidecar_path = func.replace('.nii.gz', '.json')
+                    assert os.path.exists(sidecar_path), 'Path not found: %s' % sidecar_path
+                    with open(sidecar_path, 'r') as f:
+                        sidecar = json.load(f)
+                    eventfile_path = os.path.join(
+                        raw_path, 'func', img_path.split('_run-')[0] + '_run-' + run + '_events.tsv'
                     )
-                    assert os.path.exists(raw_sidecar_path), 'Path not found: %s' % raw_sidecar_path
-                    with open(raw_sidecar_path, 'r') as f:
-                        raw_sidecar = json.load(f)
-                    eventfile_path = raw_sidecar_path.replace('_bold.json', '_events.tsv')
-                    TR = raw_sidecar.get('RepetitionTime', None)
-                    StartTime = raw_sidecar.get('StartTime', None)
-                    assert TR, 'RepetitionTime information not found in raw sidecar: %s' % raw_sidecar_path
+                    TR = sidecar.get('RepetitionTime', None)
+                    StartTime = sidecar.get('StartTime', None)
+                    assert TR, 'RepetitionTime information not found in sidecar: %s' % sidecar_path
+                    assert StartTime, 'StartTime information not found in sidecar: %s' % sidecar_path
                     if space not in datasets:
                         datasets[space] = {}
                     if task not in datasets[space]:
@@ -185,35 +188,35 @@ if __name__ == '__main__':
                     TR = datasets[space][task][run]['TR']
                     StartTime = datasets[space][task][run]['StartTime']
 
+                    stderr(f'Cleaning {func_file}\n')
+
                     confounds = pd.read_csv(confounds, sep='\t')
                     confounds = confounds.filter(
                         regex=(r'^(global_signal|csf|white|trans|rot|motion_outlier).*')
                     )
                     if 'csf_wm' in confounds:
                         del confounds['csf_wm']
+                    convolved = []
                     if config['regress_out_task'] and os.path.exists(eventfile_path):
-                        events = pd.read_csv(eventfile_path, sep='\t')['trial_type', 'onset', 'duration']
-                        dummies = pd.get_dummies(events.trial_type, prefix='trial_type', sep='.')
+                        events = pd.read_csv(eventfile_path, sep='\t')[['trial_type', 'onset', 'duration']]
+                        dummies = pd.get_dummies(events.trial_type, prefix='trial_type', prefix_sep='.')
                         events = pd.concat([dummies, events[['onset', 'duration']]], axis=1)
                         cols = [x for x in events.columns if x.startswith('trial_type')]
                         frame_times = np.arange(len(confounds)) * TR + StartTime
                         for col in cols:
-                            convolved, convolved_names = glm.first_level.compute_regressor(
-                                events[[col, 'onset', 'duration']],
+                            convolved_, convolved_names = glm.first_level.compute_regressor(
+                                (events[col], events['onset'], events['duration']),
                                 'spm',
                                 frame_times
                             )
-                            print(frame_times)
-                            print(convolved)
-                            print(convolved_names)
-                            input()
+                            convolved_ = pd.DataFrame(convolved_, columns=[col])
+                            convolved.append(convolved_)
+                    confounds = pd.concat(convolved + [confounds], axis=1)
+
                     confounds_outpath = os.path.join(
                         out_dir, func_file.replace('desc-preproc_bold.nii.gz', 'desc-confounds_timeseries.tsv')
                     )
-
-                    print(confounds)
-                    print(confounds.columns)
-                    input()
+                    confounds.to_csv(confounds_outpath, sep='\t', index=False)
 
                     if type_by_space[space] == 'vol':  # Volumetric data
                         mask_nii = load_img(mask)
@@ -231,7 +234,8 @@ if __name__ == '__main__':
                             standardize=config['standardize'],
                             detrend=config['detrend'],
                             t_r=TR,
-                            low_pass=config['smoothing_fwhm'],
+                            smoothing_fwhm=config['smoothing_fwhm'],
+                            low_pass=config['low_pass'],
                             high_pass=config['high_pass']
                         )
                         kwargs = dict(confounds=confounds.fillna(0))
@@ -258,10 +262,11 @@ if __name__ == '__main__':
                             standardize=config['standardize'],
                             detrend=config['detrend'],
                             t_r=TR,
-                            low_pass=config['smoothing_fwhm'],
+                            smoothing_fwhm=config['smoothing_fwhm'],
+                            low_pass=config['low_pass'],
                             high_pass=config['high_pass']
                         )
-                        kwargs = dict(confounds=confounds)
+                        kwargs = dict(confounds=confounds.fillna(0))
                         desc = 'desc-clean'
                         mesh = surface.PolyMesh(left=surf_L_path, right=surf_R_path)
                         data = surface.PolyData(left=func_path, right=func_path.replace('_hemi-L_', '_hemi-R_'))
