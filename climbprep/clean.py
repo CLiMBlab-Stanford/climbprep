@@ -1,3 +1,4 @@
+import gc
 import json
 import yaml
 import numpy as np
@@ -292,3 +293,5 @@ if __name__ == '__main__':
                             run.data.to_filename(run_path)
                     else:
                         raise ValueError('Unknown space: %s' % space)
+
+                    gc.collect()

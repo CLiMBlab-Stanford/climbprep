@@ -210,7 +210,7 @@ CONFIG = dict(
     ),
     parcellate=dict(
         T1w=dict(
-            cleaning_label='T1w',
+            cleaning_label='fc',
             space='T1w',
             sample=dict(
                 main=dict(
@@ -420,6 +420,6 @@ BASHRC_CLIMBLAB = r'''export APPTAINER_BIND={{LAB_PATH}},/juice6/u/{{USER}},/jui
 export APPTAINER_CACHEDIR=/juice6/u/{{USER}}/.apptainer/cache
 export FREESURFER_HOME={{LAB_PATH}}/freesurfer
 export PATH=$PATH:/u/nlp/bin:/usr/local/cuda:{{APPTAINER_PATH}}/bin:{{CODE_PATH}}/climbprep/bin:{{LAB_PATH}}/bin
-export PYTHONPATH=$PYTHONPATH:{{CODE_PATH}}/climbprep
+export PYTHONPATH=$PYTHONPATH:{{CODE_PATH}}/climbprep:{{CODE_PATH}}/parcellate
 export TMPDIR={{LAB_PATH}}/tmp
 '''

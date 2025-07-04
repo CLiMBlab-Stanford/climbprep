@@ -20,7 +20,7 @@ if __name__ == '__main__':
     argparser.add_argument('participant', help='BIDS participant ID')
     argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", '
                                                                         '"evlab", etc.). Default: "climblab"'))
-    argparser.add_argument('-c', '--config', default=CLEAN_DEFAULT_KEY, help=('Config name (default `T1w`) '
+    argparser.add_argument('-c', '--config', default=PARCELLATE_DEFAULT_KEY, help=('Config name (default `T1w`) '
         'or YAML config file to used to parameterize parcellation. '
         'See `climbprep.constants.CONFIG["parcellate"]` for available config names and their settings. '))
     args = argparser.parse_args()
@@ -71,8 +71,8 @@ if __name__ == '__main__':
         cleaning_config_path = os.path.join(cleaned_path, 'config.yml')
         assert os.path.exists(cleaning_config_path), 'Path not found: %s' % cleaning_config_path
         with open(cleaning_config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        preprocessing_label = config['preprocessing_label']
+            cleaning_config = yaml.safe_load(f)
+        preprocessing_label = cleaning_config['preprocessing_label']
         fmriprep_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label, subdir)
         assert os.path.exists(fmriprep_path), 'Path not found: %s' % fmriprep_path
         anat_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label, participant_dir, 'anat')
@@ -105,7 +105,7 @@ if __name__ == '__main__':
                     if t and f:
                         t = t.group(1)
                         f = f.group(1)
-                        if t == 'space' and 'mni' in f.lower():
+                        if t == space and 'mni' in f.lower():
                             xfm_path = os.path.join(anat_path, path)
                             break
             assert xfm_path, f'Non-MNI space used but no matching transform (*_xfm.h5) found in {anat_path}.'
@@ -133,11 +133,7 @@ if __name__ == '__main__':
                 )
             )
 
-        functional_paths = [
-            os.path.join(cleaned_path, x) for x in os.listdir(cleaned_path) if x.endswith('desc-clean_bold.nii.gz')
-        ]
-
-        parcellation_config = deepcopy(CONFIG['parcellate'][parcellation_label])
+        parcellation_config = deepcopy(config)
         if xfm_path:
             parcellation_config['xfm_path'] = xfm_path
         if surface:
@@ -147,13 +143,14 @@ if __name__ == '__main__':
         if not 'session' in nodes:
             nodes['session'] = {}
         if not session in nodes['session']:
-            nodes['session'][session] = deepcopy(CONFIG['parcellate'][parcellation_label])
+            nodes['session'][session] = deepcopy(parcellation_config)
         nodes['session'][session]['sample']['main']['functional_paths'] = functional_paths
         if not 'subject' in nodes:
-            nodes['subject'] = deepcopy(CONFIG['parcellate'][parcellation_label])
+            nodes['subject'] = deepcopy(parcellation_config)
         nodes['subject']['sample']['main']['functional_paths'] += functional_paths
 
     parcellation_dir = os.path.join(derivatives_path, 'parcellate', parcellation_label)
+    cliargs = []
     for node in nodes:
         node_dir = os.path.join(parcellation_dir, f'node-{node}')
         participant_dir = os.path.join(node_dir, 'sub-%s' % participant)
@@ -164,10 +161,24 @@ if __name__ == '__main__':
         for session in sessions:
             if session:
                 session_dir = os.path.join(participant_dir, f'ses-{session}')
+                config_ = nodes[node][session]
             else:
                 session_dir = participant_dir
+                config_ = nodes[node]
             if not os.path.exists(session_dir):
                 os.makedirs(session_dir)
+            config_['output_dir'] = session_dir
             config_path = os.path.join(session_dir, 'config.yml')
             with open(config_path, 'w') as f:
-                yaml.dump(nodes[node], f)
+                yaml.dump(config_, f)
+            cliargs.append(config_path)
+
+    for cliarg in cliargs:
+        cmd = f'python -m parcellate.bin.train {cliarg}'
+        print(cmd)
+        status = os.system(cmd)
+        if status:
+            stderr('Error during parcellation. Exiting.\n')
+            exit(status)
+
+
