@@ -63,6 +63,8 @@ if __name__ == '__main__':
     modelfiles_path = MODELFILES_PATH
     assert os.path.exists(modelfiles_path), 'Path not found: %s' % modelfiles_path
 
+    stderr(f'Modeling outputs will be written to {os.path.join(derivatives_path, "firstlevels", model_label)}\n')
+
     task_to_models = {}
     for model in os.listdir(modelfiles_path):
         ix = max(0, len(model) - 11)

@@ -40,6 +40,8 @@ if __name__ == '__main__':
             config[key] = config_default[key]
 
     out_path = os.path.join(project_path, 'derivatives', 'fmriprep', preprocessing_label)
+    stderr(f'Preprocessing outputs will be written to {out_path}\n')
+
     work_path = os.path.join(WORK_PATH, project, participant)
 
     kwarg_strings = []

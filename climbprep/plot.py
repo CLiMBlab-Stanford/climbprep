@@ -227,6 +227,8 @@ if __name__ == '__main__':
     models_path = os.path.join(derivatives_path, 'firstlevels', model_label)
     assert os.path.exists(models_path), 'Path not found: %s' % models_path
 
+    stderr(f'Plotting outputs will be written to {os.path.join(derivatives_path, "firstlevel_plots", plot_label)}\n')
+
     kwargs_all = []
     for model_subdir in os.listdir(models_path):
         if models and model_subdir not in models:

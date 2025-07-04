@@ -44,6 +44,8 @@ if __name__ ==  '__main__':
                 tasks_ |= set(tasks_df['task'].tolist())
         tasks = tasks_
 
+    stderr(f'Rescaffolded project will be written to {os.path.join(BIDS_PATH, project)}\n')
+
     climblab_project_path = os.path.join(BIDS_PATH, 'climblab')
     participants_table = pd.read_csv(os.path.join(climblab_project_path, 'participants.tsv'), sep='\t')
     participants_table.participant_id = participants_table.participant_id.str.replace('^sub-', '', regex=True)

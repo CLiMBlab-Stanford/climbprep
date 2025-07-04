@@ -54,6 +54,9 @@ if __name__ == '__main__':
     derivatives_path = os.path.join(project_path, 'derivatives')
     assert os.path.exists(derivatives_path), 'Path not found: %s' % derivatives_path
 
+    stderr(f'Parcellation outputs will be written to '
+           f'{os.path.join(derivatives_path, "parcellate", parcellation_label)}\n')
+
     sessions = set()
     for subdir in os.listdir(os.path.join(project_path, 'sub-%s' % participant)):
         if subdir.startswith('ses-') and os.path.isdir(os.path.join(project_path, 'sub-%s' % participant, subdir)):

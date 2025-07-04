@@ -252,9 +252,24 @@ data, run:
     python -m climblab.plot <PARTICIPANT_ID> -p <PROJECT_ID>
 
 (the `-p` option can be omitted if the project is `climblab`).
-The `-c` argument can optionally be used to specify plotting configuration
-parameters, including which model type to plot (defaults to `T1w`).
+The `-c` argument can be omitted (defaults to `T1w`) or set to
+another named configuration or a path to a YAML configuration file.
 To view the available config options, see `CONFIG['plot']` in
+`climbprep/constants.py`.
+
+
+## parcellate
+The parcellate step generates bottom-up network parcellations
+based on activity fluctuations. It can only be run after
+cleaning is complete. To parcellate a participant's data,
+run:
+
+    python -m climblab.parcellate <PARTICIPANT_ID> -p <PROJECT_ID>
+
+(the `-p` option can be omitted if the project is `climblab`).
+The `-c` argument can be omitted (defaults to `T1w`) or set to
+another named configuration or a path to a YAML configuration file.
+To view the available config options, see `CONFIG['parcellate']` in
 `climbprep/constants.py`.
 
 

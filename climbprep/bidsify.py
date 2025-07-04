@@ -51,6 +51,8 @@ if __name__ == '__main__':
     sourcedata_path = os.path.join(project_path, 'sourcedata')
     assert os.path.exists(sourcedata_path), 'Path not found: %s' % sourcedata_path
 
+    stderr(f'BIDSification outputs will be written to {project_path}\n')
+
     sessions = set()
     for subdir in os.listdir(os.path.join(sourcedata_path, 'sub-%s' % participant)):
         if subdir.startswith('ses-') and os.path.isdir(os.path.join(sourcedata_path, 'sub-%s' % participant, subdir)):

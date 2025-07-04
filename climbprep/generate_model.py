@@ -5,6 +5,7 @@ import pandas as pd
 import argparse
 
 from climbprep.constants import *
+from climbprep.util import *
 
 
 def get_contrast_spec(name, weights):
@@ -141,5 +142,6 @@ if __name__ == '__main__':
             node['Contrasts'].append(contrast_spec)
 
     out_path = os.path.join(os.getcwd(), f'{name}_model.json')
+    stderr(f'Saving to {out_path}\n')
     with open(out_path, 'w') as f:
         json.dump(model, f, indent=2)
