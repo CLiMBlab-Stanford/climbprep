@@ -192,10 +192,8 @@ if __name__ == '__main__':
 
                     confounds = pd.read_csv(confounds, sep='\t')
                     confounds = confounds.filter(
-                        regex=(r'^(global_signal|csf|white|trans|rot|motion_outlier).*')
+                        regex=r'{}'.format(config['confounds_regex'])
                     )
-                    if 'csf_wm' in confounds:
-                        del confounds['csf_wm']
                     convolved = []
                     if config['regress_out_task'] and os.path.exists(eventfile_path):
                         events = pd.read_csv(eventfile_path, sep='\t')[['trial_type', 'onset', 'duration']]

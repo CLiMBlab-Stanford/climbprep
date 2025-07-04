@@ -137,18 +137,9 @@ CONFIG = dict(
         fc=dict(
             clean_surf=False,
             preprocessing_label='main',
-            strategy=(
-                'global_signal',
-                'wm_csf',
-                'motion',
-                'scrub'
-            ),
-            global_signal='full',
-            wm_csf='full',
-            motion='full',
+            # Matches all global_signal, white, trans, rot, and motion_outlier confounds, excluding redundant csf_wm
+            confounds_regex=f'^(?!csf_wm)(global_signal|csf|white|trans|rot|motion_outlier).*',
             smoothing_fwhm=4,
-            std_dvars_threshold=1.5,
-            fd_threshold=0.5,
             standardize=True,
             detrend=True,
             regress_out_task=True,
@@ -158,19 +149,9 @@ CONFIG = dict(
         ),
         firstlevels_like=dict(
             clean_surf=False,
-            preprocessing_label='main',
-            strategy=(
-                'global_signal',
-                'wm_csf',
-                'motion',
-                'scrub'
-            ),
-            global_signal='full',
-            wm_csf='full',
-            motion='full',
+            # Matches all global_signal, white, trans, rot, and motion_outlier confounds, excluding redundant csf_wm
+            confounds_regex=f'^(?!csf_wm)(global_signal|csf|white|trans|rot|motion_outlier).*',
             smoothing_fwhm=4,
-            std_dvars_threshold=1.5,
-            fd_threshold=0.5,
             standardize=False,
             detrend=True,
             regress_out_task=False,
