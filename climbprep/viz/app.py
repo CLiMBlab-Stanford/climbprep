@@ -209,6 +209,8 @@ def assign_callbacks(app):
         for statmap in statmaps:
             stat_type = get_value(statmap, 'type')
             session = get_value(statmap, 'session')
+            if session == 'all':
+                session = None
 
             subdir = f'sub-{participant}'
             session_str = ''
