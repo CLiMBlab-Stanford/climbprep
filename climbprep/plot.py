@@ -576,7 +576,7 @@ def get_functionals_and_masker(
         session=None,
         cleaning_label=CLEAN_DEFAULT_KEY,
         space=PARCELLATE_DEFAULT_KEY,
-        debug=True
+        debug=False
 ):
     if session:
         sessions = {session}
