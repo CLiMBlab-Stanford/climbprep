@@ -18,3 +18,7 @@ dependencies:
     - seaborn
     - plotly
     - kaleido
+    - pyvista
+    - dash
+    - dash-iconify
+    - dash-mantine-components

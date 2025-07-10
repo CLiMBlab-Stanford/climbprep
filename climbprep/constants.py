@@ -1,5 +1,6 @@
 import re
 import os
+import numpy as np
 
 # Paths
 LAB_PATH = os.path.normpath(os.path.join('/', 'juice6', 'u', 'nlp', 'climblab'))
@@ -105,6 +106,23 @@ MODEL_TEMPLATE = {
 }
 
 # Plotting
+PLOT_COLORS = [
+    'Red',
+    'Blue',
+    'Green',
+    'Cyan',
+    'Magenta',
+    'Yellow'
+    'Orange',
+    'Pink',
+    'Lime',
+    'Aqua',
+    'Violet',
+    'Teal',
+    'Fire'
+    'Hot Pink',
+    'Ocean'
+]
 PLOT_STATMAP_SUFFIX = '.nii.gz'
 PLOT_IMG_ORDER = [0, 1, 3, 2]
 PLOT_LIGHTING = {
@@ -124,6 +142,19 @@ PLOT_VIEWS = {
     ('left', 'medial'): (0, 90),
     ('right', 'lateral'): (0, 90),
     ('right', 'medial'): (0, -90),
+}
+PLOT_BG_ALPHA = 0.1
+PLOT_AXIS_CONFIG = {
+    'showgrid': False,
+    'showline': False,
+    'ticks': '',
+    'title': '',
+    'showticklabels': False,
+    'zeroline': False,
+    'showspikes': False,
+    'spikesides': False,
+    'showbackground': False,
+    'visible': False
 }
 
 # Parcellation

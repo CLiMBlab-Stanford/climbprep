@@ -15,7 +15,6 @@ New lab members can get everything initialized in one go by running:
     python -m climbprep.quickstart
 
 Note that this script is interactive and your responses will be required at points.
-QUICKSTART NOT YET IMPLEMENTED!
 
 Alternatively, you can set manually. This will involve setting up your `~/.profile` and 
 `~/.bashrc` files following the instructions in the 
@@ -43,17 +42,19 @@ Our general BIDS super-directory is found at `/juice6/u/nlp/climblab/BIDS`.
 Each subdirectory is a BIDS project. New projects can be created as needed.
 The lab's main project is `climblab`, which contains all the non-development
 data that we have collected on site. Development data (data collected on
-development hours at the CNI) cannot be used in published research and must
-be put in the `dev` project.
+development hours at the [CNI](https://cni.su.domains/)) cannot be used 
+in published research and must be put in the `dev` project.
 
 The `climblab` project has a somewhat unusual organization: although we
 often collect multiple sessions from an individual, the project does
 not have a multisession structure. Instead, the `participant` level of
-the project indexes the session based on its `flywheel` ID, irrespective
+the project indexes the session based on its 
+(flywheel)[https://cni.flywheel.io/] ID, irrespective
 of whether other data from that participant exists in the project.
 There are two reasons for this:
-1. The mapping from sessions to projects is often many-to-many
-2. We want to avoid multisession aggregation by fMRIprep, which can change published results
+1. The mapping from sessions to studies/subprojects is often many-to-many
+2. We want to avoid multisession aggregation by fMRIprep, which can change 
+published results as new sessions are collected.
 
 Instead, the identity of the participant is tracked via the `climblab_id`
 field of `participants.tsv`, which is a unique identifier for each
@@ -76,18 +77,20 @@ Full help strings for all the utilities below can be obtained by running
 the command with the `-h` argument. Note that when you are on the cluster,
 as long as you have run `quickstart`, `climbprep` will be in your `PATH`
 and available anywhere, and you can actually run all the commands below
-without the `python -m climbprep.` (i.e., `python -m climbprep.preprocess`
-will be equivalent to `preprocess`).
+without the `python -m climbprep.` prefix (i.e., `python -m 
+climbprep.preprocess` will be equivalent to `preprocess`).
 
 ### bidsify
 
 Whether working with our own data or data from other labs, the first step is
 to convert the data into the BIDS format. We maintain running BIDS "projects"
 that are organized around sites rather than particular experiments, to
-facilitate secondary analyses. The current set of projects are:
+facilitate secondary analyses. The current set of core site-based
+projects are:
 
 - `climblab` (the main project)
-- `evlab` (data from the Fedorenko Lab)
+- `evlab` (data from the (Fedorenko Lab)[https://evlab.mit.edu/])
+- `nptl` (data from the (NPTL)[https://nptl.stanford.edu/])
 
 To BIDSify new fMRI source data,
 first copy the new source directory (in any format supported by `dcm2bids`)
@@ -258,7 +261,7 @@ To view the available config options, see `CONFIG['plot']` in
 `climbprep/constants.py`.
 
 
-## parcellate
+### parcellate
 The parcellate step generates bottom-up network parcellations
 based on activity fluctuations. It can only be run after
 cleaning is complete. To parcellate a participant's data,
@@ -404,7 +407,8 @@ want to make it conveniently available lab-wide by keyword rather than having
 to pass around config files. The codebase is set up to facilitate these kinds of
 changes by placing all constants, including default configurations, in the
 `climbprep/constants.py` file, allowing them to be easily changed or expanded
-without affecting core functionality. If you want to expand existing keyword-
-accessible configurations, you can freely add configurations to `constants.py`.
+without affecting core functionality. If you want to expand existing
+keyword-accessible configurations, you can freely add configurations to 
+`constants.py`.
 
 

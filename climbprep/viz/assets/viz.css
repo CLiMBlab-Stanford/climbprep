@@ -1,0 +1,153 @@
+@import url('https://fonts.googleapis.com/css?family=Open+Sans:300,400');
+
+
+
+/* Core elements */
+
+body {
+    font-size: 1rem;
+    line-height: 1.2rem;
+    font-weight: 400;
+    font-family: "Open Sans", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: rgb(50, 50, 50);
+    margin: 0 !important;
+}
+
+label {
+    color: #4d4d4d;
+    display: block;
+    font-size: 10pt;
+}
+
+.button,
+button,
+input[type="submit"],
+input[type="reset"],
+input[type="button"] {
+    display: inline-block;
+    color: #555;
+    text-align: center;
+    font-weight: 600;
+    letter-spacing: .1rem;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+input[type="email"],
+input[type="number"],
+input[type="search"],
+input[type="text"],
+input[type="tel"],
+input[type="url"],
+input[type="password"],
+textarea,
+select {
+    display: block;
+    height: 1rem;
+    padding: 0.5rem;
+    background-color: #fff;
+    border: 1px solid #D1D1D1;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: inherit;
+}
+
+input[type="email"]:focus,
+input[type="number"]:focus,
+input[type="search"]:focus,
+input[type="text"]:focus,
+input[type="tel"]:focus,
+input[type="url"]:focus,
+input[type="password"]:focus,
+textarea:focus,
+select:focus {
+    border: 1px solid #2186f4;
+    outline: 0;
+}
+
+
+/* Side panel */
+
+#menu-toggle {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    width: 2rem;
+    height: 2rem;
+    background-color: #2186f4;
+    border: none;
+    border-radius: 0;
+    box-sizing: border-box;
+    z-index: 1001;
+}
+
+#bars {
+    display: inline-block;
+    width: 100%;
+    height: 100%;
+    background-color: #FFFFFF;
+    position: relative;
+}
+
+#side-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 30vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #eee;
+    box-shadow: 0 0 3px 3px rgba(0, 0, 0, 0.2);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease-in-out;
+    z-index: 1000;
+}
+
+#.side-panel.open {
+    transform: translateX(0);
+}
+
+@media (max-width: 640px) {
+    #side-panel {
+        width: 70vw;
+    }
+}
+
+#update-button, #download-button {
+    color: #FFFFFF;
+    display: block;
+    float: left;
+    height: 5vh;
+    width: 100%;
+    background-color: #2186f4;
+    border: none;
+    border-radius: 0;
+    box-sizing: border-box;
+}
+
+#update-button:hover, #download-button:hover {
+    background-color: #1a67ba;
+}
+
+#display-settings {
+    height: 95vh;
+    width: 100%;
+    display: block;
+    float: left;
+    overflow: scroll;
+}
+
+
+
+
+
+/* Viewport */
+
+#viewport {
+    width: 99.9vw;
+    height: min(99.9vw, 99.9vh);
+}
+
+
+
