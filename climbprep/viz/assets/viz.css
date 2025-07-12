@@ -138,7 +138,42 @@ select:focus {
     overflow: scroll;
 }
 
+.compiling {
+    display: none;
+    position: absolute;
+    height: 80%;
+    width: 80%;
+    margin: 10%;
+    top: 0;
+    left: 0;
+    border: 5px solid #FFF;
+    border-bottom-color: transparent;
+    border-radius: 50%;
+    box-sizing: border-box;
+}
 
+#compile[disabled] .compiling {
+    display: inline-block;
+    animation: rotation 1s linear infinite;
+}
+
+@keyframes rotation {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+#progress-wrapper {
+    display: none,
+    width: 100%,
+    textAlign: center,
+    position: fixed,
+    bottom: 0,
+    left: 50%
+}
 
 
 

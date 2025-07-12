@@ -1,8 +1,6 @@
 import time
 import json
 import yaml
-import multiprocessing
-from functools import lru_cache
 import traceback
 import numpy as np
 import pandas as pd
@@ -16,123 +14,155 @@ from tempfile import TemporaryDirectory
 from PIL import Image
 import pyvista
 from nilearn import image, surface, plotting, datasets, maskers
-import h5py
+import diskcache
 import argparse
 
 from climbprep.constants import *
 from climbprep.util import *
 
 
-def plot_surface(
-        pial,
-        white,
-        midthickness,
-        sulc=None,
-        statmaps=None,
-        statmap_labels=None,
-        cmaps=None,  # Defaults to single color per statmap, only makes sense if statmap_scales_alpha=True
-        vmin=None,
-        vmax=None,
-        thresholds=None,
-        statmap_scales_alpha=True,
-        plot_path=None,
-        display_surface='midthickness',
-        colorbar=True,
-        hide_min=None,
-        hide_max=None,
-        scale=1,
-        htrim=0.1,
-        vtrim=0.1,
-        additive_color=False,
-        turn_out_hemis=False,
-        bg_brightness=0.95,
-        sulc_alpha=0.9,
-        medial_zoom=1.15
-):
-    with TemporaryDirectory() as tmp_dir:
-        zoom_factor = dict(
-            left=dict(
-                lateral=1.5 if turn_out_hemis else 1.0,
-                medial=-medial_zoom
-            ),
-            right=dict(
-                lateral=-1.5 if turn_out_hemis else -1.0,
-                medial=medial_zoom
-            )
+class PlotLib:
+
+    def get_fig(
+            self,
+            pial,
+            white,
+            midthickness,
+            sulc=None,
+            statmaps=None,
+            statmap_labels=None,
+            cmaps=None,  # Defaults to single color per statmap, only makes sense if statmap_scales_alpha=True
+            vmin=None,
+            vmax=None,
+            thresholds=None,
+            statmap_scales_alpha=True,
+            hide_min=None,
+            hide_max=None,
+            display_surface='midthickness',
+            colorbar=True,
+            bg_brightness=0.95,
+            sulc_alpha=0.9,
+            additive_color=False,
+            turn_out_hemis=False,
+            cbar_step=0.1
+    ):
+        plot_data = self.get_plot_data(
+            pial,
+            white,
+            midthickness,
+            sulc=sulc,
+            statmaps=statmaps,
+            statmap_labels=statmap_labels,
+            cmaps=cmaps,
+            vmin=vmin,
+            vmax=vmax,
+            thresholds=thresholds,
+            statmap_scales_alpha=statmap_scales_alpha,
+            hide_min=hide_min,
+            hide_max=hide_max,
+            display_surface=display_surface,
+            colorbar=colorbar,
+            bg_brightness=bg_brightness,
+            sulc_alpha=sulc_alpha,
+            additive_color=additive_color,
+            turn_out_hemis=turn_out_hemis
         )
 
-        statmap_in = statmaps
-        statmap_niis = []
-        if statmap_in is None:
-            statmap_in = []
-        elif not hasattr(statmap_in, '__iter__') or isinstance(statmap_in, str):
-            statmap_in = [statmap_in]
+        fig = self.plot_data_to_fig(
+            **plot_data,
+            cbar_step=cbar_step
+        )
+
+        return fig
+
+    def get_plot_data(
+            self,
+            pial,
+            white,
+            midthickness,
+            sulc=None,
+            statmaps=None,
+            statmap_labels=None,
+            cmaps=None,  # Defaults to single color per statmap, only makes sense if statmap_scales_alpha=True
+            vmin=None,
+            vmax=None,
+            thresholds=None,
+            statmap_scales_alpha=True,
+            hide_min=None,
+            hide_max=None,
+            display_surface='midthickness',
+            colorbar=True,
+            bg_brightness=0.95,
+            sulc_alpha=0.9,
+            additive_color=False,
+            turn_out_hemis=False,
+            progress_fn=None
+    ):
+        statmaps_in = statmaps
+        if statmaps_in is None:
+            statmaps_in = []
+        elif not hasattr(statmaps_in, '__iter__') or isinstance(statmaps_in, str):
+            statmaps_in = [statmaps_in]
         seeds = []
-        for statmap_in_ in statmap_in:
-            if isinstance(statmap_in_, dict):
-                assert 'functionals' in statmap_in_, \
-                    'If `statmaps` is a dict, it must contain a key "functionals" with the paths to the timecourses.'
-                assert 'masker' in statmap_in_, \
-                    'If `statmaps` is a dict, it must contain a key "masker" with the NiftiMasker object.'
-                assert 'seed' in statmap_in_, \
+        for statmap_in in statmaps_in:
+            if isinstance(statmap_in, dict):
+                assert 'seed' in statmap_in, \
                     'If `statmaps` is a dict, it must contain a key "seed" with the seed coordinates (x, y, z).'
-                functionals = statmap_in_['functionals']
-                masker = statmap_in_['masker']
-                x, y, z = statmap_in_['seed']
-                fwhm = statmap_in_.get('fwhm', None)
-                statmap_in_ = connectivity_from_seed(
-                    x, y, z, functionals, masker, fwhm=fwhm
-                )
-                seeds.append(generate_sphere(
-                    center=(x, y, z),
-                    radius=1
-                ))
-            statmap_niis.append(image.load_img(statmap_in_))
+                seeds.append(statmap_in['seed'])
 
         if statmap_labels is None:
-            statmap_labels = [None] * len(statmap_in)
+            statmap_labels = [None] * len(statmaps_in)
         elif not hasattr(statmap_labels, '__iter__') or isinstance(statmap_labels, str):
             statmap_labels = [statmap_labels]
-        assert len(statmap_labels) == len(statmap_in), \
+        assert len(statmap_labels) == len(statmaps_in), \
             '`statmap_labels` must either be `None` or a list of equal length to `statmaps`.'
 
         if cmaps is None:
-            cmaps = [None] * len(statmap_in)
+            cmaps = [None] * len(statmaps_in)
         elif not hasattr(cmaps, '__iter__') or isinstance(cmaps, str):
             cmaps = [cmaps]
-        assert len(cmaps) == len(statmap_niis), \
+        assert len(cmaps) == len(statmaps_in), \
             '`cmaps` must either be `None` or a list of equal length to `statmaps.'
 
         if vmin is None:
-            vmin = [None] * len(statmap_in)
+            vmin = [None] * len(statmaps_in)
         elif not hasattr(vmin, '__iter__'):
-            vmin = [vmin] * len(statmap_in)
-        assert len(vmin) == len(statmap_niis), \
+            vmin = [vmin] * len(statmaps_in)
+        assert len(vmin) == len(statmaps_in), \
             '`vmin` must either be a single value or a list of equal length to `statmaps.`'
-        
+
         if vmax is None:
-            vmax = [None] * len(statmap_in)
+            vmax = [None] * len(statmaps_in)
         elif not hasattr(vmax, '__iter__'):
-            vmax = [vmax] * len(statmap_in)
-        assert len(vmax) == len(statmap_niis), \
+            vmax = [vmax] * len(statmaps_in)
+        assert len(vmax) == len(statmaps_in), \
             '`vmax` must either be a single value or a list of equal length to `statmaps.`'
-        
+
         if thresholds is None:
-            thresholds = [None] * len(statmap_in)
+            thresholds = [None] * len(statmaps_in)
         elif not hasattr(thresholds, '__iter__'):
-            thresholds = [thresholds] * len(statmap_in)
-        assert len(thresholds) == len(statmap_niis), \
+            thresholds = [thresholds] * len(statmaps_in)
+        assert len(thresholds) == len(statmaps_in), \
             '`threshold` must either be a single value or a list of equal length to `statmaps.`'
 
         if not hasattr(statmap_scales_alpha, '__iter__'):
             statmap_scales_alpha = [statmap_scales_alpha]
-        statmap_scales_alpha = statmap_scales_alpha * len(statmap_in)
+        statmap_scales_alpha = statmap_scales_alpha * len(statmaps_in)
+
+        C = 0.8
+        T = 0.9
+        incr_meshes = 1 / (3 + len(statmaps_in) * C) * T
+        incr_statmaps = (C / (3 + len(statmaps_in) * C) * T) / 2
 
         mesh_kwargs = {}
         surf_types = dict(pial=pial, white=white, midthickness=midthickness, sulc=sulc)
         for surf_type in surf_types:
-            if surf_type is None:
-                mesh_kwargs[f'{surf_type}_{hemi}'] = None
+            if surf_types[surf_type] is None:
+                for hemi in ('left', 'right'):
+                    if surf_type == 'midthickness':
+                        mesh_kwargs[f'{surf_type}_{hemi}'] = 'infer'
+                    else:
+                        mesh_kwargs[f'{surf_type}_{hemi}'] = None
             else:
                 for hemi in ('left', 'right'):
                     if hasattr(surf_types[surf_type], 'parts'):
@@ -140,73 +170,84 @@ def plot_surface(
                     else:
                         surf = surf_types[surf_type][hemi]
                     mesh_kwargs[f'{surf_type}_{hemi}'] = surf
-        pial, white, midthickness, sulc = get_plot_meshes(**mesh_kwargs)
+        if progress_fn is not None:
+            progress_fn.incr = incr_meshes
+        mesh_kwargs['progress_fn'] = progress_fn
+        pial, white, midthickness, sulc = self.get_plot_meshes(**mesh_kwargs)
 
-        cbar_img = None
-        imgs = [None] * 4
-        ix = 0
-        if plot_path:
-            out_path_base, ext = os.path.splitext(os.path.basename(plot_path))
+        if display_surface == 'midthickness':
+            display_surface = midthickness
+        elif display_surface == 'white':
+            display_surface = white
+        elif display_surface == 'pial':
+            display_surface = pial
         else:
-            out_path_base = ext = None
+            raise ValueError(f'Invalid display_surface: {display_surface}. '
+                             'Must be one of "midthickness", "white", or "pial".')
 
-        colorbar_written = False
-        if plot_path:
-            cbar_step = 0.2
-        else:
-            cbar_step = 0.1
-
-        fig = go.Figure()
-        fig.layout.paper_bgcolor = 'white'
-        fig.layout.hovermode = 'closest'
-        fig.layout.scene = {
-            'dragmode': 'turntable',
-            **{f"{dim}axis": PLOT_AXIS_CONFIG for dim in ("x", "y", "z")},
-            'aspectmode': 'data'
-        }
-        fig.layout.margin = dict(l=0, r=0, b=0, t=0, pad=0)
-        fig.layout.scene.camera = dict(
-            eye=dict(x=-1.575, y=0, z=0),
-            up=dict(x=0, y=0, z=1),
-            center=dict(x=0, y=0, z=0),
-        )
-
-        camera = fig.layout.scene.camera
-
-        traces = {}
+        if progress_fn is not None:
+            progress_fn.incr = incr_statmaps
+        out = {}
         for hemi in ('left', 'right'):
-
-            # Mesh3d
-            if display_surface == 'midthickness':
-                surface_ = midthickness
-            elif display_surface == 'white':
-                surface_ = white
-            elif display_surface == 'pial':
-                surface_ = pial
-            else:
-                raise ValueError(f'Invalid display_surface: {display_surface}. '
-                                 'Must be one of "midthickness", "white", or "pial".')
-            trace, customdata = get_plot_Mesh3d(surface_=surface_, hemi=hemi, turn_out_hemis=turn_out_hemis)
-
             # Background colors
-            bgcolors = get_plot_bgcolors(
-                len(trace.x),
+            if progress_fn is not None:
+                progress_fn(f'Loading {hemi} background', 0)
+            bgcolors = self.get_plot_bgcolors(
+                len(pial.parts[hemi].coordinates),
                 hemi,
-                sulc=sulc,
+                sulc_left=surf_types['sulc']['left'],
+                sulc_right=surf_types['sulc']['right'],
                 bg_brightness=bg_brightness,
                 sulc_alpha=sulc_alpha
             )
+
+            # Source coordinates
+            x, y, z = display_surface.parts[hemi].coordinates.T
+            customdata = pd.DataFrame(dict(  # Store true coordinates for hover before messing with them
+                x=x,
+                y=y,
+                z=z,
+            ))
+            x, y, z = self.map_coords(x, y, z, hemi, turn_out_hemis=turn_out_hemis)
+            display_surface.parts[hemi].coordinates = np.column_stack((x, y, z))
 
             # Statmap colors
             plot_colors = iter(PLOT_COLORS)
             vertexcolor = None
             vertexalpha = None
             vertexscale = None
-            cbars = []
-            cbar_x = 1
-            for statmap_nii, cmap, label, vmin_, vmax_, threshold_, statmap_scales_alpha_ in \
-                        zip(statmap_niis, cmaps, statmap_labels, vmin, vmax, thresholds, statmap_scales_alpha):
-                statmap = get_statmap_surface(statmap_nii=statmap_nii, pial=pial, white=white, hemi=hemi)
+            colorbars = []
+
+            for statmap_in, cmap, label, vmin_, vmax_, threshold_, statmap_scales_alpha_ in \
+                    zip(statmaps_in, cmaps, statmap_labels, vmin, vmax, thresholds, statmap_scales_alpha):
+                if isinstance(statmap_in, dict):
+                    assert 'functionals' in statmap_in, \
+                        'If `statmaps` is a dict, it must contain a key "functionals" with the paths to the timecourses.'
+                    assert 'seed' in statmap_in, \
+                        'If `statmaps` is a dict, it must contain a key "seed" with the seed coordinates (x, y, z).'
+                    functional_paths = tuple(sorted(statmap_in['functionals']))
+                    seed = statmap_in['seed']
+                    statmap_kwargs = dict(
+                        functional_paths=functional_paths,
+                        seed=seed,
+                        fwhm=statmap_in.get('fwhm', None),
+                    )
+                    seeds.append(seed)
+                elif isinstance(statmap_in, str):
+                    statmap_kwargs = dict(path=statmap_in)
+                else:
+                    raise ValueError('`statmaps` must be a list of strings or dicts, not %s.' % type(statmap_in))
+                if surf_types['pial'] is None:
+                    statmap_kwargs['pial'] = None
+                else:
+                    statmap_kwargs['pial'] = surf_types['pial'][hemi]
+                if surf_types['white'] is None:
+                    statmap_kwargs['white'] = None
+                else:
+                    statmap_kwargs['white'] = surf_types['white'][hemi]
+                statmap_kwargs['hemi'] = hemi
+
+                statmap = self.get_statmap_surface(**statmap_kwargs, progress_fn=progress_fn)
                 col = label if label else 'val'
                 customdata[col] = statmap
                 if vmin_ is None:
@@ -215,7 +256,7 @@ def plot_surface(
                     vmax_ = np.nanmax(statmap)
                 cmin = vmin_
                 cmax = vmax_
-                if cmin < 0 < cmax: # If both positive and negative values are present, center around 0
+                if cmin < 0 < cmax:  # If both positive and negative values are present, center around 0
                     mag = max(np.abs(cmin), np.abs(cmax))
                     cmin = -mag
                     cmax = mag
@@ -263,7 +304,7 @@ def plot_surface(
                         else:
                             color = cmap
                         cmap = LinearSegmentedColormap.from_list(f'{cmap}', [color, color])
-                cmap.set_extremes(bad=[np.nan]*4, over=[np.nan]*4, under=[np.nan]*4)
+                cmap.set_extremes(bad=[np.nan] * 4, over=[np.nan] * 4, under=[np.nan] * 4)
 
                 vertexcolor_ = cmap(statmap)[..., :3]
                 if statmap_scales_alpha_:
@@ -289,40 +330,17 @@ def plot_surface(
                                            np.where(np.isnan(vertexalpha_), vertexscale, vertexscale + vertexalpha_))
 
                 if colorbar:
-                    cbar = go.Mesh3d()
-                    cbar.cmax = cmax
-                    cbar.cmin = cmin
-                    cbar.colorbar = dict(len=0.5, tickfont=dict(color='black', size=25), tickformat='.1f', x=cbar_x)
-                    if label:
-                        cbar.colorbar.title = dict(text=label, side='right')
-                    colorscale_ix = np.linspace(cmin, cmax, 256) / (cmax - cmin)
-                    if statmap_scales_alpha_:
-                        colorscale_alpha = np.abs(colorscale_ix)
-                    else:
-                        colorscale_alpha = np.ones_like(colorscale_ix)
-                    if threshold_ is not None:
-                        colorscale_alpha = np.where(colorscale_alpha < threshold_ / (cmax - cmin), 0., colorscale_alpha)
-                    colorscale_ix -= cmin  / (cmax - cmin)
-                    colorscale = cmap(colorscale_ix)
-                    colorscale[..., 3] = colorscale_alpha
-                    colorscale_ = []
-                    for colorscale_ix_, color in zip(colorscale_ix, colorscale):
-                        if np.all(np.isfinite(color)):
-                            color = 'rgba(' + ', '.join([f'{round(c*255)}' for c in color[:3]] + [f'{color[3]}']) + ')'
-                            colorscale_.append([colorscale_ix_, color])
-                    colorscale = colorscale_
-                    cbar.colorscale = colorscale
-                    cbar.i = [0]
-                    cbar.j = [0]
-                    cbar.k = [0]
-                    cbar.intensity = [0]
-                    cbar.opacity = 0
-                    cbar.x = [1, 0, 0]
-                    cbar.y = [0, 1, 0]
-                    cbar.z = [0, 0, 1]
-                    cbars.append(cbar)
-                    cbar_x += cbar_step
+                    colorbars.append(dict(
+                        cmap=cmap,
+                        cmin=cmin,
+                        cmax=cmax,
+                        label=label,
+                        statmap_scales_alpha=statmap_scales_alpha_,
+                        threshold=threshold_
+                    ))
 
+            if progress_fn is not None:
+                progress_fn(f'Merging {hemi} vertex colors', 0)
             if vertexcolor is None:
                 vertexcolor = bgcolors
             else:
@@ -339,15 +357,117 @@ def plot_surface(
                     vertexcolor = np.where(np.isnan(vertexcolor), 0, vertexcolor)
                     vertexcolor = bgcolors * (1 - vertexalpha) + vertexcolor * vertexalpha
 
-            trace.vertexcolor = tuple([to_hex(c) for c in vertexcolor])
-            trace.customdata = customdata
-            trace.hovertemplate = ''.join(['<b>' + col + ':</b> %{customdata[' + str(i) + ']:.2f}<br>'
-                                           for i, col in enumerate(customdata.columns)]) + '<extra></extra>'
-            traces[hemi] = trace
+            out[hemi] = dict(
+                mesh=display_surface.parts[hemi],
+                # vertexcolor=tuple([to_hex(c) for c in vertexcolor]),
+                vertexcolor=vertexcolor,
+                customdata=customdata
+            )
 
-            if plot_path:
-                fig.add_traces(traces[hemi])
+        out['colorbars'] = colorbars
+        out['seeds'] = seeds
+        out['turn_out_hemis'] = turn_out_hemis
+
+        return out
+
+    def plot_data_to_fig(
+            self,
+            left,
+            right,
+            colorbars=None,
+            seeds=None,
+            turn_out_hemis=False,
+            cbar_step=0.1
+    ):
+        traces = []
+        for hemi in ('left', 'right'):
+            data = left if hemi == 'left' else right
+            surface_ = data['mesh']
+            trace = self.make_plot_Mesh3d(surface=surface_)
+            trace.vertexcolor = data['vertexcolor']
+            trace.customdata = data['customdata']
+            trace.hovertemplate = ''.join(['<b>' + col + ':</b> %{customdata[' + str(i) + ']:.2f}<br>'
+                                           for i, col in enumerate(data['customdata'].columns)]) + '<extra></extra>'
+            traces.append(trace)
+
+        if not colorbars:
+            colorbars = []
+        cbar_x = 1
+        for colorbar in colorbars:
+            colorbar['cbar_x'] = cbar_x
+            traces.append(self.make_colorbar(**colorbar))
+            cbar_x += cbar_step
+
+        if not seeds:
+            seeds = []
+        for seed in seeds:
+            x, y, z = self.map_coords(*seed, hemi, turn_out_hemis=turn_out_hemis)
+            traces.append(self.make_sphere((x, y, z)))
+
+        fig = go.Figure()
+        fig.layout.paper_bgcolor = 'white'
+        fig.layout.hovermode = 'closest'
+        fig.layout.scene = {
+            'dragmode': 'turntable',
+            **{f"{dim}axis": PLOT_AXIS_CONFIG for dim in ("x", "y", "z")},
+            'aspectmode': 'data'
+        }
+        fig.layout.margin = dict(l=0, r=0, b=0, t=0, pad=0)
+        fig.layout.scene.camera = dict(
+            eye=dict(x=-1.575, y=0, z=0),
+            up=dict(x=0, y=0, z=1),
+            center=dict(x=0, y=0, z=0),
+        )
+
+        fig.add_traces(traces)
+
+        return fig
+
+    def fig_to_image(
+            self,
+            fig,
+            plot_path,
+            scale=1,
+            htrim=0.,
+            vtrim=0.,
+            medial_zoom=1.15,
+            cbar_step=0.2,
+            turn_out_hemis=False
+    ):
+        with TemporaryDirectory() as tmp_dir:
+            zoom_factor = dict(
+                left=dict(
+                    lateral=1.5 if turn_out_hemis else 1.0,
+                    medial=-medial_zoom
+                ),
+                right=dict(
+                    lateral=-1.5 if turn_out_hemis else -1.0,
+                    medial=medial_zoom
+                )
+            )
+            camera = fig.layout.scene.camera
+            out_path_base, ext = os.path.splitext(os.path.basename(plot_path))
+
+            hemis = dict(left=fig.data[0], right= fig.data[1])
+            colorbars = [x for x in fig.data[2:] if len(x.i) == 1]  # Colorbars have only one dummy point
+            seeds = [x for x in fig.data[2:] if len(x.i) > 1]
+            has_colorbar = len(colorbars) > 0
+
+            imgs = [None] * 4
+            ix = 0
+            colorbar_written = False
+
+            cbar_x = 1
+            for cbar in colorbars:
+                cbar.colorbar.x = cbar_x
+                cbar_x += cbar_step
+
+            cbar_img = None
+            for hemi in ('left', 'right'):
                 for view in ('lateral', 'medial'):
+                    print(hemi, view)
+                    fig.data = []
+                    fig.add_traces([hemis[hemi]] + seeds)
                     zoom = zoom_factor[hemi][view]
                     camera.eye.x = camera.eye.x * zoom
                     fig_path = os.path.join(tmp_dir, out_path_base + f'_hemi-{hemi}_view-{view}{ext}')
@@ -364,25 +484,24 @@ def plot_surface(
                     ix += 1
                     camera.eye.x = camera.eye.x / zoom
 
-                fig.data = []
+                    if has_colorbar and not colorbar_written:
+                        cbar_path = os.path.join(tmp_dir, out_path_base + f'_cbar{ext}')
+                        cbar_fig = go.Figure(fig)
+                        cbar_fig.data = cbar_fig.data[:0]
+                        cbar_fig.add_traces(colorbars)
+                        cbar_fig.layout.width = pio.kaleido.scope.default_width * cbar_x
+                        cbar_fig.write_image(
+                            cbar_path,
+                            scale=scale
+                        )
+                        cbar_img = Image.open(cbar_path)
+                        w, h = cbar_img.size
+                        l, t, r, b = w * 1 / cbar_x, h * vtrim, w, h * (1 - vtrim)
+                        cbar_img = cbar_img.crop((l, t, r, b))
+                        colorbar_written = True
 
-                if colorbar and not colorbar_written:
-                    cbar_path = os.path.join(tmp_dir, out_path_base + f'_cbar{ext}')
-                    cbar_fig = go.Figure(fig)
-                    cbar_fig.data = cbar_fig.data[:0]
-                    cbar_fig.add_traces(cbars)
-                    cbar_fig.layout.width = pio.kaleido.scope.default_width * cbar_x
-                    cbar_fig.write_image(
-                        cbar_path,
-                        scale=scale
-                    )
-                    cbar_img = Image.open(cbar_path)
-                    w, h = cbar_img.size
-                    l, t, r, b = w * 1 / cbar_x, h * vtrim, w, h * (1 - vtrim)
-                    cbar_img = cbar_img.crop((l, t, r, b))
-                    colorbar_written = True
+            print('Combining images')
 
-        if plot_path:
             if cbar_img:
                 imgs.append(cbar_img)
             widths, heights = zip(*(i.size for i in imgs))
@@ -396,288 +515,460 @@ def plot_surface(
             img_path = plot_path
             new_im.save(img_path)
 
-        fig.add_traces([traces['left'], traces['right']] + cbars + seeds)
-        fig.update_traces(lighting=PLOT_LIGHTING, lightposition=PLOT_LIGHTPOSITION)
-
-        return fig
-
-@lru_cache(maxsize=1)
-def get_plot_meshes(
-        pial_left=None,
-        pial_right=None,
-        white_left=None,
-        white_right=None,
-        midthickness_left=None,
-        midthickness_right=None,
-        sulc_left=None,
-        sulc_right=None,
-        display_surface='midthickness',
-        percent=None,
-        face_count=None
-):
-    if sulc_left is not None or sulc_right is not None:
-        sulc = surface.PolyData(left=sulc_left, right=sulc_right)
-    else:
-        sulc = None
-    if pial_left is not None or pial_right is not None:
-        pial, sulc_ = resample_mesh(
-            surface.PolyMesh(left=pial_left, right=pial_right),
-            surf_data=sulc if sulc is not None and display_surface == 'pial' else None,
-            percent=percent,
-            face_count=face_count
-        )
-        if sulc_ is not None:
-            sulc = sulc_
-    else:
-        pial = None
-    if white_left is not None or white_right is not None:
-        white, sulc_ = resample_mesh(
-            surface.PolyMesh(left=white_left, right=white_right),
-            surf_data=sulc if sulc is not None and display_surface == 'white' else None,
-            percent=percent,
-            face_count=face_count
-        )
-        if sulc_ is not None:
-            sulc = sulc_
-    else:
-        white = None
-    if midthickness_left is not None or midthickness_right is not None:
-        midthickness, sulc_ = resample_mesh(
-            surface.PolyMesh(left=midthickness_left, right=midthickness_right),
-            surf_data=sulc if sulc is not None and display_surface == 'midthickness' else None,
-            percent=percent,
-            face_count=face_count
-        )
-        if sulc_ is not None:
-            sulc = sulc_
-    else:
-        midthickness = None
-
-    return pial, white, midthickness, sulc
-
-
-def resample_mesh(
-        mesh,
-        surf_data=None,
-        percent=None,
-        face_count=None
-):
-    '''Doesn't work good, just pass through with `None` for all kwargs'''
-
-    assert not (percent and face_count), 'Either percent or face_count must be specified, not both.'
-
-    if not (percent or face_count):
-        return mesh, surf_data
-
-    has_surf_data = surf_data is not None
-    out_mesh = {}
-    out_surf = {}
-    for hemi in ('left', 'right'):
-        mesh_ = mesh.parts[hemi]
-        if percent is not None:
-            assert 0 < percent < 100, 'percent_downsample must be between 0 and 100'
-            target_reduction = percent / 100
-            resample = True
-        elif face_count is not None:
-            assert face_count > 0, 'face_count must be greater than 0'
-            target_reduction = face_count / mesh_.coordinates.shape[0]
-            resample = True
+    def get_plot_meshes(
+            self,
+            pial_left=None,
+            pial_right=None,
+            white_left=None,
+            white_right=None,
+            midthickness_left='infer',
+            midthickness_right='infer',
+            sulc_left=None,
+            sulc_right=None,
+            progress_fn=None
+    ):
+        t0 = time.time()
+        if progress_fn is not None:
+            progress_fn('Loading pial meshes')
+        if pial_left is not None or pial_right is not None:
+            pial = self.get_surface_mesh(left=pial_left, right=pial_right)
         else:
-            target_reduction = 1
-            resample = False
+            pial = None
+        t1 = time.time()
+        print(f'Loaded pial meshes in {t1 - t0:.2f} seconds.')
 
-        if resample:
-            faces_pyvista_format = np.hstack(
-                (
-                    np.full((mesh_.faces.shape[0], 1), 3),
-                    mesh_.faces
-                )
-            ).flatten()
-            mesh_ = pyvista.PolyData(
-                mesh_.coordinates,
-                faces=faces_pyvista_format,
-            )
-            mesh_.clear_data()
-            if surf_data is not None:
-                mesh_.point_data['surf_data'] = surf_data.parts[hemi]
-            mesh_ = mesh_.decimate(target_reduction=target_reduction, scalars=True)
-
-            faces_nilearn_format = mesh_.faces.reshape((-1, 4))[:, 1:]
-            out_mesh[hemi] = surface.InMemoryMesh(
-                coordinates=mesh_.points,
-                faces=faces_nilearn_format
-            )
-            if has_surf_data:
-                out_surf[hemi] = np.array(mesh_.point_data['surf_data'])
+        t0 = time.time()
+        if progress_fn is not None:
+            progress_fn('Loading white meshes')
+        if white_left is not None or white_right is not None:
+            white = self.get_surface_mesh(left=white_left, right=white_right)
         else:
-            out_mesh[hemi] = mesh_
-            if has_surf_data:
-                out_surf[hemi] = surf_data.parts[hemi]
+            white = None
+        t1 = time.time()
+        print(f'Loaded white meshes in {t1 - t0:.2f} seconds.')
 
-    out_mesh = surface.PolyMesh(**out_mesh)
-    if has_surf_data:
-        out_surf = surface.PolyData(**out_surf)
-    else:
-        out_surf = None
-
-    return out_mesh, out_surf
-
-
-def get_plot_Mesh3d(surface_, hemi, turn_out_hemis=False):
-    x, y, z = surface_.parts[hemi].coordinates.T
-    i, j, k = surface_.parts[hemi].faces.T
-    customdata = pd.DataFrame(dict(  # Store true coordinates for hover before messing with them
-        x=x,
-        y=y,
-        z=z,
-    ))
-
-    # Turn out hemispheres
-    if turn_out_hemis:
-        x = np.abs(x)
-        y -= y.min() - 10
-        if hemi == 'right':
-            y *= -1
-    trace = go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k)
-    trace.lighting = PLOT_LIGHTING
-    trace.lightposition = PLOT_LIGHTPOSITION
-
-    return trace, customdata
-
-
-def get_plot_bgcolors(nvertices, hemi, sulc=None, bg_brightness=0.95, sulc_alpha=0.9):
-    bgcolors = np.ones((nvertices, 3)) * bg_brightness
-    if sulc is not None:
-        sulc_data = sulc.parts[hemi]
-        sulc_vmin, sulc_vmax = np.min(sulc_data), np.max(sulc_data)
-        if sulc_vmin < 0 or sulc_vmax > 1:
-            bg_norm = Normalize(vmin=sulc_vmin, vmax=sulc_vmax)
-            sulc_data = bg_norm(sulc_data)
-        sulccolors = plt.get_cmap("Greys")(sulc_data)[..., :3]
-        bgcolors = bgcolors * (1 - sulc_alpha) + sulccolors * sulc_alpha
-
-    return bgcolors
-
-
-def get_statmap_surface(statmap_nii, pial, white=None, hemi='left'):
-    statmap = surface.vol_to_surf(
-        statmap_nii,
-        pial.parts[hemi],
-        inner_mesh=white.parts[hemi],
-        depth=np.linspace(0.0, 1.0, 10)
-    )
-    return statmap
-
-
-@lru_cache(maxsize=1)
-def get_functionals_and_masker(
-        participant,
-        project='climblab',
-        session=None,
-        cleaning_label=CLEAN_DEFAULT_KEY,
-        space=PARCELLATE_DEFAULT_KEY,
-        debug=False
-):
-    if session:
-        sessions = {session}
-    else:
-        sessions = set(
-            [x[4:] for x in os.listdir(os.path.join(BIDS_PATH, project, f'sub-{participant}'))
-             if x.startswith('ses-')]
+        t0 = time.time()
+        if progress_fn is not None:
+            progress_fn('Loading midthickness meshes')
+        midthickness = self.get_midthickness_mesh(
+            left=midthickness_left,
+            right=midthickness_right,
+            pial_left=pial_left,
+            pial_right=pial_right,
+            white_left=white_left,
+            white_right=white_right
         )
-        if not sessions:
-            sessions = {None}
-    functionals = []
-    for session in sessions:
-        cleaned_dir = os.path.join(
-            BIDS_PATH, project, 'derivatives', 'cleaned', cleaning_label, f'sub-{participant}'
+        t1 = time.time()
+        print(f'Loaded midthickness meshes in {t1 - t0:.2f} seconds.')
+
+        t0 = time.time()
+        if progress_fn is not None:
+            progress_fn('Loading sulcal depth', 0)
+        if sulc_left is not None or sulc_right is not None:
+            sulc = self.get_surface_data(left=sulc_left, right=sulc_right)
+        else:
+            sulc = None
+        t1 = time.time()
+        print(f'Loaded sulcal depth in {t1 - t0:.2f} seconds.')
+
+        return pial, white, midthickness, sulc
+
+    def get_surface_mesh(
+            self,
+            left,
+            right
+    ):
+        return surface.PolyMesh(
+            left=self.get_surface_mesh_hemi(left),
+            right=self.get_surface_mesh_hemi(right)
         )
+
+    # Cachable
+    def get_surface_mesh_hemi(
+            self,
+            path,
+    ):
+        print('surface', path)
+        if path is None:
+            return path
+        return surface.PolyMesh(left=path).parts['left']
+
+    def get_midthickness_mesh(
+            self,
+            left=None,
+            right=None,
+            pial_left=None,
+            pial_right=None,
+            white_left=None,
+            white_right=None
+    ):
+        if left is None and right is None:
+            return None
+
+        assert (pial_left is not None or pial_right is not None) and \
+            (white_left is not None or white_right is not None), \
+            'If no left or right mesh is provided, both pial and white meshes must be provided.'
+
+        midthickness = dict(
+            left=left,
+            right=right
+        )
+        pial = dict(
+            left=pial_left,
+            right=pial_right
+        )
+        white = dict(
+            left=white_left,
+            right=white_right
+        )
+
+        mesh_kwargs = {}
+        for hemi in ('left', 'right'):
+            if midthickness[hemi] is None:
+                mesh_kwargs[hemi] = None
+            elif midthickness[hemi] == 'infer':
+                # Average pial and white coords
+                assert pial[hemi] is not None, \
+                    f'Pial mesh must be provided for {hemi} hemisphere if midthickness is `infer`.'
+                assert white[hemi] is not None, \
+                    f'White mesh must be provided for {hemi} hemisphere if midthickness is `infer`.'
+                mesh_kwargs[hemi] = self.infer_midthickness_mesh_hemi(pial[hemi], white[hemi])
+            else:
+                mesh_kwargs[hemi] = self.get_surface_mesh_hemi(midthickness[hemi])
+        return surface.PolyMesh(**mesh_kwargs)
+
+    # Cachable
+    def infer_midthickness_mesh_hemi(
+            self,
+            pial,
+            white
+    ):
+        pial = self.get_surface_mesh_hemi(pial)
+        white = self.get_surface_mesh_hemi(white)
+        midthickness_coords = ((pial.coordinates + white.coordinates) / 2) \
+            .astype(np.float32)
+        # Use pial faces (arbitrary, faces are the same for all meshes)
+        midthickness_faces = pial.faces
+
+        return surface.InMemoryMesh(
+            coordinates=midthickness_coords,
+            faces=midthickness_faces
+        )
+
+    # Cachable
+    def get_surface_data(
+            self,
+            left,
+            right
+    ):
+        return surface.PolyData(left=left, right=right)
+
+    # Cachable
+    def get_plot_bgcolors(self, nvertices, hemi, sulc_left=None, sulc_right=None, bg_brightness=0.95, sulc_alpha=0.9):
+        bgcolors = np.ones((nvertices, 3)) * bg_brightness
+        sulc = sulc_left if hemi == 'left' else sulc_right
+        if sulc is not None:
+            sulc_data = self.get_surface_data(left=sulc_left, right=sulc_right).parts[hemi]
+            sulc_vmin, sulc_vmax = np.min(sulc_data), np.max(sulc_data)
+            if sulc_vmin < 0 or sulc_vmax > 1:
+                bg_norm = Normalize(vmin=sulc_vmin, vmax=sulc_vmax)
+                sulc_data = bg_norm(sulc_data)
+            sulccolors = plt.get_cmap("Greys")(sulc_data)[..., :3]
+            bgcolors = bgcolors * (1 - sulc_alpha) + sulccolors * sulc_alpha
+
+        bgcolors = bgcolors.astype(np.float32)
+
+        return bgcolors
+
+    def get_statmap(self, path=None, functional_paths=None, seed=None, fwhm=None, progress_fn=None):
+        if path is None and functional_paths is None:
+            raise ValueError('Either `path` or `functional_paths` must be provided.')
+        if path is not None:
+            if progress_fn is not None:
+                progress_fn(f'Loading statmap {path}')
+            statmap = self.load_statmap_from_disk(path)
+        else:
+            assert functional_paths, 'If `path` is not provided, `functional_paths` must be ' \
+                                     'a tuple of paths to timecourses.'
+            assert seed, 'If `path` is not provided, `seed` must be a tuple of (x, y, z) coordinates.'
+            x, y, z = seed
+            statmap = self.get_connectivity_from_seed(x, y, z, functional_paths, fwhm=fwhm, progress_fn=progress_fn)
+
+        return statmap
+
+    # Cachable
+    def load_statmap_from_disk(self, path=None):
+        return image.load_img(path)
+
+    def get_functional_paths(
+            self,
+            participant,
+            project='climblab',
+            session=None,
+            cleaning_label=CLEAN_DEFAULT_KEY,
+            space=PARCELLATE_DEFAULT_KEY
+    ):
         if session:
-            cleaned_dir = os.path.join(cleaned_dir, f'ses-{session}')
-        functionals += sorted([os.path.join(cleaned_dir, x) for x in os.listdir(cleaned_dir) if
-                               x.endswith(f'_space-{space}_desc-clean_bold.nii.gz')])
+            sessions = {session}
+        else:
+            sessions = set(
+                [x[4:] for x in os.listdir(os.path.join(BIDS_PATH, project, f'sub-{participant}'))
+                 if x.startswith('ses-')]
+            )
+            if not sessions:
+                sessions = {None}
+        functional_paths = []
+        for session in sessions:
+            cleaned_dir = os.path.join(
+                BIDS_PATH, project, 'derivatives', 'cleaned', cleaning_label, f'sub-{participant}'
+            )
+            if session:
+                cleaned_dir = os.path.join(cleaned_dir, f'ses-{session}')
+            functional_paths += sorted([os.path.join(cleaned_dir, x) for x in os.listdir(cleaned_dir) if
+                                   x.endswith(f'_space-{space}_desc-clean_bold.nii.gz')])
 
-    if not functionals:
-        return [], None
+        if not functional_paths:
+            return [], None
 
-    if debug:
-        functionals = functionals[:1]
+        return functional_paths
 
-    masker = maskers.NiftiMasker()
-    boldref = image.load_img(functionals[0].replace('_desc-preproc_bold', '_boldref'))
-    masker.fit(boldref)
-    functionals_ = []
-    for functional in functionals:
-        functionals_.append(masker.transform(image.resample_to_img(functional, masker.mask_img_)))
-    functionals = np.concatenate(functionals_, axis=0)  # shape (n_timepoints, n_kept_voxels)
+    # Cachable
+    def get_functionals_and_mask(
+            self,
+            functional_paths,
+            debug=False,
+            progress_fn=None
+    ):
+        if not functional_paths:
+            return [], None
 
-    return functionals, masker
+        if debug:
+            functional_paths = functional_paths[:1]
+
+        masker = maskers.NiftiMasker()
+        boldref = image.load_img(functional_paths[0].replace('_desc-preproc_bold', '_boldref'))
+        masker.fit(boldref)
+        functionals_ = []
+        incr = 0
+        if progress_fn:
+            incr = progress_fn.incr
+            progress_fn.incr = incr / (len(functional_paths) + 1)
+        for i, functional in enumerate(functional_paths):
+            if len(functional) > 75:
+                functional_str = '...' + functional[-75:]
+            else:
+                functional_str = functional
+            msg = f'Loading functional image {i+1}/{len(functional_paths)}: {functional_str}'
+            print('  ' + msg)
+            if progress_fn:
+                progress_fn(msg)
+            functionals_.append(masker.transform(image.resample_to_img(functional, masker.mask_img_)))
+        if progress_fn:
+            progress_fn('Concatenating runs')
+        functional_paths = np.concatenate(functionals_, axis=0)  # shape (n_timepoints, n_kept_voxels)
+        if progress_fn:
+            progress_fn.incr = incr
+
+        return functional_paths, masker.mask_img_
+
+    # Cachable
+    def get_connectivity_from_seed(self, x, y, z, functional_paths, fwhm=None, progress_fn=None):
+        incr = load_incr = conn_incr = 0
+        if progress_fn is not None:
+            incr = progress_fn.incr
+            load_incr = incr * 0.9
+            conn_incr = incr - load_incr
+            progress_fn.incr = load_incr
+        functionals, mask_img = self.get_functionals_and_mask(functional_paths, progress_fn=progress_fn)
+        if progress_fn is not None:
+            progress_fn.incr = conn_incr
+            progress_fn(f'Calculating connectivity from seed ({x}, {y}, {z})')
+        ix = np.where(image.get_data(mask_img))
+        X, Y, Z = image.coord_transform(*ix, mask_img.affine)
+        seed = np.array([x, y, z])
+        distances = np.sqrt(np.sum((np.array([X, Y, Z]).T - seed) ** 2, axis=1))
+        if fwhm:
+            sigma = fwhm / (2 * np.sqrt(2 * np.log(2)))
+            weights = np.exp(-(distances ** 2) / (2 * sigma ** 2))
+            seed_timecourse = functionals @ weights
+        else:
+            ix = np.argmin(distances)
+            seed_timecourse = functionals[:, ix]
+        seed_timecourse = self.standardize_timecourse(seed_timecourse)
+        other_timecourses = self.standardize_timecourse(functionals)
+        n = len(seed_timecourse)
+
+        connectivity = (other_timecourses.T @ seed_timecourse / n).astype(np.float32)
+        connectivity = self.unmask(connectivity, mask_img)
+
+        if progress_fn is not None:
+            progress_fn.incr = incr
+
+        return connectivity
+
+    # Cachable
+    def get_statmap_surface(
+            self,
+            path=None,
+            functional_paths=None,
+            seed=None, fwhm=None,
+            pial=None,
+            white=None,
+            hemi='left',
+            progress_fn=None
+    ):
+        assert hemi in ('left', 'right'), 'Hemispheres must be "left" or "right".'
+        statmap_nii = self.get_statmap(
+            path=path, functional_paths=functional_paths, seed=seed, fwhm=fwhm, progress_fn=progress_fn
+        )
+        mesh_kwargs = {
+            f'pial_{hemi}': pial,
+        }
+        if white is not None:
+            mesh_kwargs[f'white_{hemi}'] = white
+        mesh_kwargs[f'midthickness_left'] = None
+        mesh_kwargs[f'midthickness_right'] = None
+        pial, white, _, _ = self.get_plot_meshes(**mesh_kwargs)
+
+        if progress_fn is not None:
+            progress_fn(f'Projecting statmap to {hemi} surface', 0)
+        statmap = surface.vol_to_surf(
+            statmap_nii,
+            pial.parts[hemi],
+            inner_mesh=white.parts[hemi],
+            depth=np.linspace(0.0, 1.0, 10)
+        ).astype(np.float32)
+
+        return statmap
+
+    def make_plot_Mesh3d(self, surface):
+        x, y, z = surface.coordinates.T
+        i, j, k = surface.faces.T
+
+        trace = go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k)
+        trace.lighting = PLOT_LIGHTING
+        trace.lightposition = PLOT_LIGHTPOSITION
+
+        return trace
+
+    def make_colorbar(
+            self,
+            cmap,
+            cmin,
+            cmax,
+            label,
+            statmap_scales_alpha,
+            threshold,
+            cbar_x=1.0
+    ):
+        cbar = go.Mesh3d()
+        cbar.cmax = cmax
+        cbar.cmin = cmin
+        cbar.colorbar = dict(len=0.5, tickfont=dict(color='black', size=25), tickformat='.1f', x=cbar_x)
+        if label:
+            cbar.colorbar.title = dict(text=label, side='right')
+        colorscale_ix = np.linspace(cmin, cmax, 256) / (cmax - cmin)
+        if statmap_scales_alpha:
+            colorscale_alpha = np.abs(colorscale_ix)
+        else:
+            colorscale_alpha = np.ones_like(colorscale_ix)
+        if threshold is not None:
+            colorscale_alpha = np.where(colorscale_alpha < threshold / (cmax - cmin), 0., colorscale_alpha)
+        colorscale_ix -= cmin / (cmax - cmin)
+        colorscale = cmap(colorscale_ix)
+        colorscale[..., 3] = colorscale_alpha
+        colorscale_ = []
+        for colorscale_ix_, color in zip(colorscale_ix, colorscale):
+            if np.all(np.isfinite(color)):
+                color = 'rgba(' + ', '.join([f'{round(c * 255)}' for c in color[:3]] + [f'{color[3]}']) + ')'
+                colorscale_.append([colorscale_ix_, color])
+        colorscale = colorscale_
+        cbar.colorscale = colorscale
+        cbar.i = [0]
+        cbar.j = [0]
+        cbar.k = [0]
+        cbar.intensity = [0]
+        cbar.opacity = 0
+        cbar.x = [1, 0, 0]
+        cbar.y = [0, 1, 0]
+        cbar.z = [0, 0, 1]
+
+        return cbar
+
+    # Cachable
+    def make_sphere(self, center, radius=1, opacity=0.7):
+        sphere_pv = pyvista.Sphere(radius=radius, center=center)
+        x, y, z = sphere_pv.points.T.astype(np.float32)
+        i, j, k = sphere_pv.faces.reshape((-1, 4))[:, 1:].T
+        sphere = go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k, color='white', opacity=opacity)
+
+        return sphere
+
+    def map_coords(self, x, y, z, hemi, spacer=5, turn_out_hemis=False):
+        if turn_out_hemis:
+            if hemi == 'right':
+                x = -x
+                y = -y
+            x -= x.min()
+            if hemi == 'left':
+                y -= y.min() - spacer
+            else:
+                y -= y.max() + spacer
+
+        return x, y, z
+
+    def standardize_timecourse(self, arr, axis=0):
+        return (arr - np.mean(arr, axis=axis, keepdims=True)) / np.std(arr, axis=axis, keepdims=True)
+
+    def unmask(self, arr, mask_nii):
+        # arr.shape -> (n_timepoints, n_kept_voxels) OR (n_kept_voxels,)
+        if arr.ndim == 2:
+            T = arr.shape[0]
+        else:
+            T = 0
+        mask = image.get_data(mask_nii).astype(bool)
+        shape = tuple(mask.shape)
+        if T:
+            shape = shape + (T,)
+            arr = arr.T
+        out = np.zeros(shape, dtype=arr.dtype)
+        out[mask] = arr
+        nii = image.new_img_like(mask_nii, out)
+
+        return nii
 
 
-def standardize_timecourse(arr, axis=0):
-    return (arr - np.mean(arr, axis=axis, keepdims=True)) / np.std(arr, axis=axis, keepdims=True)
+class PlotLibMemoized(PlotLib):
 
+    _cachables = (
+        'get_surface_mesh_hemi',
+        'infer_midthickness_mesh_hemi',
+        'get_surface_data',
+        'get_plot_bgcolors',
+        'load_statmap_from_disk',
+        'get_functionals_and_mask',
+        'get_connectivity_from_seed',
+        'get_statmap_surface',
+        'make_sphere'
+    )
 
-def unmask(arr, mask_nii):
-    # arr.shape -> (n_timepoints, n_kept_voxels) OR (n_kept_voxels,)
-    if arr.ndim == 2:
-        T = arr.shape[0]
-    else:
-        T = 0
-    mask = image.get_data(mask_nii).astype(bool)
-    shape = tuple(mask.shape)
-    if T:
-        shape = shape + (T,)
-        arr = arr.T
-    out = np.zeros(shape, dtype=arr.dtype)
-    out[mask] = arr
-    nii = image.new_img_like(mask_nii, out)
+    def __init__(
+            self,
+            cache_fns=None
+    ):
+        if cache_fns is None:
+            self.cache_fn_default = lambda x: x
+            self.cache_fns = {}
+        elif isinstance(cache_fns, dict):
+            self.cache_fn_default = lambda x: x
+            self.cache_fns = cache_fns
+        else:
+            self.cache_fn_default = cache_fns
+            self.cache_fns = {}
 
-    return nii
-
-
-def connectivity_from_seed(x, y, z, functionals, masker, fwhm=None):
-    mask_img = masker.mask_img_
-    ix = np.where(image.get_data(mask_img))
-    X, Y, Z = image.coord_transform(*ix, mask_img.affine)
-    seed = np.array([x, y, z])
-    distances = np.sqrt(np.sum((np.array([X, Y, Z]).T - seed) ** 2, axis=1))
-    if fwhm:
-        sigma = fwhm / (2 * np.sqrt(2 * np.log(2)))
-        weights = np.exp(-(distances ** 2) / (2 * sigma ** 2))
-        seed_timecourse = functionals @ weights
-    else:
-        ix = np.argmin(distances)
-        seed_timecourse = functionals[:, ix]
-    seed_timecourse = standardize_timecourse(seed_timecourse)
-    other_timecourses = standardize_timecourse(functionals)
-    n = len(seed_timecourse)
-
-    connectivity = other_timecourses.T @ seed_timecourse / n
-    connectivity = unmask(connectivity, mask_img)
-
-    return connectivity
-
-
-def generate_sphere(center, radius, opacity=0.7):
-    sphere_pv = pyvista.Sphere(radius=radius, center=center)
-    x, y, z = sphere_pv.points.T
-    i, j, k = sphere_pv.faces.reshape((-1, 4))[:, 1:].T
-    sphere = go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k, color='white', opacity=opacity)
-
-    return sphere
-
-
-
-
-
-def _plot(kwargs):
-    try:
-        plot_surface(**kwargs)
-    except Exception as e:
-        stderr(f'Error plotting statmap {kwargs["statmap_path"]}\n')
-        traceback.print_exc()
-        raise e
+        for cachable in self._cachables:
+            cache_fn = self.cache_fns.get(cachable, self.cache_fn_default)
+            setattr(self, cachable, cache_fn(getattr(self, cachable)))
 
 
 if __name__ == '__main__':
@@ -696,6 +987,13 @@ if __name__ == '__main__':
         'values. For details, see the `fmriprep` documentation.'))
     argparser.add_argument('--ncpus', type=int, default=8, help='Number of parallel processes to use.')
     args = argparser.parse_args()
+
+    cache = diskcache.Cache(
+        os.path.join(os.getcwd(), '.cache', 'viz'),
+        size_limit=1024 * 1024 * 1024 * 16,  # 16GB
+    )
+
+    pl = PlotLibMemoized(cache_fns=cache.memoize(ignore={'progress_fn'}))
 
     participant = args.participant
     project = args.project
@@ -732,7 +1030,6 @@ if __name__ == '__main__':
 
     stderr(f'Plotting outputs will be written to {os.path.join(derivatives_path, "firstlevel_plots", plot_label)}\n')
 
-    kwargs_all = []
     for model_subdir in os.listdir(models_path):
         if models and model_subdir not in models:
             continue
@@ -836,7 +1133,8 @@ if __name__ == '__main__':
                         continue
                     stat = stat.group(1)
                     contrast = contrast.group(1)
-                    kwargs = dict(
+                    stderr(f'Plotting statmap {os.path.join(contrast_path, statmap_path)}\n')
+                    fig = pl.get_fig(
                         pial=pial,
                         white=white,
                         midthickness=midthickness,
@@ -848,22 +1146,18 @@ if __name__ == '__main__':
                         vmax=5,
                         thresholds=None,
                         statmap_scales_alpha=False,
-                        plot_path=os.path.join(
-                            plot_path,
-                            os.path.basename(statmap_path)[:-len(PLOT_STATMAP_SUFFIX)] + '.png'
-                        ),
                         display_surface='midthickness',
-                        colorbar=True,
-                        hide_min=True,
-                        hide_max=False,
+                        colorbar=True
+                    )
+                    plot_path_ = os.path.join(
+                        plot_path,
+                        os.path.basename(statmap_path)[:-len(PLOT_STATMAP_SUFFIX)] + '.png'
+                    )
+                    pl.fig_to_image(
+                        fig,
+                        plot_path=plot_path_,
                         scale=config['scale'],
                         htrim=config['htrim'],
-                        vtrim=config['vtrim'],
+                        vtrim=config['vtrim']
                     )
-                    stderr(f'Plotting statmap {os.path.join(contrast_path, statmap_path)}\n')
-                    plot_surface(**kwargs)
-                    stderr(f'  Finished plotting statmap {os.path.join(contrast_path, statmap_path)}\n')
-                    kwargs_all.append(kwargs)
-
-    # pool = multiprocessing.Pool(ncpus)
-    # pool.map(_plot, kwargs_all)
+                    stderr(f'  Finished plotting: {plot_path_}\n')

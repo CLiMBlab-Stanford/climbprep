@@ -1,21 +1,27 @@
-import os
-import pprint
-import json
-import yaml
-import time
-import numpy as np
-from nilearn import image
-from nilearn.surface import PolyMesh, PolyData
+from uuid import uuid4
 from plotly import graph_objects as go
 from dash_iconify import DashIconify
 import dash_mantine_components as dmc
-from dash import Dash, html, dcc, Input, Output, State, Patch, callback_context
+from dash import Dash, DiskcacheManager, html, dcc, Input, Output, State, Patch, callback_context
+import diskcache
 import argparse
 
-from climbprep.plot import plot_surface, get_functionals_and_masker, connectivity_from_seed, generate_sphere
+from climbprep.plot import PlotLibMemoized
 from climbprep.constants import *
 
-dirpath = '/mnt/c/Users/corys/Downloads/c001'
+
+class Progress:
+    def __init__(self, progress_fn):
+        self.progress_fn = progress_fn
+        self.max = 1
+        self.value = 0
+        self.incr = 0
+
+    def __call__(self, message, incr=None):
+        if incr is None:
+            incr = self.incr
+        self.progress_fn((message, str(self.value), str(self.max)))
+        self.value += incr
 
 
 def viewport():
@@ -38,13 +44,13 @@ def viewport():
         ]
     )
 
-    loading = dcc.Loading(
-        id='viewport-loader',
-        children=[div],
-        target_components={'main': '*'}
-    )
+    # loading = dcc.Loading(
+    #     id='viewport-loader',
+    #     children=[div],
+    #     target_components={'main': '*'}
+    # )
 
-    return loading
+    return div
 
 
 def menu():
@@ -63,8 +69,11 @@ def menu():
         ),
         dmc.Affix(
             dmc.Button(
-                DashIconify(icon='mdi:brain', color='#fff',
+                children=[
+                    DashIconify(icon='mdi:brain', color='#fff',
                             style={'width': '3rem', 'height': '3rem'}),
+                    html.Span(className='compiling')
+                ],
                 id='compile',
                 style=dict(
                     height='4rem',
@@ -73,32 +82,75 @@ def menu():
             ),
             position=dict(top='1rem', left='6rem'),
         ),
+        dmc.Affix(
+            dmc.Button(
+                children=[
+                    DashIconify(icon='material-symbols:stop', color='#fff',
+                            style={'width': '3rem', 'height': '3rem'})
+                ],
+                id='cancel',
+                style=dict(
+                    height='4rem',
+                    width='4rem',
+                    display='none',
+                    background='red'
+                )
+            ),
+            position=dict(top='1rem', left='11rem'),
+        ),
         dmc.Drawer(
             [
-                html.Label('Projects'),
-                dcc.Dropdown(
-                    [],
-                    None,
-                    id='project-dropdown',
-                    clearable=False
+                html.Div(
+                    children=[
+                        html.Label('Project'),
+                        dcc.Dropdown(
+                            [],
+                            None,
+                            id='project-dropdown',
+                            clearable=False
+                        )
+                    ]
                 ),
-                html.Label('Participant'),
-                dcc.Dropdown(
-                    [],
-                    None,
-                    id='participant-dropdown',
-                    clearable=False
+                html.Div(
+                    children=[
+                        html.Label('Participant'),
+                        dcc.Dropdown(
+                            [],
+                            None,
+                            id='participant-dropdown',
+                            clearable=False,
+                        )
+                    ],
+                    id='participant-dropdown-wrapper'
+                ),
+                html.Div(
+                    children=[
+                        html.Label('Anatomical directory'),
+                        dmc.TextInput(
+                            id='anatomical-directory',
+                            placeholder=f'Path to anatomical directory',
+                            style={'width': '100%', 'padding-top': '0.25rem'}
+                        ),
+                    ],
+                    id='anatomical-directory-wrapper',
+                    style=dict(display='none')
                 ),
                 dmc.TextInput(
                     id='preprocessing-label',
                     placeholder=f'Preprocessing label (default: {PREPROCESS_DEFAULT_KEY})',
-                    style={'width': '100%', 'padding-top': '0.25rem'}
+                    style={'width': '100%', 'margin-top': '0.25rem'}
                 ),
                 dmc.Switch(
                     id='additive-color',
-                    label="Additive color",
+                    label='Additive color',
                     checked=True,
-                    style={'width': '49%', 'padding-top': '0.25rem'}
+                    style={'width': '48%', 'margin-top': '0.25rem'}
+                ),
+                dmc.Switch(
+                    id='turn-out-hemis',
+                    label='Turn out hemispheres',
+                    checked=False,
+                    style={'width': '48%', 'margin-top': '0.25rem'}
                 ),
                 html.Div(
                     children=[
@@ -118,6 +170,7 @@ def menu():
                                     ],
                                     value='contrast',
                                     clearable=False,
+                                    allowDeselect=False,
                                     size='sm',
                                     style=dict(width='40%')
                                 )
@@ -132,7 +185,7 @@ def menu():
                 )
             ],
             id='menu',
-            opened=True,
+            opened=True
         )
     ])
 
@@ -143,23 +196,101 @@ def layout():
     return html.Div(
         children=[
             dcc.Store(id='store', storage_type='memory'),
+            html.Div(
+                [
+                    html.Progress(
+                        id='progress',
+                        value='0'
+                    ),
+                    html.Span(
+                        id='progress-text',
+                        style={'margin-left': '1rem'}
+                    )
+                ],
+                id='progress-wrapper',
+                style={'display': 'none'}
+            ),
             menu(),
             viewport()
         ]
     )
 
 
-def assign_callbacks(app):
-    @app.callback(Output('main', 'figure'),
-                  Output('main', 'style'),
-                  Input('compile', 'n_clicks'),
-                  State('project-dropdown', 'value'),
-                  State('participant-dropdown', 'value'),
-                  State('preprocessing-label', 'value'),
-                  State('additive-color', 'checked'),
-                  State('statmap-list', 'children'),
-                  prevent_initial_call=True)
-    def update_graph(n_clicks, project, participant, preprocessing_label, additive_color, statmap_list):
+def assign_callbacks(app, cache):
+    pl = PlotLibMemoized(
+        cache.memoize(ignore={'progress_fn'})
+    )
+
+    @app.callback(
+        Output('main', 'figure'),
+        Output('main', 'style'),
+        Input('compile', 'n_clicks'),
+        State('project-dropdown', 'value'),
+        State('participant-dropdown', 'value'),
+        State('preprocessing-label', 'value'),
+        State('additive-color', 'checked'),
+        State('turn-out-hemis', 'checked'),
+        State('statmap-list', 'children'),
+        State('main', 'figure'),
+        prevent_initial_call=True,
+        background=True,
+        running=[
+            (Output('compile', 'disabled'), True, False),
+            (
+                    Output('cancel', 'style'),
+                    dict(
+                        height='4rem',
+                        width='4rem',
+                        display='block',
+                        background='red'
+                    ),
+                    dict(
+                        height='4rem',
+                        width='4rem',
+                        display='none',
+                        background='red'
+                    )
+            ),
+            (
+                Output("progress-wrapper", "style"),
+                {
+                    'display': 'block',
+                    'width': '100%',
+                    'textAlign': 'left',
+                    'position': 'fixed',
+                    'bottom': 0,
+                    'left': 0,
+                    'padding': '1rem',
+                    'zIndex': 2000,
+                    'backgroundColor': '#f0f0f0',
+                    'opacity': 0.7,
+                },
+                {
+                    'display': 'none'
+                }
+            )
+        ],
+        progress=[
+            Output("progress-text", "children"),
+            Output("progress", "value"),
+            Output("progress", "max")
+        ],
+        cancel=[Input("cancel", "n_clicks")]
+    )
+    def update_graph(
+            progress_fn,
+            n_clicks,
+            project,
+            participant,
+            preprocessing_label,
+            additive_color,
+            turn_out_hemis,
+            statmap_list,
+            fig_prev
+    ):
+        if progress_fn is not None:
+            progress_fn = Progress(progress_fn)
+        progress_fn('Initializing...', 0)
         projects = sorted([x for x in os.listdir(BIDS_PATH) if os.path.isdir(os.path.join(BIDS_PATH, x))])
         if project is None or project not in projects:
             project = 'climblab'
@@ -183,16 +314,16 @@ def assign_callbacks(app):
                 )
                 if not os.path.exists(surf_path):
                     session_subdirs = [
-                        x for x in os.path.join(
+                        x for x in os.listdir(os.path.join(
                             BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}'
-                        ) if x.startswith('ses-')
+                        )) if x.startswith('ses-')
                     ]
                     if session_subdirs:
                         session = session_subdirs[0][4:]
                         surf_path = os.path.join(
                             BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}',
                             f'ses-{session}', 'anat',
-                            f'sub-{participant}ses-{session}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
+                            f'sub-{participant}_ses-{session}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
                         )
                 if not surf_type in anat:
                     anat[surf_type] = dict()
@@ -222,8 +353,8 @@ def assign_callbacks(app):
                 node = 'subject'
 
             if stat_type == 'contrast':
-                task = get_value(statmap, 'task')
-                contrast = get_value(statmap, 'contrast')
+                task = get_value(statmap, 'task') or None
+                contrast = get_value(statmap, 'contrast') or None
                 model_label = get_value(statmap, 'model_label') or MODEL_DEFAULT_KEY
                 if task is None or contrast is None:
                     continue
@@ -233,11 +364,12 @@ def assign_callbacks(app):
                 )
                 if not os.path.exists(statmap_img):
                     continue
-                statmap_label = statmap.get('label', f'{contrast} (t)')
-                vmin_ = statmap.get('vmin', 0)
-                vmax_ = statmap.get('vmax', 5)
+                statmap_label_default = f'{contrast} (t)' if not session else f'{contrast} (t), {session}'
+                statmap_label = get_value(statmap, 'text') or statmap_label_default
+                vmin_ = get_value(statmap, 'vmin') or 0
+                vmax_ = get_value(statmap, 'vmax') or 5
             elif stat_type == 'network':
-                network = get_value(statmap, 'network')
+                network = get_value(statmap, 'network') or None
                 if network is None:
                     continue
                 parcellation_label = get_value(statmap, 'parcellation_label') or PARCELLATE_DEFAULT_KEY
@@ -248,9 +380,10 @@ def assign_callbacks(app):
                 )
                 if not os.path.exists(statmap_img):
                     continue
-                statmap_label = statmap.get('label', f'p({network})')
-                vmin_ = statmap.get('vmin', 0)
-                vmax_ = statmap.get('vmin', 0.8)
+                statmap_label_default = f'p({network})' if not session else f'p({network}), {session}'
+                statmap_label = get_value(statmap, 'text') or statmap_label_default
+                vmin_ = get_value(statmap, 'vmin') or 0
+                vmax_ = get_value(statmap, 'vmax') or 0.5
             elif stat_type == 'connectivity':
                 seed = (
                     get_value(statmap, 'seed_x'),
@@ -259,40 +392,39 @@ def assign_callbacks(app):
                 )
                 if seed[0] is None or seed[1] is None or seed[2] is None:
                     continue
-                fwhm = get_value(statmap, 'fwhm')
+                fwhm = get_value(statmap, 'fwhm') or None
                 cleaning_label = get_value(statmap, 'cleaning_label') or CLEAN_DEFAULT_KEY
                 space = PARCELLATE_DEFAULT_KEY
 
-                t0 = time.time()
-                functionals, masker = get_functionals_and_masker(
+                functional_paths = pl.get_functional_paths(
                     participant,
                     project=project,
                     session=session,
                     cleaning_label=cleaning_label,
                     space=space
                 )
-                t1 = time.time()
-                print('Getting functionals and masker took %.2f seconds.' % (t1 - t0))
 
                 # Not really an image, just a parameterization for seed-based connectivity,
                 # but this is what the plotting function expects.
                 statmap_img = dict(
-                    functionals=functionals,
-                    masker=masker,
+                    functionals=functional_paths,
                     seed=seed,
                     fwhm=fwhm
                 )
-                statmap_label = statmap.get('label', 'Connectivity (r)')
+                statmap_label_default = f'Connectivity @ {round(seed[0])}, {round(seed[1])}, {round(seed[2])} (r)'
+                if session:
+                    statmap_label_default += f', {session}'
+                statmap_label = get_value(statmap, 'text') or statmap_label_default
                 vmin_ = get_value(statmap, 'vmin') or 0
-                vmax_ = get_value(statmap, 'vmax') or 0.5
+                vmax_ = get_value(statmap, 'vmax') or 0.3
             else:
                 raise ValueError(f'Unknown statmap type: {stat_type}. Must be one of contrast or network.')
             statmap_paths.append(statmap_img)
             statmap_labels.append(statmap_label)
-            cmaps.append(get_value(statmap, 'color'))
+            cmaps.append(get_value(statmap, 'color') or None)
             vmin.append(vmin_)
             vmax.append(vmax_)
-            thresholds.append(get_value(statmap, 'threshold'))
+            thresholds.append(get_value(statmap, 'threshold') or None)
             statmap_scales_alpha.append(get_value(statmap, 'statmap_scales_alpha'))
 
         plot_kwargs = dict(
@@ -303,18 +435,70 @@ def assign_callbacks(app):
             vmax=vmax,
             thresholds=thresholds,
             statmap_scales_alpha=statmap_scales_alpha,
-            additive_color=additive_color
+            additive_color=additive_color,
+            turn_out_hemis=turn_out_hemis
         )
         for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
             for hemi in ('left', 'right'):
                 if not surf_type in plot_kwargs:
                     plot_kwargs[surf_type] = dict()
                 plot_kwargs[surf_type][hemi] = anat[surf_type][hemi]
+        plot_kwargs['progress_fn'] = progress_fn
 
-        t0 = time.time()
-        fig = plot_surface(**plot_kwargs)
-        t1 = time.time()
-        print('Plotting surface took %.2f seconds.' % (t1 - t0))
+        plot_data = pl.get_plot_data(**plot_kwargs)
+
+        if progress_fn is not None:
+            progress_fn('Rendering figure...', 0.1)
+
+        if fig_prev is None:
+            fig = pl.plot_data_to_fig(**plot_data)
+            fig.layout.meta = dict(project=project, participant=participant)
+        else:
+            fig_ = Patch()
+            for trace in fig_prev['data'][2:]:
+                fig_['data'].remove(trace)
+            project_prev = fig_prev.get('layout', {}).get('meta', {}).get('project', None)
+            participant_prev = fig_prev.get('layout', {}).get('meta', {}).get('participant', None)
+            same_participant = project == project_prev and participant == participant_prev
+            if not same_participant:
+                print(f'Participant changed from {participant_prev} to {participant}. Rebuilding mesh.')
+                for hemi in ('left', 'right'):
+                    data = plot_data['left'] if hemi == 'left' else plot_data['right']
+                    ix = 0 if hemi == 'left' else 1
+                    surface_ = data['mesh']
+                    trace = pl.make_plot_Mesh3d(surface=surface_)
+                    trace.vertexcolor = data['vertexcolor']
+                    trace.customdata = data['customdata']
+                    trace.hovertemplate = ''.join(['<b>' + col + ':</b> %{customdata[' + str(i) + ']:.2f}<br>'
+                                                   for i, col in enumerate(data['customdata'].columns)]) + '<extra></extra>'
+                    fig_['data'][ix] = trace
+            else:
+                print(f'Updating vertex colors.')
+                for hemi in ('left', 'right'):
+                    data = plot_data['left'] if hemi == 'left' else plot_data['right']
+                    ix = 0 if hemi == 'left' else 1
+                    fig_['data'][ix]['vertexcolor'] = data['vertexcolor']
+
+            cbar_x = 1
+            cbar_step = 0.1
+            extra_traces = []
+            for colorbar in plot_data['colorbars']:
+                # Add any colorbar traces
+                extra_traces.append(pl.make_colorbar(**colorbar, cbar_x=cbar_x))
+                cbar_x += cbar_step
+            for seed in plot_data['seeds']:
+                # Add any seed traces
+                extra_traces.append(pl.make_sphere(seed))
+            fig_['data'].extend(extra_traces)
+
+            fig_['layout'] = fig_prev['layout']
+            fig_['layout']['meta']['project'] = project
+            fig_['layout']['meta']['participant'] = participant
+            fig = fig_
+
+        if progress_fn is not None:
+            progress_fn.value = 0
+            progress_fn('', 0)
 
         return fig, {}
 
@@ -323,6 +507,9 @@ def assign_callbacks(app):
                   Output('participant-dropdown', 'options'),
                   Output('participant-dropdown', 'value'),
                   Output('statmap-list', 'children'),
+                  Output('participant-dropdown-wrapper', 'style'),
+                  Output('preprocessing-label', 'style'),
+                  Output('anatomical-directory-wrapper', 'style'),
                   Input('project-dropdown', 'value'),
                   Input('participant-dropdown', 'value'),
                   Input('add-statmap', 'n_clicks'),
@@ -344,18 +531,31 @@ def assign_callbacks(app):
         if store is None:
             store = {}
 
-        projects = sorted([x for x in os.listdir(BIDS_PATH) if os.path.isdir(os.path.join(BIDS_PATH, x))])
+        if os.path.exists(BIDS_PATH):
+            projects = sorted([x for x in os.listdir(BIDS_PATH) if os.path.isdir(os.path.join(BIDS_PATH, x))])
+        else:
+            projects = []
+        projects.append('local file')
         if project is None or project not in projects:
-            project = 'climblab'
-        participants = sorted(
-            [x[4:] for x in os.listdir(os.path.join(BIDS_PATH, project)) if x.startswith('sub-')]
-        )
+            if projects and 'climblab' in projects:
+                project = 'climblab'
+            else:
+                project = 'local file'
+        if project == 'local file':
+            participants = []
+        else:
+            participants = sorted(
+                [x[4:] for x in os.listdir(os.path.join(BIDS_PATH, project)) if x.startswith('sub-')]
+            )
         if participant is None or participant not in participants:
             participant = participants[0] if participants else None
-        sessions = sorted(
-            [x[4:] for x in os.listdir(os.path.join(BIDS_PATH, project, f'sub-{participant}'))
-                         if x.startswith('ses-')]
-        )
+        if project == 'local file':
+            sessions = []
+        else:
+            sessions = sorted(
+                [x[4:] for x in os.listdir(os.path.join(BIDS_PATH, project, f'sub-{participant}'))
+                             if x.startswith('ses-')]
+            )
 
         statmap_list_ = []
         for statmap in statmap_list:
@@ -413,7 +613,8 @@ def assign_callbacks(app):
                 if store is not None:
                     seed = store.get('seed', {}).get('points', [None])[0]
                     if seed is not None and 'customdata' in seed:
-                        x, y, z = seed['customdata'][0], seed['customdata'][1], seed['customdata'][2]
+                        x, y, z = round(seed['customdata'][0], 2), round(seed['customdata'][1], 2), \
+                                  round(seed['customdata'][2], 2)
                 children += [
                     dmc.NumberInput(
                         id={'type': 'statmap-seed-x', 'index': statmap_ix},
@@ -511,23 +712,29 @@ def assign_callbacks(app):
             found = False
             for child in children_src:
                 if is_dict:
-                    found_ = 'id' in child['props'] and child['props']['id']['type'] == 'statmap-session'
+                    found_ = 'id' in child['props'] and child['props']['id']['type'] == 'statmap-session-wrapper'
                 else:
                     found_ = hasattr(child, 'id') and 'type' in child.id and \
-                            child.id['type'] == 'statmap-session'
+                            child.id['type'] == 'statmap-session-wrapper'
                 found = found or found_
                 if found_ and delete:
                     continue
                 children.append(child)
             if not delete and not found:
-                session_select = dmc.RadioGroup(
-                    id={'type': 'statmap-session', 'index': statmap_ix},
-                    children=dmc.Group([dmc.Radio(k, value=k) for k in ['all'] + sessions], my=10),
-                    value='all',
-                    label='Session',
-                    mb=10,
-                    style=dict(width='98%'),
+                session_select = html.Div(
+                    [
+                        html.Label('Session'),
+                        dcc.Dropdown(
+                            id={'type': 'statmap-session', 'index': statmap_ix},
+                            options=[{'label': 'All', 'value': 'all'}] + [{'label': s, 'value': s} for s in sessions],
+                            value='all',
+                            clearable=False,
+                        )
+                    ],
+                    id={'type': 'statmap-session-wrapper', 'index': statmap_ix},
+                    style=dict(width='98%')
                 )
+
                 if is_dict:
                     children = statmap['props']['children']
                 else:
@@ -543,7 +750,10 @@ def assign_callbacks(app):
             project,
             [{'label': p, 'value': p} for p in participants],
             participant,
-            statmap_list
+            statmap_list,
+            {'display': 'none'} if project == 'local file' else {},
+            {'display': 'none'} if project == 'local file' else {},
+            {} if project == 'local file' else {'display': 'none'}
         ]
 
     @app.callback(
@@ -556,7 +766,7 @@ def assign_callbacks(app):
     @app.callback(Output('store', 'data'),
                   Input('main', 'clickData'),
                   State('store', 'data'))
-    def capture_seed(click_data, store):
+    def update_store(click_data, store):
         if store is None:
             store = {}
         if 'statmap_ix' not in store:
@@ -587,17 +797,19 @@ def get_value(statmap, key):
     return val
 
 
-
-
-
-
 def initialize_app(config_path):
-    app = Dash(__name__)
+    cache = diskcache.Cache(
+        os.path.join(os.getcwd(), '.cache', 'viz'),
+        size_limit=1024 * 1024 * 1024 * 16,  # 16GB
+    )
+    background_callback_manager = DiskcacheManager(cache)
+
+    app = Dash(__name__, background_callback_manager=background_callback_manager)
     app.config_path = config_path
     app.layout = dmc.MantineProvider(layout())
     app.title = 'Cortical Surface Viewer'
 
-    return app
+    return app, cache
 
 
 if __name__ == '__main__':
@@ -610,6 +822,6 @@ if __name__ == '__main__':
     config_path = args.config_path
     debug = args.debug
 
-    app = initialize_app(config_path)
-    assign_callbacks(app)
+    app, cache = initialize_app(config_path)
+    assign_callbacks(app, cache)
     app.run(debug=debug, dev_tools_hot_reload=False)

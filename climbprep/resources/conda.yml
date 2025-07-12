@@ -19,6 +19,6 @@ dependencies:
     - plotly
     - kaleido
     - pyvista
-    - dash
+    - dash[diskcache]
     - dash-iconify
     - dash-mantine-components
