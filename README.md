@@ -247,6 +247,21 @@ using the same task data and conditions. If you're not sure how to
 implement a variant, consult the docs for `fitlins` and `BIDS Stats Models`.
 
 
+### parcellate
+The parcellate step generates bottom-up network parcellations
+based on activity fluctuations. It can only be run after
+cleaning is complete. To parcellate a participant's data,
+run:
+
+    python -m climblab.parcellate <PARTICIPANT_ID> -p <PROJECT_ID>
+
+(the `-p` option can be omitted if the project is `climblab`).
+The `-c` argument can be omitted (defaults to `T1w`) or set to
+another named configuration or a path to a YAML configuration file.
+To view the available config options, see `CONFIG['parcellate']` in
+`climbprep/constants.py`.
+
+
 ### plot
 The plotting step generates surface plots of the results of the modeling
 step. It can only be run after modeling is complete. To plot a participant's
@@ -261,19 +276,57 @@ To view the available config options, see `CONFIG['plot']` in
 `climbprep/constants.py`.
 
 
-### parcellate
-The parcellate step generates bottom-up network parcellations
-based on activity fluctuations. It can only be run after
-cleaning is complete. To parcellate a participant's data,
-run:
+## Usage: viz
 
-    python -m climblab.parcellate <PARTICIPANT_ID> -p <PROJECT_ID>
+The steps above will produce lots of derivatives that can be visualized
+in a large number of ways and combinations. The `plot` step provides
+a configurable way to generate individual plots of individual statmaps
+(e.g., firstlevel contrasts), but it can be restrictive for exploratory
+data analysis where you just want to be able to quickly visualize the
+comparisons you care about.
 
-(the `-p` option can be omitted if the project is `climblab`).
-The `-c` argument can be omitted (defaults to `T1w`) or set to
-another named configuration or a path to a YAML configuration file.
-To view the available config options, see `CONFIG['parcellate']` in
-`climbprep/constants.py`.
+To support this kind of exploration, you can use the `viz` module to
+view arbitrary statmaps in native space in an interactive browser
+session. To use `viz`, first map the lab directory to a matched path
+on your local machine. To do this, you will need to create the empty
+directory below and make sure you have read/write permissions to it:
+
+    sudo mkdir -p /juice6/u/nlp/climblab
+    sudo chown -R $USER /juice6/u/nlp/climblab
+
+You can then mount the lab directory using e.g., `sshfs`:
+
+    sshfs -o allow_other <SC_USERNAME>@scdt.stanford.edu:/juice6/u/nlp/climblab /juice6/u/nlp/climblab
+
+This will let you access lab files as if they were on your local machine.
+
+Finally, you can start the viz app by running:
+
+    python -m climbprep.viz.app -d
+
+This will spin a webserver on your local machine, which will report
+a URL in the console (typically `http://localhost:8050`) that you can
+open in a browser. There is a left panel to configure your visualization
+(selecting a project/participant, and adding one or more statmaps to
+render), and a "brain" button that you can use to render the statmap(s)
+as a 3D interactive figure.
+
+`viz` supports three main classes of visualizations: contrasts (*t*-maps from
+firstlevels), networks (probabilistic parcellations), and connectivity (seed-based
+correlation maps). To visualize connectivity, you must first select a seed (brain
+location in 3D coordinate space). A quick way to do this is to first render the
+brain surface without any statmaps, then click on the brain to select a seed
+location, then select "Connectivity" in the left panel and click "+" to add a
+new connectivity statmap against the brain location where you last clicked.
+You can add as many seeds as you want this way, and the resulting maps will
+be superposed on the surface. Note that seed-based analyses must initially load 
+large amounts of data (all relevant functional runs for the participant), which 
+can be time-consuming (dozens of minutes or more depending on how much data the
+participant has). These timecourses will be cached to disk locally, so subsequent
+seeds will render much faster. If you want to clear the cache to recover disk
+space, you can run:
+
+    python -m climbprep.viz.clear_cache
 
 
 ## Usage: Helper Functions

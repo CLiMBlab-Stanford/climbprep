@@ -527,27 +527,20 @@ class PlotLib:
             sulc_right=None,
             progress_fn=None
     ):
-        t0 = time.time()
         if progress_fn is not None:
             progress_fn('Loading pial meshes')
         if pial_left is not None or pial_right is not None:
             pial = self.get_surface_mesh(left=pial_left, right=pial_right)
         else:
             pial = None
-        t1 = time.time()
-        print(f'Loaded pial meshes in {t1 - t0:.2f} seconds.')
 
-        t0 = time.time()
         if progress_fn is not None:
             progress_fn('Loading white meshes')
         if white_left is not None or white_right is not None:
             white = self.get_surface_mesh(left=white_left, right=white_right)
         else:
             white = None
-        t1 = time.time()
-        print(f'Loaded white meshes in {t1 - t0:.2f} seconds.')
 
-        t0 = time.time()
         if progress_fn is not None:
             progress_fn('Loading midthickness meshes')
         midthickness = self.get_midthickness_mesh(
@@ -558,18 +551,13 @@ class PlotLib:
             white_left=white_left,
             white_right=white_right
         )
-        t1 = time.time()
-        print(f'Loaded midthickness meshes in {t1 - t0:.2f} seconds.')
 
-        t0 = time.time()
         if progress_fn is not None:
             progress_fn('Loading sulcal depth', 0)
         if sulc_left is not None or sulc_right is not None:
             sulc = self.get_surface_data(left=sulc_left, right=sulc_right)
         else:
             sulc = None
-        t1 = time.time()
-        print(f'Loaded sulcal depth in {t1 - t0:.2f} seconds.')
 
         return pial, white, midthickness, sulc
 
@@ -588,7 +576,6 @@ class PlotLib:
             self,
             path,
     ):
-        print('surface', path)
         if path is None:
             return path
         return surface.PolyMesh(left=path).parts['left']
@@ -688,9 +675,10 @@ class PlotLib:
                 progress_fn(f'Loading statmap {path}')
             statmap = self.load_statmap_from_disk(path)
         else:
-            assert functional_paths, 'If `path` is not provided, `functional_paths` must be ' \
+            assert functional_paths is not None, 'If `path` is not provided, `functional_paths` must be ' \
                                      'a tuple of paths to timecourses.'
-            assert seed, 'If `path` is not provided, `seed` must be a tuple of (x, y, z) coordinates.'
+            assert seed and len(seed) == 3, 'If `path` is not provided, `seed` must be a tuple of (x, y, z) ' \
+                                            'coordinates.'
             x, y, z = seed
             statmap = self.get_connectivity_from_seed(x, y, z, functional_paths, fwhm=fwhm, progress_fn=progress_fn)
 
@@ -724,11 +712,12 @@ class PlotLib:
             )
             if session:
                 cleaned_dir = os.path.join(cleaned_dir, f'ses-{session}')
-            functional_paths += sorted([os.path.join(cleaned_dir, x) for x in os.listdir(cleaned_dir) if
-                                   x.endswith(f'_space-{space}_desc-clean_bold.nii.gz')])
+            if os.path.exists(cleaned_dir):
+                functional_paths += sorted([os.path.join(cleaned_dir, x) for x in os.listdir(cleaned_dir) if
+                                       x.endswith(f'_space-{space}_desc-clean_bold.nii.gz')])
 
         if not functional_paths:
-            return [], None
+            return functional_paths
 
         return functional_paths
 

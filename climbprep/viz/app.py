@@ -66,6 +66,7 @@ def menu():
                 )
             ),
             position=dict(top='1rem', left='1rem'),
+            zIndex=2000
         ),
         dmc.Affix(
             dmc.Button(
@@ -77,10 +78,11 @@ def menu():
                 id='compile',
                 style=dict(
                     height='4rem',
-                    width='4rem',
+                    width='4rem'
                 )
             ),
             position=dict(top='1rem', left='6rem'),
+            zIndex=2000
         ),
         dmc.Affix(
             dmc.Button(
@@ -97,6 +99,7 @@ def menu():
                 )
             ),
             position=dict(top='1rem', left='11rem'),
+            zIndex=2000
         ),
         dmc.Drawer(
             [
@@ -109,7 +112,10 @@ def menu():
                             id='project-dropdown',
                             clearable=False
                         )
-                    ]
+                    ],
+                    style={
+                        'marginTop': '2rem',
+                    }
                 ),
                 html.Div(
                     children=[
@@ -129,7 +135,7 @@ def menu():
                         dmc.TextInput(
                             id='anatomical-directory',
                             placeholder=f'Path to anatomical directory',
-                            style={'width': '100%', 'padding-top': '0.25rem'}
+                            style={'width': '100%', 'paddingTop': '0.25rem'}
                         ),
                     ],
                     id='anatomical-directory-wrapper',
@@ -138,19 +144,19 @@ def menu():
                 dmc.TextInput(
                     id='preprocessing-label',
                     placeholder=f'Preprocessing label (default: {PREPROCESS_DEFAULT_KEY})',
-                    style={'width': '100%', 'margin-top': '0.25rem'}
+                    style={'width': '100%', 'marginTop': '0.25rem'}
                 ),
                 dmc.Switch(
                     id='additive-color',
                     label='Additive color',
                     checked=True,
-                    style={'width': '48%', 'margin-top': '0.25rem'}
+                    style={'width': '48%', 'marginTop': '0.25rem'}
                 ),
                 dmc.Switch(
                     id='turn-out-hemis',
                     label='Turn out hemispheres',
                     checked=False,
-                    style={'width': '48%', 'margin-top': '0.25rem'}
+                    style={'width': '48%', 'marginTop': '0.25rem'}
                 ),
                 html.Div(
                     children=[
@@ -204,7 +210,7 @@ def layout():
                     ),
                     html.Span(
                         id='progress-text',
-                        style={'margin-left': '1rem'}
+                        style={'marginLeft': '1rem'}
                     )
                 ],
                 id='progress-wrapper',
@@ -404,6 +410,9 @@ def assign_callbacks(app, cache):
                     space=space
                 )
 
+                if not functional_paths:
+                    continue
+
                 # Not really an image, just a parameterization for seed-based connectivity,
                 # but this is what the plotting function expects.
                 statmap_img = dict(
@@ -461,7 +470,6 @@ def assign_callbacks(app, cache):
             participant_prev = fig_prev.get('layout', {}).get('meta', {}).get('participant', None)
             same_participant = project == project_prev and participant == participant_prev
             if not same_participant:
-                print(f'Participant changed from {participant_prev} to {participant}. Rebuilding mesh.')
                 for hemi in ('left', 'right'):
                     data = plot_data['left'] if hemi == 'left' else plot_data['right']
                     ix = 0 if hemi == 'left' else 1
@@ -473,7 +481,6 @@ def assign_callbacks(app, cache):
                                                    for i, col in enumerate(data['customdata'].columns)]) + '<extra></extra>'
                     fig_['data'][ix] = trace
             else:
-                print(f'Updating vertex colors.')
                 for hemi in ('left', 'right'):
                     data = plot_data['left'] if hemi == 'left' else plot_data['right']
                     ix = 0 if hemi == 'left' else 1
@@ -758,9 +765,13 @@ def assign_callbacks(app, cache):
 
     @app.callback(
         Output('menu', 'opened'),
-        Input('button1', 'n_clicks')
+        Input('button1', 'n_clicks'),
+        State('menu', 'opened'),
+        prevent_initial_call=True
     )
-    def menu_toggle(n_clicks):
+    def menu_toggle(n_clicks, opened):
+        if opened:
+            return False
         return True
 
     @app.callback(Output('store', 'data'),
