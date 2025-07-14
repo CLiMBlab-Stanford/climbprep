@@ -24,7 +24,7 @@ from climbprep.util import *
 class PlotLib:
 
     CACHABLE = {
-        # 'get_statmap_surface_and_color',
+        'get_statmap_surface_and_color',
         'get_surface_mesh_hemi',
         'infer_midthickness_mesh_hemi',
         'get_surface_data',
