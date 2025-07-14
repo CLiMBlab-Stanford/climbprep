@@ -23,6 +23,18 @@ from climbprep.util import *
 
 class PlotLib:
 
+    CACHABLE = {
+        'get_statmap_surface_and_color',
+        'get_surface_mesh_hemi',
+        'infer_midthickness_mesh_hemi',
+        'get_surface_data',
+        'get_plot_bgcolors',
+        'get_mask',
+        'get_functional',
+        'get_connectivity_from_seed',
+        'make_sphere'
+    }
+
     def get_fig(
             self,
             pial,
@@ -53,7 +65,7 @@ class PlotLib:
             sulc=sulc,
             statmaps=statmaps,
             statmap_labels=statmap_labels,
-            cmaps=cmaps,
+            colors=cmaps,
             vmin=vmin,
             vmax=vmax,
             thresholds=thresholds,
@@ -83,10 +95,11 @@ class PlotLib:
             sulc=None,
             statmaps=None,
             statmap_labels=None,
-            cmaps=None,  # Defaults to single color per statmap, only makes sense if statmap_scales_alpha=True
+            colors=None,  # Defaults to single color per statmap, only makes sense if statmap_scales_alpha=True
             vmin=None,
             vmax=None,
             thresholds=None,
+            skip=False,
             statmap_scales_alpha=True,
             hide_min=None,
             hide_max=None,
@@ -105,9 +118,9 @@ class PlotLib:
             statmaps_in = [statmaps_in]
         seeds = []
         for statmap_in in statmaps_in:
-            if isinstance(statmap_in, dict):
+            if isinstance(statmap_in, dict) and 'functionals' in statmap_in:
                 assert 'seed' in statmap_in, \
-                    'If `statmaps` is a dict, it must contain a key "seed" with the seed coordinates (x, y, z).'
+                    'If statmap is connectivity, it must contain a key "seed" with the seed coordinates (x, y, z).'
                 seeds.append(statmap_in['seed'])
 
         if statmap_labels is None:
@@ -117,11 +130,11 @@ class PlotLib:
         assert len(statmap_labels) == len(statmaps_in), \
             '`statmap_labels` must either be `None` or a list of equal length to `statmaps`.'
 
-        if cmaps is None:
-            cmaps = [None] * len(statmaps_in)
-        elif not hasattr(cmaps, '__iter__') or isinstance(cmaps, str):
-            cmaps = [cmaps]
-        assert len(cmaps) == len(statmaps_in), \
+        if colors is None:
+            colors = [None] * len(statmaps_in)
+        elif not hasattr(colors, '__iter__') or isinstance(colors, str):
+            colors = [colors]
+        assert len(colors) == len(statmaps_in), \
             '`cmaps` must either be `None` or a list of equal length to `statmaps.'
 
         if vmin is None:
@@ -146,8 +159,14 @@ class PlotLib:
             '`threshold` must either be a single value or a list of equal length to `statmaps.`'
 
         if not hasattr(statmap_scales_alpha, '__iter__'):
-            statmap_scales_alpha = [statmap_scales_alpha]
-        statmap_scales_alpha = statmap_scales_alpha * len(statmaps_in)
+            statmap_scales_alpha = [statmap_scales_alpha] * len(statmaps_in)
+        assert len(statmap_scales_alpha) == len(statmaps_in), \
+            '`statmap_scales_alpha` must either be a single value or a list of equal length to `statmaps.`'
+
+        if not hasattr(skip, '__iter__'):
+            skip = [skip] * len(statmaps_in)
+        assert len(skip) == len(statmaps_in), \
+            '`skip` must either be a single value or a list of equal length to `statmaps.`'
 
         C = 0.8
         T = 0.9
@@ -172,8 +191,9 @@ class PlotLib:
                     mesh_kwargs[f'{surf_type}_{hemi}'] = surf
         if progress_fn is not None:
             progress_fn.incr = incr_meshes
+            progress_fn('Loading surface meshes', 0)
         mesh_kwargs['progress_fn'] = progress_fn
-        pial, white, midthickness, sulc = self.get_plot_meshes(**mesh_kwargs)
+        pial, white, midthickness, sulc = self.get_surface_meshes(**mesh_kwargs)
 
         if display_surface == 'midthickness':
             display_surface = midthickness
@@ -218,21 +238,31 @@ class PlotLib:
             vertexscale = None
             colorbars = []
 
-            for statmap_in, cmap, label, vmin_, vmax_, threshold_, statmap_scales_alpha_ in \
-                    zip(statmaps_in, cmaps, statmap_labels, vmin, vmax, thresholds, statmap_scales_alpha):
+            for statmap_in, color, label, vmin_, vmax_, threshold_, statmap_scales_alpha_, skip_ in \
+                    zip(statmaps_in, colors, statmap_labels, vmin, vmax, thresholds, statmap_scales_alpha, skip):
+                if progress_fn is not None:
+                    progress_fn(f'Computing {hemi} vertex colors for statmap {label}', 0)
                 if isinstance(statmap_in, dict):
-                    assert 'functionals' in statmap_in, \
-                        'If `statmaps` is a dict, it must contain a key "functionals" with the paths to the timecourses.'
-                    assert 'seed' in statmap_in, \
-                        'If `statmaps` is a dict, it must contain a key "seed" with the seed coordinates (x, y, z).'
-                    functional_paths = tuple(sorted(statmap_in['functionals']))
-                    seed = statmap_in['seed']
-                    statmap_kwargs = dict(
-                        functional_paths=functional_paths,
-                        seed=seed,
-                        fwhm=statmap_in.get('fwhm', None),
-                    )
-                    seeds.append(seed)
+                    if 'functionals' in statmap_in:
+                        assert 'mask' in statmap_in, \
+                            'If statmap is connectivity, it must contain a key "mask" with the path to the mask.'
+                        assert 'seed' in statmap_in, \
+                            'If statmap is connectivity, it must contain a key "seed" with the seed coordinates ' \
+                            '(x, y, z).'
+                        functional_paths = tuple(sorted(statmap_in['functionals']))
+                        mask = statmap_in['mask']
+                        seed = statmap_in['seed']
+                        statmap_kwargs = dict(
+                            functional_paths=functional_paths,
+                            mask=mask,
+                            seed=seed,
+                            fwhm=statmap_in.get('fwhm', None),
+                        )
+                        seeds.append(seed)
+                    elif 'path' in statmap_in:
+                        statmap_kwargs = dict(path=statmap_in['path'], mask=statmap_in.get('mask', None))
+                    else:
+                        raise ValueError('`statmaps` dict must contain either "functionals" or "path" key.')
                 elif isinstance(statmap_in, str):
                     statmap_kwargs = dict(path=statmap_in)
                 else:
@@ -247,82 +277,43 @@ class PlotLib:
                     statmap_kwargs['white'] = surf_types['white'][hemi]
                 statmap_kwargs['hemi'] = hemi
 
-                statmap = self.get_statmap_surface(**statmap_kwargs, progress_fn=progress_fn)
-                col = label if label else 'val'
-                customdata[col] = statmap
-                if vmin_ is None:
-                    vmin_ = np.nanmin(statmap)
-                if vmax_ is None:
-                    vmax_ = np.nanmax(statmap)
-                cmin = vmin_
-                cmax = vmax_
-                if cmin < 0 < cmax:  # If both positive and negative values are present, center around 0
-                    mag = max(np.abs(cmin), np.abs(cmax))
-                    cmin = -mag
-                    cmax = mag
-                    if hide_min is None:
-                        hide_min = False
-                    if hide_max is None:
-                        hide_max = False
-                elif cmin >= 0:  # If only positive values are present
-                    if hide_min is None:
-                        hide_min = True
-                    if hide_max is None:
-                        hide_max = False
-                elif cmax <= 0:  # If only negative values are present
-                    if hide_min is None:
-                        hide_min = False
-                    if hide_max is None:
-                        hide_max = True
-                if hide_min:
-                    statmap = np.where(statmap < vmin_, np.nan, statmap)
-                if hide_max:
-                    statmap = np.where(statmap > vmax_, np.nan, statmap)
-                statmap_abs = np.abs(statmap)
-                if threshold_ is not None:
-                    assert threshold_ >= 0, 'Threshold must be non-negative'
-                    statmap = np.where(statmap_abs < threshold_, np.nan, statmap)
-                statmap = np.clip(statmap, cmin, cmax)
-                statmap /= cmax - cmin
-                statmap_abs = np.abs(statmap)
-                statmap -= cmin / (cmax - cmin)
+                if progress_fn is not None:
+                    progress_fn(f'Projecting statmap {label} to {hemi} surface', 0)
 
-                if cmap is None:
+                if color is None:
                     try:
                         color = next(plot_colors)
                     except StopIteration:
                         raise ValueError('Not enough colors in `climbprep.constants.PLOT_COLORS` to plot all statmaps. '
                                          'Please provide a list of colors for `cmaps`.')
-                    color = to_rgb(color)
-                    cmap = LinearSegmentedColormap.from_list(f'{color}', [color, color])
-                elif isinstance(cmap, str):
-                    try:
-                        cmap = plt.get_cmap(cmap)
-                    except ValueError:
-                        if isinstance(cmap, str):
-                            color = to_rgb(cmap)
-                        else:
-                            color = cmap
-                        cmap = LinearSegmentedColormap.from_list(f'{cmap}', [color, color])
-                cmap.set_extremes(bad=[np.nan] * 4, over=[np.nan] * 4, under=[np.nan] * 4)
 
-                vertexcolor_ = cmap(statmap)[..., :3]
-                if statmap_scales_alpha_:
-                    vertexcolor_ = vertexcolor_ * statmap_abs[..., None]
+                if skip_:
+                    continue
+
+                statmap, vertexcolor_, vertexalpha_, cmap, cmin, cmax = self.get_statmap_surface_and_color(
+                    color,
+                    vmin_=vmin_,
+                    vmax_=vmax_,
+                    threshold_=threshold_,
+                    statmap_scales_alpha_=statmap_scales_alpha_,
+                    hide_min=hide_min,
+                    hide_max=hide_max,
+                    progress_fn=progress_fn,
+                    **statmap_kwargs
+                )
+
+                col = label if label else 'val'
+                customdata[col] = statmap
+
                 if vertexcolor is None:
                     vertexcolor = vertexcolor_
                 else:
                     vertexcolor = np.where(np.isnan(vertexcolor), vertexcolor_,
                                            np.where(np.isnan(vertexcolor_), vertexcolor, vertexcolor + vertexcolor_))
-                if statmap_scales_alpha_:
-                    vertexalpha_ = statmap_abs[..., None]
-                else:
-                    vertexalpha_ = np.isfinite(statmap_abs)[..., None].astype(statmap_abs.dtype)
                 if vertexalpha is None:
                     vertexalpha = vertexalpha_
                 else:
                     vertexalpha = np.fmax(vertexalpha, vertexalpha_)
-
                 if vertexscale is None:
                     vertexscale = vertexalpha_
                 else:
@@ -465,7 +456,6 @@ class PlotLib:
             cbar_img = None
             for hemi in ('left', 'right'):
                 for view in ('lateral', 'medial'):
-                    print(hemi, view)
                     fig.data = []
                     fig.add_traces([hemis[hemi]] + seeds)
                     zoom = zoom_factor[hemi][view]
@@ -500,8 +490,6 @@ class PlotLib:
                         cbar_img = cbar_img.crop((l, t, r, b))
                         colorbar_written = True
 
-            print('Combining images')
-
             if cbar_img:
                 imgs.append(cbar_img)
             widths, heights = zip(*(i.size for i in imgs))
@@ -515,7 +503,7 @@ class PlotLib:
             img_path = plot_path
             new_im.save(img_path)
 
-    def get_plot_meshes(
+    def get_surface_meshes(
             self,
             pial_left=None,
             pial_right=None,
@@ -667,26 +655,29 @@ class PlotLib:
 
         return bgcolors
 
-    def get_statmap(self, path=None, functional_paths=None, seed=None, fwhm=None, progress_fn=None):
+    def get_statmap(self, path=None, functional_paths=None, mask=None, seed=None, fwhm=None, progress_fn=None):
         if path is None and functional_paths is None:
             raise ValueError('Either `path` or `functional_paths` must be provided.')
         if path is not None:
             if progress_fn is not None:
                 progress_fn(f'Loading statmap {path}')
-            statmap = self.load_statmap_from_disk(path)
+            statmap = self.load_nii(path)
         else:
             assert functional_paths is not None, 'If `path` is not provided, `functional_paths` must be ' \
                                      'a tuple of paths to timecourses.'
             assert seed and len(seed) == 3, 'If `path` is not provided, `seed` must be a tuple of (x, y, z) ' \
                                             'coordinates.'
+            assert mask, 'If `path` is not provided, `mask` must be a path to a NIFTI image mask.'
             x, y, z = seed
-            statmap = self.get_connectivity_from_seed(x, y, z, functional_paths, fwhm=fwhm, progress_fn=progress_fn)
+            statmap = self.get_connectivity_from_seed(
+                x=x, y=y, z=z,
+                functional_paths=functional_paths,
+                mask_path=mask,
+                fwhm=fwhm,
+                progress_fn=progress_fn
+            )
 
         return statmap
-
-    # Cachable
-    def load_statmap_from_disk(self, path=None):
-        return image.load_img(path)
 
     def get_functional_paths(
             self,
@@ -694,8 +685,11 @@ class PlotLib:
             project='climblab',
             session=None,
             cleaning_label=CLEAN_DEFAULT_KEY,
-            space=PARCELLATE_DEFAULT_KEY
+            space=PARCELLATE_DEFAULT_KEY,
+            regex_filter=None
     ):
+        if regex_filter is not None:
+            regex_filter = re.compile(regex_filter)
         if session:
             sessions = {session}
         else:
@@ -713,18 +707,21 @@ class PlotLib:
             if session:
                 cleaned_dir = os.path.join(cleaned_dir, f'ses-{session}')
             if os.path.exists(cleaned_dir):
-                functional_paths += sorted([os.path.join(cleaned_dir, x) for x in os.listdir(cleaned_dir) if
-                                       x.endswith(f'_space-{space}_desc-clean_bold.nii.gz')])
+                for x in os.listdir(cleaned_dir):
+                    path_ = os.path.join(cleaned_dir, x)
+                    if not x.endswith(f'_space-{space}_desc-clean_bold.nii.gz'):
+                        continue
+                    if regex_filter is not None and not regex_filter.search(x):
+                        continue
+                    functional_paths.append(path_)
 
-        if not functional_paths:
-            return functional_paths
-
-        return functional_paths
+        return tuple(sorted(functional_paths))
 
     # Cachable
     def get_functionals_and_mask(
             self,
             functional_paths,
+            mask_path,
             debug=False,
             progress_fn=None
     ):
@@ -734,41 +731,80 @@ class PlotLib:
         if debug:
             functional_paths = functional_paths[:1]
 
-        masker = maskers.NiftiMasker()
-        boldref = image.load_img(functional_paths[0].replace('_desc-preproc_bold', '_boldref'))
-        masker.fit(boldref)
+        if progress_fn:
+            progress_fn('Getting mask', 0)
+        mask = self.get_mask(mask_path)
         functionals_ = []
         incr = 0
         if progress_fn:
             incr = progress_fn.incr
             progress_fn.incr = incr / (len(functional_paths) + 1)
+            progress_fn(f'Loading {len(functional_paths)} timecourses', 0)
         for i, functional in enumerate(functional_paths):
             if len(functional) > 75:
                 functional_str = '...' + functional[-75:]
             else:
                 functional_str = functional
-            msg = f'Loading functional image {i+1}/{len(functional_paths)}: {functional_str}'
+            msg = f'Loading and resampling functional image {i+1}/{len(functional_paths)}: {functional_str}'
             print('  ' + msg)
             if progress_fn:
                 progress_fn(msg)
-            functionals_.append(masker.transform(image.resample_to_img(functional, masker.mask_img_)))
+            functionals_.append(self.get_functional(functional, mask_path))
         if progress_fn:
-            progress_fn('Concatenating runs')
-        functional_paths = np.concatenate(functionals_, axis=0)  # shape (n_timepoints, n_kept_voxels)
+            progress_fn(f'Concatenating {len(functional_paths)} timecourses', 0)
+        t0 = time.time()
+        functionals_ = np.concatenate(functionals_, axis=0)  # shape (n_timepoints, n_kept_voxels)
+        t1 = time.time()
+        print(f'   Concatenating runs into shape {functionals_.shape} took {t1 - t0:.2f} seconds.' % ())
         if progress_fn:
             progress_fn.incr = incr
 
-        return functional_paths, masker.mask_img_
+        return functionals_, mask
 
     # Cachable
-    def get_connectivity_from_seed(self, x, y, z, functional_paths, fwhm=None, progress_fn=None):
+    def get_mask(self, mask_path, target_affine=None, mask_fwhm=2):
+        if target_affine is None:
+            target_affine = np.eye(3) * 2
+        mask = self.load_nii(mask_path)
+        mask = image.new_img_like(mask, image.get_data(mask).astype(np.float32))
+        if mask_fwhm:
+            mask = image.smooth_img(mask, fwhm=mask_fwhm)
+        mask = image.resample_img(mask, target_affine=target_affine, interpolation='linear')
+        mask = image.math_img('x > 0', x=mask)
+
+        return mask
+
+    # Cachable
+    def get_functional(self, path, mask_path, target_affine=None):
+        t0 = time.time()
+        functional = self.load_nii(path)
+        mask = self.get_mask(mask_path, target_affine=target_affine)
+        t1 = time.time()
+        print(f'    Loading data {path} took {t1 - t0:.2f} seconds.')
+        t0 = time.time()
+        functional = image.resample_to_img(functional, mask)
+        functional = self.apply_mask(functional, mask)
+        t1 = time.time()
+        print(f'    Resampling functional image {path} took {t1 - t0:.2f} seconds.')
+
+        return functional
+
+    def load_nii(self, path, fwhm=None):
+        if fwhm:
+            return image.smooth_img(path, fwhm=fwhm)
+        return image.load_img(path)
+
+    # Cachable
+    def get_connectivity_from_seed(self, x, y, z, functional_paths, mask_path, fwhm=None, progress_fn=None):
         incr = load_incr = conn_incr = 0
         if progress_fn is not None:
             incr = progress_fn.incr
             load_incr = incr * 0.9
             conn_incr = incr - load_incr
             progress_fn.incr = load_incr
-        functionals, mask_img = self.get_functionals_and_mask(functional_paths, progress_fn=progress_fn)
+        functionals, mask_img = self.get_functionals_and_mask(
+            functional_paths, mask_path=mask_path, progress_fn=progress_fn
+        )
         if progress_fn is not None:
             progress_fn.incr = conn_incr
             progress_fn(f'Calculating connectivity from seed ({x}, {y}, {z})')
@@ -788,19 +824,22 @@ class PlotLib:
         n = len(seed_timecourse)
 
         connectivity = (other_timecourses.T @ seed_timecourse / n).astype(np.float32)
-        connectivity = self.unmask(connectivity, mask_img)
+        connectivity = self.invert_mask(connectivity, mask_img)
 
         if progress_fn is not None:
             progress_fn.incr = incr
 
         return connectivity
 
+
     # Cachable
     def get_statmap_surface(
             self,
             path=None,
             functional_paths=None,
-            seed=None, fwhm=None,
+            mask=None,
+            seed=None,
+            fwhm=None,
             pial=None,
             white=None,
             hemi='left',
@@ -808,7 +847,7 @@ class PlotLib:
     ):
         assert hemi in ('left', 'right'), 'Hemispheres must be "left" or "right".'
         statmap_nii = self.get_statmap(
-            path=path, functional_paths=functional_paths, seed=seed, fwhm=fwhm, progress_fn=progress_fn
+            path=path, functional_paths=functional_paths, mask=mask, seed=seed, fwhm=fwhm, progress_fn=progress_fn
         )
         mesh_kwargs = {
             f'pial_{hemi}': pial,
@@ -817,18 +856,88 @@ class PlotLib:
             mesh_kwargs[f'white_{hemi}'] = white
         mesh_kwargs[f'midthickness_left'] = None
         mesh_kwargs[f'midthickness_right'] = None
-        pial, white, _, _ = self.get_plot_meshes(**mesh_kwargs)
+        pial, white, _, _ = self.get_surface_meshes(**mesh_kwargs)
 
         if progress_fn is not None:
             progress_fn(f'Projecting statmap to {hemi} surface', 0)
         statmap = surface.vol_to_surf(
             statmap_nii,
             pial.parts[hemi],
+            mask_img=None if mask is None else self.get_mask(mask),
             inner_mesh=white.parts[hemi],
             depth=np.linspace(0.0, 1.0, 10)
         ).astype(np.float32)
 
         return statmap
+
+    # Cachable
+    def get_statmap_surface_and_color(
+            self,
+            color,
+            vmin_=None,
+            vmax_=None,
+            threshold_=None,
+            statmap_scales_alpha_=True,
+            hide_min=None,
+            hide_max=None,
+            progress_fn=None,
+            **statmap_kwargs
+    ):
+        statmap = self.get_statmap_surface(**statmap_kwargs, progress_fn=progress_fn)
+        if vmin_ is None:
+            vmin_ = np.nanmin(statmap)
+        if vmax_ is None:
+            vmax_ = np.nanmax(statmap)
+        cmin = vmin_
+        cmax = vmax_
+        if cmin < 0 < cmax:  # If both positive and negative values are present, center around 0
+            mag = max(np.abs(cmin), np.abs(cmax))
+            cmin = -mag
+            cmax = mag
+            if hide_min is None:
+                hide_min = False
+            if hide_max is None:
+                hide_max = False
+        elif cmin >= 0:  # If only positive values are present
+            if hide_min is None:
+                hide_min = True
+            if hide_max is None:
+                hide_max = False
+        elif cmax <= 0:  # If only negative values are present
+            if hide_min is None:
+                hide_min = False
+            if hide_max is None:
+                hide_max = True
+        if hide_min:
+            statmap = np.where(statmap < vmin_, np.nan, statmap)
+        if hide_max:
+            statmap = np.where(statmap > vmax_, np.nan, statmap)
+        statmap_abs = np.abs(statmap)
+        if threshold_ is not None:
+            assert threshold_ >= 0, 'Threshold must be non-negative'
+            statmap = np.where(statmap_abs < threshold_, np.nan, statmap)
+        statmap = np.clip(statmap, cmin, cmax)
+        statmap /= cmax - cmin
+        statmap_abs = np.abs(statmap)
+        statmap -= cmin / (cmax - cmin)
+
+        assert isinstance(color, str), '`cmap` must be a string.'
+        try:
+            color = to_rgb(color)
+            cmap = LinearSegmentedColormap.from_list(f'{color}', [color, color])
+        except ValueError:
+            cmap = plt.get_cmap(color)
+        cmap.set_extremes(bad=[np.nan] * 4, over=[np.nan] * 4, under=[np.nan] * 4)
+
+        vertexcolor_ = cmap(statmap)[..., :3]
+        if statmap_scales_alpha_:
+            vertexcolor_ = vertexcolor_ * statmap_abs[..., None]
+        if statmap_scales_alpha_:
+            vertexalpha_ = statmap_abs[..., None]
+        else:
+            vertexalpha_ = np.isfinite(statmap_abs)[..., None].astype(statmap_abs.dtype)
+
+        return statmap, vertexcolor_, vertexalpha_, cmap, cmin, cmax
 
     def make_plot_Mesh3d(self, surface):
         x, y, z = surface.coordinates.T
@@ -909,7 +1018,14 @@ class PlotLib:
     def standardize_timecourse(self, arr, axis=0):
         return (arr - np.mean(arr, axis=axis, keepdims=True)) / np.std(arr, axis=axis, keepdims=True)
 
-    def unmask(self, arr, mask_nii):
+    def apply_mask(self, arr, mask_nii):
+        # arr and mask_nii are NIFTI images
+        arr = image.get_data(arr)
+        mask = image.get_data(mask_nii).astype(bool)
+        # arr.shape -> (n_timepoints, n_kept_voxels) OR (n_kept_voxels,)
+        return arr[mask].T
+
+    def invert_mask(self, arr, mask_nii):
         # arr.shape -> (n_timepoints, n_kept_voxels) OR (n_kept_voxels,)
         if arr.ndim == 2:
             T = arr.shape[0]
@@ -929,18 +1045,6 @@ class PlotLib:
 
 class PlotLibMemoized(PlotLib):
 
-    _cachables = (
-        'get_surface_mesh_hemi',
-        'infer_midthickness_mesh_hemi',
-        'get_surface_data',
-        'get_plot_bgcolors',
-        'load_statmap_from_disk',
-        'get_functionals_and_mask',
-        'get_connectivity_from_seed',
-        'get_statmap_surface',
-        'make_sphere'
-    )
-
     def __init__(
             self,
             cache_fns=None
@@ -955,7 +1059,7 @@ class PlotLibMemoized(PlotLib):
             self.cache_fn_default = cache_fns
             self.cache_fns = {}
 
-        for cachable in self._cachables:
+        for cachable in self.CACHABLE:
             cache_fn = self.cache_fns.get(cachable, self.cache_fn_default)
             setattr(self, cachable, cache_fn(getattr(self, cachable)))
 
@@ -982,7 +1086,9 @@ if __name__ == '__main__':
         size_limit=1024 * 1024 * 1024 * 16,  # 16GB
     )
 
-    pl = PlotLibMemoized(cache_fns=cache.memoize(ignore={'progress_fn'}))
+    pl = PlotLibMemoized(
+        cache.memoize(ignore={'progress_fn', 'masker'})
+    )
 
     participant = args.participant
     project = args.project

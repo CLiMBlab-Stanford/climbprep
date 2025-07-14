@@ -184,5 +184,8 @@ select:focus {
     height: min(99.9vw, 99.9vh);
 }
 
+.mantine-Drawer-header {
+    height: 6rem;
+}
 
 

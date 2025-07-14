@@ -326,7 +326,7 @@ participant has). These timecourses will be cached to disk locally, so subsequen
 seeds will render much faster. If you want to clear the cache to recover disk
 space, you can run:
 
-    python -m climbprep.viz.clear_cache
+    python -m climbprep.viz.reset_cache
 
 
 ## Usage: Helper Functions

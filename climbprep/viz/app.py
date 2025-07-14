@@ -10,17 +10,20 @@ from climbprep.plot import PlotLibMemoized
 from climbprep.constants import *
 
 
+CACHE_PATH = os.path.join(os.getcwd(), '.cache', 'viz')
+CACHE_SIZE = 1024 * 1024 * 1024 * 16  # 16GB
+
+
 class Progress:
     def __init__(self, progress_fn):
         self.progress_fn = progress_fn
-        self.max = 1
         self.value = 0
         self.incr = 0
 
     def __call__(self, message, incr=None):
         if incr is None:
             incr = self.incr
-        self.progress_fn((message, str(self.value), str(self.max)))
+        self.progress_fn((message, self.value * 100))
         self.value += incr
 
 
@@ -59,7 +62,7 @@ def menu():
             dmc.Button(
                 DashIconify(icon='material-symbols:menu-rounded', color='#fff',
                             style={'width': '3rem', 'height': '3rem'}),
-                id='button1',
+                id='drawer-toggle',
                 style=dict(
                     height='4rem',
                     width='4rem'
@@ -128,6 +131,22 @@ def menu():
                         )
                     ],
                     id='participant-dropdown-wrapper'
+                ),
+                html.Div(
+                    children=[
+                        html.Label('Display surface'),
+                        dcc.Dropdown(
+                            [
+                                {'label': 'Pial', 'value': 'pial'},
+                                {'label': 'White', 'value': 'white'},
+                                {'label': 'Midthickness', 'value': 'midthickness'}
+                            ],
+                            'midthickness',
+                            id='display-surface-dropdown',
+                            clearable=False,
+                        )
+                    ],
+                    id='display-surface-dropdown-wrapper'
                 ),
                 html.Div(
                     children=[
@@ -204,13 +223,23 @@ def layout():
             dcc.Store(id='store', storage_type='memory'),
             html.Div(
                 [
-                    html.Progress(
+                    dmc.Progress(
                         id='progress',
-                        value='0'
+                        value=0,
+                        size='lg',
+                        radius='5px',
+                        striped=False,
+                        animated=False,
+                        style={
+                            'width': '20%',
+                            'display': 'block',
+                            'border': '1.5px solid #777',
+                        }
                     ),
                     html.Span(
+                        'Compiling figure',
                         id='progress-text',
-                        style={'marginLeft': '1rem'}
+                        style={'display': 'block'}
                     )
                 ],
                 id='progress-wrapper',
@@ -224,7 +253,7 @@ def layout():
 
 def assign_callbacks(app, cache):
     pl = PlotLibMemoized(
-        cache.memoize(ignore={'progress_fn'})
+        cache.memoize(ignore={'progress_fn', 'masker'})
     )
 
     @app.callback(
@@ -233,6 +262,7 @@ def assign_callbacks(app, cache):
         Input('compile', 'n_clicks'),
         State('project-dropdown', 'value'),
         State('participant-dropdown', 'value'),
+        State('display-surface-dropdown', 'value'),
         State('preprocessing-label', 'value'),
         State('additive-color', 'checked'),
         State('turn-out-hemis', 'checked'),
@@ -269,7 +299,7 @@ def assign_callbacks(app, cache):
                     'padding': '1rem',
                     'zIndex': 2000,
                     'backgroundColor': '#f0f0f0',
-                    'opacity': 0.7,
+                    'opacity': 0.9,
                 },
                 {
                     'display': 'none'
@@ -278,8 +308,7 @@ def assign_callbacks(app, cache):
         ],
         progress=[
             Output("progress-text", "children"),
-            Output("progress", "value"),
-            Output("progress", "max")
+            Output("progress", "value")
         ],
         cancel=[Input("cancel", "n_clicks")]
     )
@@ -288,6 +317,7 @@ def assign_callbacks(app, cache):
             n_clicks,
             project,
             participant,
+            display_surface,
             preprocessing_label,
             additive_color,
             turn_out_hemis,
@@ -296,7 +326,7 @@ def assign_callbacks(app, cache):
     ):
         if progress_fn is not None:
             progress_fn = Progress(progress_fn)
-        progress_fn('Initializing...', 0)
+            progress_fn('Initializing...', 0)
         projects = sorted([x for x in os.listdir(BIDS_PATH) if os.path.isdir(os.path.join(BIDS_PATH, x))])
         if project is None or project not in projects:
             project = 'climblab'
@@ -307,30 +337,41 @@ def assign_callbacks(app, cache):
             participant = participants[0] if participants else None
 
         preprocessing_label = preprocessing_label or PREPROCESS_DEFAULT_KEY
+        session_subdirs = [
+            x for x in os.listdir(os.path.join(
+                BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}'
+            )) if x.startswith('ses-')
+        ]
         anat = {}
+        mask_type = 'ribbon'
         for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
             if surf_type == 'sulc':
                 suffix = '.shape.gii'
             else:
                 suffix = '.surf.gii'
+            mask_path = os.path.join(
+                BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}', 'anat',
+                f'sub-{participant}_desc-{mask_type}_mask.nii.gz'
+            )
+            if not os.path.exists(mask_path) and session_subdirs:
+                session = session_subdirs[0][4:]
+                mask_path = os.path.join(
+                    BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}',
+                    f'ses-{session}', 'anat', f'sub-{participant}_ses-{session}_desc-{mask_type}_mask.nii.gz'
+                )
+            anat['mask'] = mask_path
             for hemi in ('left', 'right'):
                 surf_path = os.path.join(
                     BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}', 'anat',
                     f'sub-{participant}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
                 )
-                if not os.path.exists(surf_path):
-                    session_subdirs = [
-                        x for x in os.listdir(os.path.join(
-                            BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}'
-                        )) if x.startswith('ses-')
-                    ]
-                    if session_subdirs:
-                        session = session_subdirs[0][4:]
-                        surf_path = os.path.join(
-                            BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}',
-                            f'ses-{session}', 'anat',
-                            f'sub-{participant}_ses-{session}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
-                        )
+                if not os.path.exists(surf_path) and session_subdirs:
+                    session = session_subdirs[0][4:]
+                    surf_path = os.path.join(
+                        BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}',
+                        f'ses-{session}', 'anat',
+                        f'sub-{participant}_ses-{session}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
+                    )
                 if not surf_type in anat:
                     anat[surf_type] = dict()
                 anat[surf_type][hemi] = surf_path
@@ -338,11 +379,12 @@ def assign_callbacks(app, cache):
         statmaps = statmap_list
         statmap_paths = []
         statmap_labels = []
-        cmaps = []
+        colors = []
         vmin = []
         vmax = []
         thresholds = []
         statmap_scales_alpha = []
+        skip = []
         for statmap in statmaps:
             stat_type = get_value(statmap, 'type')
             session = get_value(statmap, 'session')
@@ -364,12 +406,16 @@ def assign_callbacks(app, cache):
                 model_label = get_value(statmap, 'model_label') or MODEL_DEFAULT_KEY
                 if task is None or contrast is None:
                     continue
-                statmap_img = os.path.join(
+                statmap_path = os.path.join(
                     BIDS_PATH, project, 'derivatives', 'firstlevels', model_label, task, f'node-{node}', subdir,
                     f'sub-{participant}{session_str}_contrast-{contrast}_stat-t_statmap.nii.gz'
                 )
-                if not os.path.exists(statmap_img):
+                if not os.path.exists(statmap_path):
                     continue
+                statmap_in = dict(
+                    path=statmap_path,
+                    mask=anat['mask'],
+                )
                 statmap_label_default = f'{contrast} (t)' if not session else f'{contrast} (t), {session}'
                 statmap_label = get_value(statmap, 'text') or statmap_label_default
                 vmin_ = get_value(statmap, 'vmin') or 0
@@ -380,12 +426,16 @@ def assign_callbacks(app, cache):
                     continue
                 parcellation_label = get_value(statmap, 'parcellation_label') or PARCELLATE_DEFAULT_KEY
                 node = 'session' if session else 'subject'
-                statmap_img = os.path.join(
+                statmap_path = os.path.join(
                     BIDS_PATH, project, 'derivatives', 'parcellate', parcellation_label, f'node-{node}', subdir,
                     'parcellation', 'main', f'{network}.nii.gz'
                 )
-                if not os.path.exists(statmap_img):
+                if not os.path.exists(statmap_path):
                     continue
+                statmap_in = dict(
+                    path=statmap_path,
+                    mask=anat['mask'],
+                )
                 statmap_label_default = f'p({network})' if not session else f'p({network}), {session}'
                 statmap_label = get_value(statmap, 'text') or statmap_label_default
                 vmin_ = get_value(statmap, 'vmin') or 0
@@ -399,6 +449,7 @@ def assign_callbacks(app, cache):
                 if seed[0] is None or seed[1] is None or seed[2] is None:
                     continue
                 fwhm = get_value(statmap, 'fwhm') or None
+                regex_filter = get_value(statmap, 'regex_filter') or None
                 cleaning_label = get_value(statmap, 'cleaning_label') or CLEAN_DEFAULT_KEY
                 space = PARCELLATE_DEFAULT_KEY
 
@@ -407,16 +458,16 @@ def assign_callbacks(app, cache):
                     project=project,
                     session=session,
                     cleaning_label=cleaning_label,
-                    space=space
+                    space=space,
+                    regex_filter=regex_filter
                 )
 
                 if not functional_paths:
                     continue
 
-                # Not really an image, just a parameterization for seed-based connectivity,
-                # but this is what the plotting function expects.
-                statmap_img = dict(
+                statmap_in = dict(
                     functionals=functional_paths,
+                    mask=anat['mask'],
                     seed=seed,
                     fwhm=fwhm
                 )
@@ -428,22 +479,25 @@ def assign_callbacks(app, cache):
                 vmax_ = get_value(statmap, 'vmax') or 0.3
             else:
                 raise ValueError(f'Unknown statmap type: {stat_type}. Must be one of contrast or network.')
-            statmap_paths.append(statmap_img)
+            statmap_paths.append(statmap_in)
             statmap_labels.append(statmap_label)
-            cmaps.append(get_value(statmap, 'color') or None)
+            colors.append(get_value(statmap, 'color') or None)
             vmin.append(vmin_)
             vmax.append(vmax_)
             thresholds.append(get_value(statmap, 'threshold') or None)
             statmap_scales_alpha.append(get_value(statmap, 'statmap_scales_alpha'))
+            skip.append((not get_value(statmap, 'show')) or False)
 
         plot_kwargs = dict(
             statmaps=statmap_paths,
             statmap_labels=statmap_labels,
-            cmaps=cmaps,
+            colors=colors,
             vmin=vmin,
             vmax=vmax,
             thresholds=thresholds,
             statmap_scales_alpha=statmap_scales_alpha,
+            skip=skip,
+            display_surface=display_surface,
             additive_color=additive_color,
             turn_out_hemis=turn_out_hemis
         )
@@ -461,15 +515,23 @@ def assign_callbacks(app, cache):
 
         if fig_prev is None:
             fig = pl.plot_data_to_fig(**plot_data)
-            fig.layout.meta = dict(project=project, participant=participant)
+            fig.layout.meta = dict(
+                project=project,
+                participant=participant,
+                display_surface=display_surface,
+                turn_out_hemis=turn_out_hemis
+            )
         else:
             fig_ = Patch()
             for trace in fig_prev['data'][2:]:
                 fig_['data'].remove(trace)
             project_prev = fig_prev.get('layout', {}).get('meta', {}).get('project', None)
             participant_prev = fig_prev.get('layout', {}).get('meta', {}).get('participant', None)
-            same_participant = project == project_prev and participant == participant_prev
-            if not same_participant:
+            display_surface_prev = fig_prev.get('layout', {}).get('meta', {}).get('display_surface', None)
+            turn_out_hemis_prev = fig_prev.get('layout', {}).get('meta', {}).get('turn_out_hemis', None)
+            update_meshes = project != project_prev or participant != participant_prev or \
+                            display_surface != display_surface_prev or turn_out_hemis_prev != turn_out_hemis
+            if update_meshes:
                 for hemi in ('left', 'right'):
                     data = plot_data['left'] if hemi == 'left' else plot_data['right']
                     ix = 0 if hemi == 'left' else 1
@@ -501,11 +563,12 @@ def assign_callbacks(app, cache):
             fig_['layout'] = fig_prev['layout']
             fig_['layout']['meta']['project'] = project
             fig_['layout']['meta']['participant'] = participant
+            fig_['layout']['meta']['display_surface'] = display_surface
             fig = fig_
 
         if progress_fn is not None:
             progress_fn.value = 0
-            progress_fn('', 0)
+            progress_fn('Compiling figure', 0)
 
         return fig, {}
 
@@ -647,9 +710,14 @@ def assign_callbacks(app, cache):
                         style=dict(width='24%')
                     ),
                     dmc.TextInput(
+                        id={'type': 'statmap-regex-filter', 'index': statmap_ix},
+                        placeholder=f'Regex filter (optional)',
+                        style=dict(width='49%')
+                    ),
+                    dmc.TextInput(
                         id={'type': 'statmap-cleaning-label', 'index': statmap_ix},
                         placeholder=f'Cleaning label (default: {CLEAN_DEFAULT_KEY})',
-                        style=dict(width='98%')
+                        style=dict(width='49%')
                     ),
                 ]
             children += [
@@ -680,6 +748,8 @@ def assign_callbacks(app, cache):
                 ),
                 dmc.Switch(id={'type': 'statmap-statmap-scales-alpha', 'index': statmap_ix},
                            label="Statmap scales transparency", checked=True),
+                dmc.Switch(id={'type': 'statmap-show', 'index': statmap_ix},
+                           label="Show", checked=True),
                 dmc.Button(
                     DashIconify(icon='mdi:delete-outline'),
                     id={'type': 'remove-statmap', 'index': statmap_ix},
@@ -765,7 +835,7 @@ def assign_callbacks(app, cache):
 
     @app.callback(
         Output('menu', 'opened'),
-        Input('button1', 'n_clicks'),
+        Input('drawer-toggle', 'n_clicks'),
         State('menu', 'opened'),
         prevent_initial_call=True
     )
@@ -776,14 +846,17 @@ def assign_callbacks(app, cache):
 
     @app.callback(Output('store', 'data'),
                   Input('main', 'clickData'),
+                  Input('add-statmap', 'n_clicks'),
                   State('store', 'data'))
-    def update_store(click_data, store):
+    def update_store(click_data, n_clicks, store):
         if store is None:
             store = {}
         if 'statmap_ix' not in store:
             store['statmap_ix'] = 0
         if click_data is not None:
             store['seed'] = click_data
+        if n_clicks is not None:
+            store['statmap_ix'] = n_clicks
 
         return store
 
@@ -810,8 +883,8 @@ def get_value(statmap, key):
 
 def initialize_app(config_path):
     cache = diskcache.Cache(
-        os.path.join(os.getcwd(), '.cache', 'viz'),
-        size_limit=1024 * 1024 * 1024 * 16,  # 16GB
+        CACHE_PATH,
+        size_limit=CACHE_SIZE
     )
     background_callback_manager = DiskcacheManager(cache)
 
@@ -828,11 +901,13 @@ if __name__ == '__main__':
     argparser.add_argument('-c', '--config_path', help=('Path to the configuration file (YAML) used to initialize '
                                                         'the app.'))
     argparser.add_argument('-d', '--debug', action='store_true', help='Run the app in debug mode.')
+    argparser.add_argument('--port', default=8050, help='Port.')
     args = argparser.parse_args()
 
     config_path = args.config_path
     debug = args.debug
+    port = args.port
 
     app, cache = initialize_app(config_path)
     assign_callbacks(app, cache)
-    app.run(debug=debug, dev_tools_hot_reload=False)
+    app.run(port=port, debug=debug, dev_tools_hot_reload=False)
