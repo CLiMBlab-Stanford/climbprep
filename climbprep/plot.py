@@ -24,7 +24,7 @@ from climbprep.util import *
 class PlotLib:
 
     CACHABLE = {
-        'get_statmap_surface_and_color',
+        # 'get_statmap_surface_and_color',
         'get_surface_mesh_hemi',
         'infer_midthickness_mesh_hemi',
         'get_surface_data',
@@ -52,8 +52,9 @@ class PlotLib:
             hide_max=None,
             display_surface='midthickness',
             colorbar=True,
-            bg_brightness=0.95,
-            sulc_alpha=0.9,
+            bg_brightness=PLOT_BG_BRIGHTNESS,
+            sulc_alpha=PLOT_SULC_ALPHA,
+            bg_alpha=PLOT_BG_ALPHA,
             additive_color=False,
             turn_out_hemis=False,
             cbar_step=0.1
@@ -76,6 +77,7 @@ class PlotLib:
             colorbar=colorbar,
             bg_brightness=bg_brightness,
             sulc_alpha=sulc_alpha,
+            bg_alpha=bg_alpha,
             additive_color=additive_color,
             turn_out_hemis=turn_out_hemis
         )
@@ -105,8 +107,9 @@ class PlotLib:
             hide_max=None,
             display_surface='midthickness',
             colorbar=True,
-            bg_brightness=0.95,
-            sulc_alpha=0.9,
+            bg_brightness=PLOT_BG_BRIGHTNESS,
+            sulc_alpha=PLOT_SULC_ALPHA,
+            bg_alpha=PLOT_BG_ALPHA,
             additive_color=False,
             turn_out_hemis=False,
             progress_fn=None
@@ -228,7 +231,8 @@ class PlotLib:
                 y=y,
                 z=z,
             ))
-            x, y, z = self.map_coords(x, y, z, hemi, turn_out_hemis=turn_out_hemis)
+            coord_map = self.get_coord_map(x, y, z, hemi, turn_out_hemis=turn_out_hemis)
+            x, y, z = coord_map(x, y, z)
             display_surface.parts[hemi].coordinates = np.column_stack((x, y, z))
 
             # Statmap colors
@@ -258,7 +262,6 @@ class PlotLib:
                             seed=seed,
                             fwhm=statmap_in.get('fwhm', None),
                         )
-                        seeds.append(seed)
                     elif 'path' in statmap_in:
                         statmap_kwargs = dict(path=statmap_in['path'], mask=statmap_in.get('mask', None))
                     else:
@@ -343,7 +346,7 @@ class PlotLib:
                 if vertexcolor is None:
                     vertexcolor = bgcolors
                 else:
-                    vertexalpha *= 1 - PLOT_BG_ALPHA
+                    vertexalpha *= 1 - bg_alpha
                     vertexalpha = np.where(np.isnan(vertexalpha), 0, vertexalpha)
                     vertexcolor = np.where(np.isnan(vertexcolor), 0, vertexcolor)
                     vertexcolor = bgcolors * (1 - vertexalpha) + vertexcolor * vertexalpha
@@ -392,7 +395,15 @@ class PlotLib:
         if not seeds:
             seeds = []
         for seed in seeds:
-            x, y, z = self.map_coords(*seed, hemi, turn_out_hemis=turn_out_hemis)
+            x, y, z = seed
+            if hemi == 'right':
+                x = -x
+                y = -y
+                trace = traces[1]
+            else:
+                trace = traces[0]
+            y_delta = trace.y[0] - trace.customdata['y'].values[0]
+            y += y_delta
             traces.append(self.make_sphere((x, y, z)))
 
         fig = go.Figure()
@@ -639,7 +650,7 @@ class PlotLib:
         return surface.PolyData(left=left, right=right)
 
     # Cachable
-    def get_plot_bgcolors(self, nvertices, hemi, sulc_left=None, sulc_right=None, bg_brightness=0.95, sulc_alpha=0.9):
+    def get_plot_bgcolors(self, nvertices, hemi, sulc_left=None, sulc_right=None, bg_brightness=0.5, sulc_alpha=0.9):
         bgcolors = np.ones((nvertices, 3)) * bg_brightness
         sulc = sulc_left if hemi == 'left' else sulc_right
         if sulc is not None:
@@ -883,7 +894,8 @@ class PlotLib:
             progress_fn=None,
             **statmap_kwargs
     ):
-        statmap = self.get_statmap_surface(**statmap_kwargs, progress_fn=progress_fn)
+        statmap_src = self.get_statmap_surface(**statmap_kwargs, progress_fn=progress_fn)
+        statmap = statmap_src.copy()
         if vmin_ is None:
             vmin_ = np.nanmin(statmap)
         if vmax_ is None:
@@ -937,7 +949,7 @@ class PlotLib:
         else:
             vertexalpha_ = np.isfinite(statmap_abs)[..., None].astype(statmap_abs.dtype)
 
-        return statmap, vertexcolor_, vertexalpha_, cmap, cmin, cmax
+        return statmap_src, vertexcolor_, vertexalpha_, cmap, cmin, cmax
 
     def make_plot_Mesh3d(self, surface):
         x, y, z = surface.coordinates.T
@@ -1001,6 +1013,26 @@ class PlotLib:
         sphere = go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k, color='white', opacity=opacity)
 
         return sphere
+
+    def get_coord_map(self, x, y, z, hemi, spacer=5, turn_out_hemis=False):
+        if turn_out_hemis:
+            if hemi == 'left':
+                x_a = 1
+                x_b = 0
+                y_a = 1
+                y_b = -y.min() + spacer
+            else:
+                x_a = -1
+                x_b = 0
+                y_a = -1
+                y_b = -y.max() - spacer
+            def coord_map (x, y, z):
+                return x * x_a + x_b, y * y_a + y_b, z
+        else:
+            def coord_map(x, y, z):
+                return x, y, z
+
+        return coord_map
 
     def map_coords(self, x, y, z, hemi, spacer=5, turn_out_hemis=False):
         if turn_out_hemis:

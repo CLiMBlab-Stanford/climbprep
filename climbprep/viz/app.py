@@ -324,6 +324,7 @@ def assign_callbacks(app, cache):
             statmap_list,
             fig_prev
     ):
+        print('Updating graph')
         if progress_fn is not None:
             progress_fn = Progress(progress_fn)
             progress_fn('Initializing...', 0)
@@ -531,22 +532,36 @@ def assign_callbacks(app, cache):
             turn_out_hemis_prev = fig_prev.get('layout', {}).get('meta', {}).get('turn_out_hemis', None)
             update_meshes = project != project_prev or participant != participant_prev or \
                             display_surface != display_surface_prev or turn_out_hemis_prev != turn_out_hemis
+            left = None
+            right = None
             if update_meshes:
                 for hemi in ('left', 'right'):
                     data = plot_data['left'] if hemi == 'left' else plot_data['right']
-                    ix = 0 if hemi == 'left' else 1
                     surface_ = data['mesh']
                     trace = pl.make_plot_Mesh3d(surface=surface_)
                     trace.vertexcolor = data['vertexcolor']
                     trace.customdata = data['customdata']
-                    trace.hovertemplate = ''.join(['<b>' + col + ':</b> %{customdata[' + str(i) + ']:.2f}<br>'
-                                                   for i, col in enumerate(data['customdata'].columns)]) + '<extra></extra>'
+                    trace.hovertemplate = ''.join(
+                        ['<b>' + col + ':</b> %{customdata[' + str(i) + ']:.2f}<br>'
+                               for i, col in enumerate(data['customdata'].columns)]) + '<extra></extra>'
+                    if hemi == 'left':
+                        ix = 0
+                        left = trace
+                    else:
+                        ix = 1
+                        right = trace
                     fig_['data'][ix] = trace
             else:
                 for hemi in ('left', 'right'):
                     data = plot_data['left'] if hemi == 'left' else plot_data['right']
-                    ix = 0 if hemi == 'left' else 1
+                    if hemi == 'left':
+                        ix = 0
+                        left = fig_prev['data'][ix]
+                    else:
+                        ix = 1
+                        right = fig_prev['data'][ix]
                     fig_['data'][ix]['vertexcolor'] = data['vertexcolor']
+                    fig_['data'][ix]['customdata'] = data['customdata'].values
 
             cbar_x = 1
             cbar_step = 0.1
@@ -557,13 +572,28 @@ def assign_callbacks(app, cache):
                 cbar_x += cbar_step
             for seed in plot_data['seeds']:
                 # Add any seed traces
-                extra_traces.append(pl.make_sphere(seed))
+                x, y, z = seed
+                if turn_out_hemis:
+                    if x > 0:  # Proxy for RH, may not work well on the midline. TODO: fix
+                        x = -x
+                        y = -y
+                        trace = right
+                    else:
+                        trace = left
+                    if isinstance(trace['customdata'][0], dict):
+                        y_src = trace['customdata'][0]['y']
+                    else:
+                        y_src = trace['customdata'][0][1]
+                    y_delta = trace['y'][0] - y_src
+                    y += y_delta
+                extra_traces.append(pl.make_sphere((x, y, z)))
             fig_['data'].extend(extra_traces)
 
             fig_['layout'] = fig_prev['layout']
             fig_['layout']['meta']['project'] = project
             fig_['layout']['meta']['participant'] = participant
             fig_['layout']['meta']['display_surface'] = display_surface
+            fig_['layout']['meta']['turn_out_hemis'] = turn_out_hemis
             fig = fig_
 
         if progress_fn is not None:

@@ -109,19 +109,19 @@ MODEL_TEMPLATE = {
 PLOT_COLORS = [
     'Red',
     'Blue',
-    'Green',
+    'Lime',
     'Cyan',
     'Magenta',
     'Yellow'
     'Orange',
     'Pink',
-    'Lime',
-    'Aqua',
+    'Green',
+    'aquamarine',
     'Violet',
     'Teal',
-    'Fire'
-    'Hot Pink',
-    'Ocean'
+    'saddlebrown',
+    'deeppink',
+    'navy'
 ]
 PLOT_STATMAP_SUFFIX = '.nii.gz'
 PLOT_IMG_ORDER = [0, 1, 3, 2]
@@ -143,6 +143,8 @@ PLOT_VIEWS = {
     ('right', 'lateral'): (0, 90),
     ('right', 'medial'): (0, -90),
 }
+PLOT_BG_BRIGHTNESS = 0.
+PLOT_SULC_ALPHA = 0.8
 PLOT_BG_ALPHA = 0.1
 PLOT_AXIS_CONFIG = {
     'showgrid': False,
