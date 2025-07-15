@@ -248,19 +248,20 @@ class PlotLib:
                     progress_fn(f'Computing {hemi} vertex colors for statmap {label}', 0)
                 if isinstance(statmap_in, dict):
                     if 'functionals' in statmap_in:
-                        assert 'mask' in statmap_in, \
-                            'If statmap is connectivity, it must contain a key "mask" with the path to the mask.'
                         assert 'seed' in statmap_in, \
                             'If statmap is connectivity, it must contain a key "seed" with the seed coordinates ' \
                             '(x, y, z).'
                         functional_paths = tuple(sorted(statmap_in['functionals']))
-                        mask = statmap_in['mask']
+                        assert len(functional_paths) > 0, \
+                            'If statmap is connectivity, it must contain a key "functionals" with a list of ' \
+                            'at least one functional path.'
+                        mask = statmap_in.get('mask', functional_paths[0])
                         seed = statmap_in['seed']
                         statmap_kwargs = dict(
                             functional_paths=functional_paths,
                             mask=mask,
                             seed=seed,
-                            fwhm=statmap_in.get('fwhm', None),
+                            fwhm=statmap_in.get('fwhm', None)
                         )
                     elif 'path' in statmap_in:
                         statmap_kwargs = dict(path=statmap_in['path'], mask=statmap_in.get('mask', None))
@@ -396,14 +397,15 @@ class PlotLib:
             seeds = []
         for seed in seeds:
             x, y, z = seed
-            if hemi == 'right':
-                x = -x
-                y = -y
-                trace = traces[1]
-            else:
-                trace = traces[0]
-            y_delta = trace.y[0] - trace.customdata['y'].values[0]
-            y += y_delta
+            if turn_out_hemis:
+                if x > 0:
+                    x = -x
+                    y = -y
+                    trace = traces[1]
+                else:
+                    trace = traces[0]
+                y_delta = trace.y[0] - data['customdata'].y.values[0]
+                y += y_delta
             traces.append(self.make_sphere((x, y, z)))
 
         fig = go.Figure()
@@ -764,6 +766,9 @@ class PlotLib:
         if progress_fn:
             progress_fn(f'Concatenating {len(functional_paths)} timecourses', 0)
         t0 = time.time()
+        for functional_ in functionals_:
+            std = np.std(functional_, axis=0)
+            print('Std quantiles: ', np.quantile(std, [0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99]))
         functionals_ = np.concatenate(functionals_, axis=0)  # shape (n_timepoints, n_kept_voxels)
         t1 = time.time()
         print(f'   Concatenating runs into shape {functionals_.shape} took {t1 - t0:.2f} seconds.' % ())
