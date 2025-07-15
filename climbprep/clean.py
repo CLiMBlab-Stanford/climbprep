@@ -49,6 +49,9 @@ if __name__ == '__main__':
                                             'Please provide a valid config file or keyword.'
     preprocessing_label = config['preprocessing_label']
     clean_surf = config['clean_surf']
+    mask_suffix = config.get('mask_suffix', DEFAULT_MASK_SUFFIX)
+    mask_fwhm = config.get('mask_fwhm', DEFAULT_MASK_FWHM)
+    target_affine = config.get('target_affine', DEFAULT_TARGET_AFFINE)
 
     # Set session-agnostic paths
     project_path = os.path.join(BIDS_PATH, args.project)
@@ -229,14 +232,17 @@ if __name__ == '__main__':
 
                     if type_by_space[space] == 'vol':  # Volumetric data
                         mask_nii = load_img(mask)
-                        func = load_img(func_path)
-
-                        mask_nii = image.math_img(
-                            'img > 0.5',
-                            img=image.resample_to_img(
-                                mask_nii, func, interpolation='nearest', force_resample=True, copy_header=True
+                        mask_nii = image.new_img_like(mask_nii, image.get_data(mask_nii).astype(np.float32))
+                        if mask_fwhm:
+                            mask_nii = image.smooth_img(mask_nii, fwhm=mask_fwhm)
+                        if target_affine is not None:
+                            mask_nii = image.resample_img(
+                                mask_nii, target_affine=target_affine, interpolation='linear'
                             )
-                        )
+                        mask_nii = image.math_img('x > 0.', x=mask_nii)
+
+                        func = load_img(func_path)
+                        func = image.resample_to_img(func, mask_nii)
 
                         masker = maskers.NiftiMasker(
                             mask_img=mask_nii,

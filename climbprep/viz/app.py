@@ -115,10 +115,7 @@ def menu():
                             id='project-dropdown',
                             clearable=False
                         )
-                    ],
-                    style={
-                        'marginTop': '2rem',
-                    }
+                    ]
                 ),
                 html.Div(
                     children=[
@@ -150,14 +147,137 @@ def menu():
                 ),
                 html.Div(
                     children=[
-                        html.Label('Anatomical directory'),
                         dmc.TextInput(
-                            id='anatomical-directory',
-                            placeholder=f'Path to anatomical directory',
-                            style={'width': '100%', 'paddingTop': '0.25rem'}
+                            id='local-directory',
+                            placeholder=f'Path to local directory',
+                            style={'width': '100%', 'paddingTop': '0.25rem'},
+                            label='Local directory',
+                            required=True
+                        ),
+                        dmc.Flex(
+                            [
+                                html.Div(
+                                    [
+                                        html.Label('Pial left'),
+                                        dcc.Dropdown(
+                                            [],
+                                            'None',
+                                            id='pial-left',
+                                            clearable=False
+                                        )
+                                    ],
+                                    style={'width': '49%'}
+                                ),
+                                html.Div(
+                                    [
+                                        html.Label('Pial right'),
+                                        dcc.Dropdown(
+                                            [],
+                                            'None',
+                                            id='pial-right',
+                                            clearable=False
+                                        )
+                                    ],
+                                    style={'width': '49%'}
+                                ),
+                            ]
+                        ),
+                        dmc.Flex(
+                            [
+                                html.Div(
+                                    [
+                                        html.Label('White left'),
+                                        dcc.Dropdown(
+                                            [],
+                                            'None',
+                                            id='white-left',
+                                            clearable=False
+                                        )
+                                    ],
+                                    style={'width': '49%'}
+                                ),
+                                html.Div(
+                                    [
+                                        html.Label('White right'),
+                                        dcc.Dropdown(
+                                            [],
+                                            'None',
+                                            id='white-right',
+                                            clearable=False
+                                        )
+                                    ],
+                                    style={'width': '49%'}
+                                ),
+                            ]
+                        ),
+                        dmc.Flex(
+                            [
+                                html.Div(
+                                    [
+                                        html.Label('Midthickness left'),
+                                        dcc.Dropdown(
+                                            [],
+                                            'None',
+                                            id='midthickness-left',
+                                            clearable=True
+                                        )
+                                    ],
+                                    style={'width': '49%'}
+                                ),
+                                html.Div(
+                                    [
+                                        html.Label('Midthickness right'),
+                                        dcc.Dropdown(
+                                            [],
+                                            'None',
+                                            id='midthickness-right',
+                                            clearable=True
+                                        )
+                                    ],
+                                    style={'width': '49%'}
+                                ),
+                            ]
+                        ),
+                        dmc.Flex(
+                            [
+                                html.Div(
+                                    [
+                                        html.Label('Sulc left'),
+                                        dcc.Dropdown(
+                                            [],
+                                            'None',
+                                            id='sulc-left',
+                                            clearable=True
+                                        )
+                                    ],
+                                    style={'width': '49%'}
+                                ),
+                                html.Div(
+                                    [
+                                        html.Label('Sulc right'),
+                                        dcc.Dropdown(
+                                            [],
+                                            'None',
+                                            id='sulc-right',
+                                            clearable=True
+                                        )
+                                    ],
+                                    style={'width': '49%'}
+                                ),
+                            ]
+                        ),
+                        html.Div(
+                            [
+                                html.Label('Mask'),
+                                dmc.TextInput(
+                                    id='mask',
+                                    placeholder='Path to mask file (optional)',
+                                )
+                            ],
+                            style={'width': '98%'}
                         ),
                     ],
-                    id='anatomical-directory-wrapper',
+                    id='local-directory-wrapper',
                     style=dict(display='none')
                 ),
                 dmc.TextInput(
@@ -186,18 +306,12 @@ def menu():
                                     '+',
                                     id='add-statmap'
                                 ),
-                                dmc.Select(
+                                dcc.Dropdown(
+                                    [],
                                     id='statmap-type',
-                                    data=[
-                                        {'label': 'Contrast', 'value': 'contrast'},
-                                        {'label': 'Network', 'value': 'network'},
-                                        {'label': 'Connectivity', 'value': 'connectivity'}
-                                    ],
-                                    value='contrast',
+                                    value=None,
                                     clearable=False,
-                                    allowDeselect=False,
-                                    size='sm',
-                                    style=dict(width='40%')
+                                    style=dict(width='80%')
                                 )
                             ]
                         ),
@@ -266,6 +380,16 @@ def assign_callbacks(app, cache):
         State('preprocessing-label', 'value'),
         State('additive-color', 'checked'),
         State('turn-out-hemis', 'checked'),
+        State('local-directory', 'value'),
+        State('mask', 'value'),
+        State('pial-left', 'value'),
+        State('pial-right', 'value'),
+        State('white-left', 'value'),
+        State('white-right', 'value'),
+        State('midthickness-left', 'value'),
+        State('midthickness-right', 'value'),
+        State('sulc-left', 'value'),
+        State('sulc-right', 'value'),
         State('statmap-list', 'children'),
         State('main', 'figure'),
         prevent_initial_call=True,
@@ -321,61 +445,93 @@ def assign_callbacks(app, cache):
             preprocessing_label,
             additive_color,
             turn_out_hemis,
+            local_directory,
+            local_mask,
+            pial_left,
+            pial_right,
+            white_left,
+            white_right,
+            midthickness_left,
+            midthickness_right,
+            sulc_left,
+            sulc_right,
             statmap_list,
             fig_prev
     ):
-        print('Updating graph')
         if progress_fn is not None:
             progress_fn = Progress(progress_fn)
             progress_fn('Initializing...', 0)
-        projects = sorted([x for x in os.listdir(BIDS_PATH) if os.path.isdir(os.path.join(BIDS_PATH, x))])
-        if project is None or project not in projects:
-            project = 'climblab'
-        participants = sorted(
-            [x[4:] for x in os.listdir(os.path.join(BIDS_PATH, project)) if x.startswith('sub-')]
-        )
-        if participant is None or participant not in participants:
-            participant = participants[0] if participants else None
 
-        preprocessing_label = preprocessing_label or PREPROCESS_DEFAULT_KEY
-        session_subdirs = [
-            x for x in os.listdir(os.path.join(
-                BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}'
-            )) if x.startswith('ses-')
-        ]
-        anat = {}
-        mask_type = 'ribbon'
-        for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
-            if surf_type == 'sulc':
-                suffix = '.shape.gii'
-            else:
-                suffix = '.surf.gii'
-            mask_path = os.path.join(
-                BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}', 'anat',
-                f'sub-{participant}_desc-{mask_type}_mask.nii.gz'
+        surfaces = dict(
+            pial=dict(left=pial_left, right=pial_right),
+            white=dict(left=white_left, right=white_right),
+            midthickness=dict(left=midthickness_left, right=midthickness_right),
+            sulc=dict(left=sulc_left, right=sulc_right)
+        )
+
+        if project == 'local':
+            anat = {'mask': None}
+            for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
+                for hemi in ('left', 'right'):
+                    surf_path = surfaces[surf_type][hemi]
+                    if local_directory is not None and surf_path is not None:
+                        surf_path = os.path.join(local_directory, surf_path)
+                    assert os.path.exists(surf_path), f'Surface {surf_type} for {hemi} hemisphere does not exist: ' \
+                                                      f'{surf_path}'
+                    if surf_type not in anat:
+                        anat[surf_type] = {}
+                    anat[surf_type][hemi] = surf_path
+            if local_mask:
+                anat['mask'] = os.path.join(local_directory, local_mask)
+        else:
+            projects = sorted([x for x in os.listdir(BIDS_PATH) if os.path.isdir(os.path.join(BIDS_PATH, x))])
+            if project is None or project not in projects:
+                project = 'climblab'
+            participants = sorted(
+                [x[4:] for x in os.listdir(os.path.join(BIDS_PATH, project)) if x.startswith('sub-')]
             )
-            if not os.path.exists(mask_path) and session_subdirs:
-                session = session_subdirs[0][4:]
+            if participant is None or participant not in participants:
+                participant = participants[0] if participants else None
+
+            preprocessing_label = preprocessing_label or PREPROCESS_DEFAULT_KEY
+            session_subdirs = [
+                x for x in os.listdir(os.path.join(
+                    BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}'
+                )) if x.startswith('ses-')
+            ]
+            anat = {}
+            mask_type = 'ribbon'
+            for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
+                if surf_type == 'sulc':
+                    suffix = '.shape.gii'
+                else:
+                    suffix = '.surf.gii'
                 mask_path = os.path.join(
-                    BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}',
-                    f'ses-{session}', 'anat', f'sub-{participant}_ses-{session}_desc-{mask_type}_mask.nii.gz'
-                )
-            anat['mask'] = mask_path
-            for hemi in ('left', 'right'):
-                surf_path = os.path.join(
                     BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}', 'anat',
-                    f'sub-{participant}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
+                    f'sub-{participant}_desc-{mask_type}_mask.nii.gz'
                 )
-                if not os.path.exists(surf_path) and session_subdirs:
+                if not os.path.exists(mask_path) and session_subdirs:
                     session = session_subdirs[0][4:]
+                    mask_path = os.path.join(
+                        BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}',
+                        f'ses-{session}', 'anat', f'sub-{participant}_ses-{session}_desc-{mask_type}_mask.nii.gz'
+                    )
+                anat['mask'] = mask_path
+                for hemi in ('left', 'right'):
                     surf_path = os.path.join(
                         BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}',
-                        f'ses-{session}', 'anat',
-                        f'sub-{participant}_ses-{session}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
+                        'anat', f'sub-{participant}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
                     )
-                if not surf_type in anat:
-                    anat[surf_type] = dict()
-                anat[surf_type][hemi] = surf_path
+                    if not os.path.exists(surf_path) and session_subdirs:
+                        session = session_subdirs[0][4:]
+                        surf_path = os.path.join(
+                            BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}',
+                            f'ses-{session}', 'anat',
+                            f'sub-{participant}_ses-{session}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
+                        )
+                    if not surf_type in anat:
+                        anat[surf_type] = dict()
+                    anat[surf_type][hemi] = surf_path
 
         statmaps = statmap_list
         statmap_paths = []
@@ -389,6 +545,7 @@ def assign_callbacks(app, cache):
         for statmap in statmaps:
             stat_type = get_value(statmap, 'type')
             session = get_value(statmap, 'session')
+            print(session)
             if session == 'all':
                 session = None
 
@@ -411,6 +568,7 @@ def assign_callbacks(app, cache):
                     BIDS_PATH, project, 'derivatives', 'firstlevels', model_label, task, f'node-{node}', subdir,
                     f'sub-{participant}{session_str}_contrast-{contrast}_stat-t_statmap.nii.gz'
                 )
+                print(statmap_path)
                 if not os.path.exists(statmap_path):
                     continue
                 statmap_in = dict(
@@ -441,6 +599,21 @@ def assign_callbacks(app, cache):
                 statmap_label = get_value(statmap, 'text') or statmap_label_default
                 vmin_ = get_value(statmap, 'vmin') or 0
                 vmax_ = get_value(statmap, 'vmax') or 0.5
+            elif stat_type == 'file':
+                statmap_file = get_value(statmap, 'local_file') or None
+                print('statmap_file', statmap_file)
+                if not statmap_file:
+                    continue
+                statmap_path = os.path.join(local_directory, statmap_file)
+                if not os.path.exists(statmap_path):
+                    continue
+                statmap_in = dict(
+                    path=statmap_path,
+                )
+                statmap_label_default = f'{statmap_file.replace("nii.gz", "").replace("nii", "")}'
+                statmap_label = get_value(statmap, 'text') or statmap_label_default
+                vmin_ = get_value(statmap, 'vmin') or None
+                vmax_ = get_value(statmap, 'vmax') or None
             elif stat_type == 'connectivity':
                 seed = (
                     get_value(statmap, 'seed_x'),
@@ -466,6 +639,33 @@ def assign_callbacks(app, cache):
                 if not functional_paths:
                     continue
 
+                statmap_in = dict(
+                    functionals=functional_paths,
+                    mask=anat['mask'],
+                    seed=seed,
+                    fwhm=fwhm
+                )
+                statmap_label_default = f'Connectivity @ {round(seed[0])}, {round(seed[1])}, {round(seed[2])} (r)'
+                if session:
+                    statmap_label_default += f', {session}'
+                statmap_label = get_value(statmap, 'text') or statmap_label_default
+                vmin_ = get_value(statmap, 'vmin') or 0
+                vmax_ = get_value(statmap, 'vmax') or 0.3
+            elif stat_type == 'connectivity_local':
+                seed = (
+                    get_value(statmap, 'seed_x'),
+                    get_value(statmap, 'seed_y'),
+                    get_value(statmap, 'seed_z'),
+                )
+                if seed[0] is None or seed[1] is None or seed[2] is None:
+                    continue
+                fwhm = get_value(statmap, 'fwhm') or None
+                functional_paths = get_value(statmap, 'functional_files') or None
+
+                if not functional_paths:
+                    continue
+
+                functional_paths = [os.path.join(local_directory, x) for x in functional_paths]
                 statmap_in = dict(
                     functionals=functional_paths,
                     mask=anat['mask'],
@@ -606,16 +806,45 @@ def assign_callbacks(app, cache):
                   Output('project-dropdown', 'value'),
                   Output('participant-dropdown', 'options'),
                   Output('participant-dropdown', 'value'),
+                  Output('pial-left', 'value'),
+                  Output('pial-right', 'value'),
+                  Output('white-left', 'value'),
+                  Output('white-right', 'value'),
+                  Output('midthickness-left', 'value'),
+                  Output('midthickness-right', 'value'),
+                  Output('sulc-left', 'value'),
+                  Output('sulc-right', 'value'),
+                  Output('mask', 'value'),
+                  Output('pial-left', 'options'),
+                  Output('pial-right', 'options'),
+                  Output('white-left', 'options'),
+                  Output('white-right', 'options'),
+                  Output('midthickness-left', 'options'),
+                  Output('midthickness-right', 'options'),
+                  Output('sulc-left', 'options'),
+                  Output('sulc-right', 'options'),
+                  Output('statmap-type', 'options'),
+                  Output('statmap-type', 'value'),
                   Output('statmap-list', 'children'),
                   Output('participant-dropdown-wrapper', 'style'),
                   Output('preprocessing-label', 'style'),
-                  Output('anatomical-directory-wrapper', 'style'),
+                  Output('local-directory-wrapper', 'style'),
                   Input('project-dropdown', 'value'),
                   Input('participant-dropdown', 'value'),
                   Input('add-statmap', 'n_clicks'),
                   Input('statmap-list', 'n_clicks'),
                   Input('main', 'clickData'),
                   Input('store', 'data'),
+                  Input('local-directory', 'value'),
+                  Input('pial-left', 'value'),
+                  Input('pial-right', 'value'),
+                  Input('white-left', 'value'),
+                  Input('white-right', 'value'),
+                  Input('midthickness-left', 'value'),
+                  Input('midthickness-right', 'value'),
+                  Input('sulc-left', 'value'),
+                  Input('sulc-right', 'value'),
+                  Input('mask', 'value'),
                   State('statmap-type', 'value'),
                   State('statmap-list', 'children'))
     def update_menu(
@@ -625,31 +854,87 @@ def assign_callbacks(app, cache):
             statmap_list_n_clicks,
             click_data,
             store,
+            local_directory,
+            pial_left,
+            pial_right,
+            white_left,
+            white_right,
+            midthickness_left,
+            midthickness_right,
+            sulc_left,
+            sulc_right,
+            mask,
             statmap_type,
             statmap_list
     ):
+        print('Updating menu')
         if store is None:
             store = {}
+
+        surfaces = dict(
+            pial=dict(left=pial_left, right=pial_right),
+            white=dict(left=white_left, right=white_right),
+            midthickness=dict(left=midthickness_left, right=midthickness_right),
+            sulc=dict(left=sulc_left, right=sulc_right)
+        )
 
         if os.path.exists(BIDS_PATH):
             projects = sorted([x for x in os.listdir(BIDS_PATH) if os.path.isdir(os.path.join(BIDS_PATH, x))])
         else:
             projects = []
-        projects.append('local file')
+        projects.append('local')
         if project is None or project not in projects:
             if projects and 'climblab' in projects:
                 project = 'climblab'
             else:
-                project = 'local file'
-        if project == 'local file':
+                project = 'local'
+        local_directory_files = []
+        local_directory_options = []
+        mask = None
+        if project == 'local':
             participants = []
+            statmap_type_data = [
+                {'label': 'File', 'value': 'file'},
+                {'label': 'Connectivity', 'value': 'connectivity_local'}
+            ]
+            statmap_type_value = statmap_type if statmap_type else 'file'
+            if local_directory and os.path.exists(local_directory):
+                local_directory = os.path.abspath(local_directory)
+                if not local_directory.endswith(os.sep):
+                    local_directory += os.sep
+                if os.path.exists(local_directory):
+                    local_directory_files = os.listdir(local_directory)
+                    local_directory_options = [
+                        {'label': x, 'value': x} for x in local_directory_files
+                    ]
+            for surf_type in surfaces:
+                for hemi in surfaces[surf_type]:
+                    if surfaces[surf_type][hemi] not in local_directory_files:
+                        if surf_type == 'sulc':
+                            suffix = '.shape.gii'
+                        else:
+                            suffix = '.surf.gii'
+                        for x in local_directory_files:
+                            if x.endswith(f'_hemi-{hemi[0].upper()}_{surf_type}{suffix}'):
+                                surfaces[surf_type][hemi] = x
+                                break
+            for x in local_directory_files:
+                if x.endswith('_mask.nii.gz'):
+                    mask = x
+                    break
         else:
             participants = sorted(
                 [x[4:] for x in os.listdir(os.path.join(BIDS_PATH, project)) if x.startswith('sub-')]
             )
+            statmap_type_data = [
+                {'label': 'Contrast', 'value': 'contrast'},
+                {'label': 'Network', 'value': 'network'},
+                {'label': 'Connectivity', 'value': 'connectivity'}
+            ]
+            statmap_type_value = statmap_type if statmap_type else 'contrast'
         if participant is None or participant not in participants:
             participant = participants[0] if participants else None
-        if project == 'local file':
+        if project == 'local':
             sessions = []
         else:
             sessions = sorted(
@@ -708,6 +993,16 @@ def assign_callbacks(app, cache):
                         style=dict(width='98%')
                     ),
                 ]
+            elif statmap_type == 'file':
+                children += [
+                    dcc.Dropdown(
+                        id={'type': 'statmap-local-file', 'index': statmap_ix},
+                        options=local_directory_options,
+                        value=None,
+                        clearable=False,
+                        style=dict(width='98%')
+                    )
+                ]
             elif statmap_type == 'connectivity':
                 x = y = z = None
                 if store is not None:
@@ -748,6 +1043,55 @@ def assign_callbacks(app, cache):
                         id={'type': 'statmap-cleaning-label', 'index': statmap_ix},
                         placeholder=f'Cleaning label (default: {CLEAN_DEFAULT_KEY})',
                         style=dict(width='49%')
+                    ),
+                ]
+            elif statmap_type == 'connectivity_local':
+                x = y = z = None
+                if store is not None:
+                    seed = store.get('seed', {}).get('points', [None])[0]
+                    if seed is not None and 'customdata' in seed:
+                        x, y, z = round(seed['customdata'][0], 2), round(seed['customdata'][1], 2), \
+                                  round(seed['customdata'][2], 2)
+                children += [
+                    html.Div(
+                        [
+                            html.Label('Functional files'),
+                            dcc.Dropdown(
+                                id={'type': 'statmap-functional-files', 'index': statmap_ix},
+                                options=[x for x in local_directory_options if x['value'].endswith('.nii.gz') or
+                                         x['value'].endswith('.nii')],
+                                value=None,
+                                clearable=False,
+                                multi=True,
+                                closeOnSelect=False,
+                                style=dict(width='98%')
+                            )
+                        ],
+                        id={'type': 'statmap-functional-files-wrapper', 'index': statmap_ix},
+                        style=dict(width='98%')
+                    ),
+                    dmc.NumberInput(
+                        id={'type': 'statmap-seed-x', 'index': statmap_ix},
+                        placeholder='x',
+                        value=x,
+                        style=dict(width='24%')
+                    ),
+                    dmc.NumberInput(
+                        id={'type': 'statmap-seed-y', 'index': statmap_ix},
+                        placeholder='y',
+                        value=y,
+                        style=dict(width='24%')
+                    ),
+                    dmc.NumberInput(
+                        id={'type': 'statmap-seed-z', 'index': statmap_ix},
+                        placeholder='z',
+                        value=z,
+                        style=dict(width='24%')
+                    ),
+                    dmc.NumberInput(
+                        id={'type': 'statmap-fwhm', 'index': statmap_ix},
+                        placeholder='FWHM (mm)',
+                        style=dict(width='24%')
                     ),
                 ]
             children += [
@@ -857,10 +1201,29 @@ def assign_callbacks(app, cache):
             project,
             [{'label': p, 'value': p} for p in participants],
             participant,
+            surfaces['pial']['left'],
+            surfaces['pial']['right'],
+            surfaces['white']['left'],
+            surfaces['white']['right'],
+            surfaces['midthickness']['left'],
+            surfaces['midthickness']['right'],
+            surfaces['sulc']['left'],
+            surfaces['sulc']['right'],
+            mask,
+            local_directory_options,
+            local_directory_options,
+            local_directory_options,
+            local_directory_options,
+            local_directory_options,
+            local_directory_options,
+            local_directory_options,
+            local_directory_options,
+            statmap_type_data,
+            statmap_type_value,
             statmap_list,
-            {'display': 'none'} if project == 'local file' else {},
-            {'display': 'none'} if project == 'local file' else {},
-            {} if project == 'local file' else {'display': 'none'}
+            {'display': 'none'} if project == 'local' else {},
+            {'display': 'none'} if project == 'local' else {},
+            {} if project == 'local' else {'display': 'none'}
         ]
 
     @app.callback(
@@ -896,6 +1259,9 @@ def get_value(statmap, key):
     for child in statmap['props']['children']:
         if child['props']['id']['type'][8:].replace('-', '_') == key:
             key_child = child
+            break
+        elif child['props']['id']['type'][8:].replace('-', '_') == f'{key}_wrapper':
+            key_child = child['props']['children'][1]
             break
 
     if key_child is None:
