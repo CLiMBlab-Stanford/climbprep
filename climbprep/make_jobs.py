@@ -42,7 +42,7 @@ if __name__ == '__main__':
         'more of ``["bidsify", "preprocess", "clean", "model", "plot", "parcellate"]``'))
     argparser.add_argument('-t', '--time', type=int, default=72, help='Maximum number of hours to train models')
     argparser.add_argument('-n', '--n-cores', type=int, default=8, help='Number of cores to request')
-    argparser.add_argument('-m', '--memory', type=int, default=64, help='Number of GB of memory to request')
+    argparser.add_argument('-m', '--memory', type=int, default=128, help='Number of GB of memory to request')
     argparser.add_argument('-P', '--partition', default='sphinx', help=('Value for SLURM --partition setting, if '
                                                                       'applicable'))
     argparser.add_argument('-a', '--account', default='nlp', help='Value for SLURM --account setting, if applicable')

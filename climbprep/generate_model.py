@@ -34,8 +34,6 @@ def get_contrast_spec(name, weights):
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser(('Generate a model configuration file for fMRI analysis. Writes a file to '
                                          'the current working directory named `name`_model.json.'))
-    argparser.add_argument('participant', help=('BIDS participant ID from which to initialize the model configuration '
-                                                '(i.e., load *events.tsv to extract condition names).'))
     argparser.add_argument('tasks', nargs='+', help='List of tasks to include in the model.')
     argparser.add_argument('-n', '--name', help=('Name of the model configuration file to generate. Required if '
                                                  '`len(tasks) > `1, otherwise can be inferred as the task name.'))
@@ -60,7 +58,6 @@ if __name__ == '__main__':
                                                    '1, for valid comparison between contrasts.'))
     args = argparser.parse_args()
 
-    participant = args.participant
     tasks = args.tasks
     name = args.name
     if not name:
@@ -81,34 +78,33 @@ if __name__ == '__main__':
     project_path = os.path.join(BIDS_PATH, project)
     assert os.path.exists(project_path), 'Path not found: %s' % project_path
 
-    sessions = set()
-    for subdir in os.listdir(os.path.join(project_path, 'sub-%s' % participant)):
-        if subdir.startswith('ses-') and os.path.isdir(os.path.join(project_path, 'sub-%s' % participant, subdir)):
-            sessions.add(subdir[4:])
-    if not sessions:
-        sessions = {None}
+    participants = set()
+    func_dirs = set()
+    for subdir in [x for x in os.listdir(project_path) if x.startswith('sub-')]:
+        sessions_ = [x for x in os.listdir(os.path.join(project_path, subdir)) if x.startswith('ses-')]
+        if not sessions_:
+            func_dirs.add(os.path.join(project_path, subdir, 'func'))
+        else:
+            for session in sessions_:
+                func_dirs.add(os.path.join(project_path, subdir, session, 'func'))
+    if not func_dirs:
+        print('No matching functional directories found. Exiting...')
 
     conditions = set()
-    for session in sessions:
-        subdir = 'sub-%s' % participant
-        if session:
-            subdir = os.path.join(subdir, 'ses-%s' % session)
-        raw_path = os.path.join(project_path, subdir)
-        assert os.path.exists(raw_path), 'Path not found: %s' % raw_path
-        func_path = os.path.join(raw_path, 'func')
-        assert os.path.exists(func_path), 'Path not found: %s' % func_path
-
-        for event_file in os.listdir(func_path):
+    for func_dir in func_dirs:
+        assert os.path.exists(func_dir), 'Path not found: %s' % func_dir
+        for event_file in os.listdir(func_dir):
             if event_file.endswith('_events.tsv'):
                 task = TASK_RE.match(event_file)
                 if task:
                     task = task.group(1)
                     if task in tasks:
-                        df = pd.read_csv(os.path.join(func_path, event_file), sep='\t')
+                        df = pd.read_csv(os.path.join(func_dir, event_file), sep='\t')
                         conditions_ = set(df.trial_type.unique() if 'trial_type' in df.columns else [])
                         conditions |= conditions_
 
-    second_level_in = conditions | set(config.get('run', {}).keys())
+    second_level_in = sorted(list(conditions | set(config.get('run', {}).keys())))
+    conditions = sorted(list(conditions))
 
     model = MODEL_TEMPLATE.copy()
     model['Name'] = name
