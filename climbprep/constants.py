@@ -23,7 +23,7 @@ PLOT_DEFAULT_KEY = MODEL_DEFAULT_KEY
 PARCELLATE_DEFAULT_KEY = 'T1w'
 DEFAULT_MASK_SUFFIX = '_label-GM_probseg.nii.gz'
 DEFAULT_MASK_FWHM = 1
-DEFAULT_TARGET_AFFINE = 2
+DEFAULT_TARGET_AFFINE = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
 
 # Regex
 SPACE_RE = re.compile('.+_space-([a-zA-Z0-9]+)_')
@@ -180,6 +180,7 @@ CONFIG = dict(
             clean_surf=False,
             preprocessing_label='main',
             # Matches global_signal, white, trans, rot, and motion_outlier confounds w/derivatives, excluding redundant csf_wm
+            #confounds_regex=f'^(?!csf_wm)(global_signal|csf|white|trans|rot|motion_outlier).*',
             #confounds_regex=f'^(?!csf_wm)(global_signal|csf|white_matter|trans(_x|_y|_z)|rot(_x|_y|_z)|motion_outlier.*)(_derivative1)?$',
             confounds_regex=f'^(trans(_x|_y|_z)|rot(_x|_y|_z)|a_comp_cor_0[1-5]|cosine.*|motion_outlier.*)(_derivative1)?$',
             smoothing_fwhm=4,
