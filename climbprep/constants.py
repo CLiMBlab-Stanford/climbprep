@@ -180,10 +180,8 @@ CONFIG = dict(
         fc=dict(
             clean_surf=False,
             preprocessing_label='main',
-            # Matches global_signal, white, trans, rot, and motion_outlier confounds w/derivatives, excluding redundant csf_wm
-            #confounds_regex=f'^(?!csf_wm)(global_signal|csf|white|trans|rot|motion_outlier).*',
-            #confounds_regex=f'^(?!csf_wm)(global_signal|csf|white_matter|trans(_x|_y|_z)|rot(_x|_y|_z)|motion_outlier.*)(_derivative1)?$',
-            confounds_regex=f'^(trans(_x|_y|_z)|rot(_x|_y|_z)|a_comp_cor_0[1-5]|cosine.*|motion_outlier.*)(_derivative1)?$',
+            # Matches all global_signal, white, trans, rot, and motion_outlier confounds, excluding redundant csf_wm
+            confounds_regex=f'^(?!csf_wm)(global_signal|csf|white|trans|rot|motion_outlier).*',
             smoothing_fwhm=4,
             standardize=True,
             detrend=True,

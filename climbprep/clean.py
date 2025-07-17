@@ -67,7 +67,7 @@ if __name__ == '__main__':
             sessions.add(subdir[4:])
     if not sessions:
         sessions = {None}
-    for session in sessions:
+    for session in sorted(list(sessions)):
         # Set session-dependent paths
         subdir = 'sub-%s' % participant
         participant_dir = subdir
@@ -91,7 +91,7 @@ if __name__ == '__main__':
 
         datasets = {}  # Structure: space > task > run > filetype (func, mask, confounds, tr) > value
         type_by_space = {}
-        for img_path in os.listdir(func_path):
+        for img_path in sorted(list(os.listdir(func_path))):
             if img_path.endswith('desc-preproc_bold.nii.gz'):
                 space = SPACE_RE.match(img_path)
                 run = RUN_RE.match(img_path)
