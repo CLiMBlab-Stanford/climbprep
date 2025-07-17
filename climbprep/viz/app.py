@@ -496,36 +496,35 @@ def assign_callbacks(app, cache):
             preprocessing_label = preprocessing_label or PREPROCESS_DEFAULT_KEY
             session_subdirs = [
                 x for x in os.listdir(os.path.join(
-                    BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}'
+                    BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}'
                 )) if x.startswith('ses-')
             ]
             anat = {}
-            mask_type = 'ribbon'
+            mask_path = os.path.join(
+                BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}', 'anat',
+                f'sub-{participant}{DEFAULT_MASK_SUFFIX}'
+            )
+            if not os.path.exists(mask_path) and session_subdirs:
+                session = session_subdirs[0][4:]
+                mask_path = os.path.join(
+                    BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}',
+                    f'ses-{session}', 'anat', f'sub-{participant}_ses-{session}{DEFAULT_MASK_SUFFIX}'
+                )
+            anat['mask'] = mask_path
             for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
                 if surf_type == 'sulc':
                     suffix = '.shape.gii'
                 else:
                     suffix = '.surf.gii'
-                mask_path = os.path.join(
-                    BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}', 'anat',
-                    f'sub-{participant}_desc-{mask_type}_mask.nii.gz'
-                )
-                if not os.path.exists(mask_path) and session_subdirs:
-                    session = session_subdirs[0][4:]
-                    mask_path = os.path.join(
-                        BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}',
-                        f'ses-{session}', 'anat', f'sub-{participant}_ses-{session}_desc-{mask_type}_mask.nii.gz'
-                    )
-                anat['mask'] = mask_path
                 for hemi in ('left', 'right'):
                     surf_path = os.path.join(
-                        BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}',
+                        BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}',
                         'anat', f'sub-{participant}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
                     )
                     if not os.path.exists(surf_path) and session_subdirs:
                         session = session_subdirs[0][4:]
                         surf_path = os.path.join(
-                            BIDS_PATH, project, 'derivatives', 'fmriprep', preprocessing_label, f'sub-{participant}',
+                            BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}',
                             f'ses-{session}', 'anat',
                             f'sub-{participant}_ses-{session}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
                         )
@@ -545,7 +544,6 @@ def assign_callbacks(app, cache):
         for statmap in statmaps:
             stat_type = get_value(statmap, 'type')
             session = get_value(statmap, 'session')
-            print(session)
             if session == 'all':
                 session = None
 
@@ -568,7 +566,6 @@ def assign_callbacks(app, cache):
                     BIDS_PATH, project, 'derivatives', 'firstlevels', model_label, task, f'node-{node}', subdir,
                     f'sub-{participant}{session_str}_contrast-{contrast}_stat-t_statmap.nii.gz'
                 )
-                print(statmap_path)
                 if not os.path.exists(statmap_path):
                     continue
                 statmap_in = dict(
@@ -601,7 +598,6 @@ def assign_callbacks(app, cache):
                 vmax_ = get_value(statmap, 'vmax') or 0.5
             elif stat_type == 'file':
                 statmap_file = get_value(statmap, 'local_file') or None
-                print('statmap_file', statmap_file)
                 if not statmap_file:
                     continue
                 statmap_path = os.path.join(local_directory, statmap_file)
@@ -716,6 +712,7 @@ def assign_callbacks(app, cache):
 
         if fig_prev is None:
             fig = pl.plot_data_to_fig(**plot_data)
+            fig.layout.uirevision = True
             fig.layout.meta = dict(
                 project=project,
                 participant=participant,
@@ -789,7 +786,8 @@ def assign_callbacks(app, cache):
                 extra_traces.append(pl.make_sphere((x, y, z)))
             fig_['data'].extend(extra_traces)
 
-            fig_['layout'] = fig_prev['layout']
+            # fig_['layout'] = fig_prev['layout']
+            fig_['layout']['uirevision'] = True
             fig_['layout']['meta']['project'] = project
             fig_['layout']['meta']['participant'] = participant
             fig_['layout']['meta']['display_surface'] = display_surface
@@ -919,7 +917,7 @@ def assign_callbacks(app, cache):
                                 surfaces[surf_type][hemi] = x
                                 break
             for x in local_directory_files:
-                if x.endswith('_mask.nii.gz'):
+                if x.endswith(DEFAULT_MASK_SUFFIX):
                     mask = x
                     break
         else:

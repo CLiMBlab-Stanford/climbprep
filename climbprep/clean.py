@@ -59,7 +59,7 @@ if __name__ == '__main__':
     derivatives_path = os.path.join(project_path, 'derivatives')
     assert os.path.exists(derivatives_path), 'Path not found: %s' % derivatives_path
 
-    stderr(f'Cleaning outputs will be written to {os.path.join(derivatives_path, "cleaned", cleaning_label)}\n')
+    stderr(f'Cleaning outputs will be written to {os.path.join(derivatives_path, "clean", cleaning_label)}\n')
 
     sessions = set()
     for subdir in os.listdir(os.path.join(project_path, 'sub-%s' % participant)):
@@ -73,15 +73,15 @@ if __name__ == '__main__':
         participant_dir = subdir
         if session:
             subdir = os.path.join(subdir, 'ses-%s' % session)
-        fmriprep_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label, subdir)
-        assert os.path.exists(fmriprep_path), 'Path not found: %s' % fmriprep_path
-        raw_path = os.path.join(project_path, subdir)
-        assert os.path.exists(raw_path), 'Path not found: %s' % raw_path
-        func_path = os.path.join(fmriprep_path, 'func')
+        preprocess_path = os.path.join(derivatives_path, 'preprocess', preprocessing_label, subdir)
+        assert os.path.exists(preprocess_path), 'Path not found: %s' % preprocess_path
+        bids_path = os.path.join(project_path, subdir)
+        assert os.path.exists(bids_path), 'Path not found: %s' % bids_path
+        func_path = os.path.join(preprocess_path, 'func')
         assert os.path.exists(func_path), 'Path not found: %s' % func_path
-        anat_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label, participant_dir, 'anat')
+        anat_path = os.path.join(derivatives_path, 'preprocess', preprocessing_label, participant_dir, 'anat')
         if not os.path.exists(anat_path):
-            anat_path = os.path.join(fmriprep_path, 'anat')
+            anat_path = os.path.join(preprocess_path, 'anat')
         assert os.path.exists(anat_path), 'Path not found: %s' % anat_path
 
         if session:
@@ -96,10 +96,15 @@ if __name__ == '__main__':
                 space = SPACE_RE.match(img_path)
                 run = RUN_RE.match(img_path)
                 task = TASK_RE.match(img_path)
-                if space and run and task:
+                if space and task:
                     space = space.group(1)
                     type_by_space[space] = 'vol'
-                    run = run.group(1)
+                    if run:
+                        run = run.group(1)
+                        run_str = '_run-%s' % run
+                    else:
+                        run = None
+                        run_str = ''
                     task = task.group(1)
                     if space == 'T1w':
                         mask = f'sub-{participant}{ses_str}_label-GM_probseg.nii.gz'
@@ -115,7 +120,7 @@ if __name__ == '__main__':
                     assert os.path.exists(mask), 'Mask file not found: %s' % mask
                     confounds = os.path.join(
                         func_path,
-                        f'sub-{participant}{ses_str}_task-{task}_run-{run}_desc-confounds_timeseries.tsv'
+                        f'sub-{participant}{ses_str}_task-{task}{run_str}_desc-confounds_timeseries.tsv'
                     )
                     assert os.path.exists(confounds), 'Confounds file not found: %s' % confounds
                     func = os.path.join(func_path, img_path)
@@ -124,7 +129,7 @@ if __name__ == '__main__':
                     with open(sidecar_path, 'r') as f:
                         sidecar = json.load(f)
                     eventfile_path = os.path.join(
-                        raw_path, 'func', img_path.split('_run-')[0] + '_run-' + run + '_events.tsv'
+                        bids_path, 'func', img_path.split('_task-')[0] + '_task-' + task + run_str + '_events.tsv'
                     )
                     TR = sidecar.get('RepetitionTime', None)
                     StartTime = sidecar.get('StartTime', None)
@@ -146,14 +151,19 @@ if __name__ == '__main__':
                 space = SPACE_RE.match(img_path)
                 run = RUN_RE.match(img_path)
                 task = TASK_RE.match(img_path)
-                if space and run and task:
+                if space and task:
                     space = space.group(1)
                     type_by_space[space] = 'surf'
-                    run = run.group(1)
+                    if run:
+                        run = run.group(1)
+                        run_str = '_run-%s' % run
+                    else:
+                        run = None
+                        run_str = ''
                     task = task.group(1)
                     confounds = os.path.join(
                         func_path,
-                        f'sub-{participant}{ses_str}_task-{task}_run-{run}_desc-confounds_timeseries.tsv'
+                        f'sub-{participant}{ses_str}_task-{task}{run_str}_desc-confounds_timeseries.tsv'
                     )
                     assert os.path.exists(confounds), 'Confounds file not found: %s' % confounds
                     func = os.path.join(func_path, img_path)
@@ -162,7 +172,7 @@ if __name__ == '__main__':
                     with open(sidecar_path, 'r') as f:
                         sidecar = json.load(f)
                     eventfile_path = os.path.join(
-                        raw_path, 'func', img_path.split('_run-')[0] + '_run-' + run + '_events.tsv'
+                        bids_path, 'func', img_path.split('_task-')[0] + '_task-' + task + run_str + '_events.tsv'
                     )
                     TR = sidecar.get('RepetitionTime', None)
                     StartTime = sidecar.get('StartTime', None)
@@ -181,8 +191,7 @@ if __name__ == '__main__':
                     datasets[space][task][run]['TR'] = TR
                     datasets[space][task][run]['StartTime'] = StartTime
 
-
-        out_dir = os.path.join(derivatives_path, 'cleaned', cleaning_label, subdir)
+        out_dir = os.path.join(derivatives_path, 'clean', cleaning_label, subdir)
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
 
@@ -269,7 +278,7 @@ if __name__ == '__main__':
                         else:
                             space_str = '_space-%s' % space
                         surf_L_path = os.path.join(
-                            fmriprep_path, 'anat', f'sub-{participant}{ses_str}{space_str}_hemi-L_pial.surf.gii'
+                            preprocess_path, 'anat', f'sub-{participant}{ses_str}{space_str}_hemi-L_pial.surf.gii'
                         )
                         surf_R_path = surf_L_path.replace('_hemi-L_', '_hemi-R_')
 

@@ -21,7 +21,7 @@ if __name__ == '__main__':
                                                                           'available for the participant.'))
     argparser.add_argument('-c', '--config', default=MODEL_DEFAULT_KEY, help=('Config name (default `T1w`) '
         'or YAML config file to used to parameterize model. '
-        'See `climbprep.constants.CONFIG["model"]` for available config names and their settings. '))
+        'See `climbprep.constants.CONFIG["model"]` for available config names and their settings.'))
     args = argparser.parse_args()
 
     participant = args.participant.replace('sub-', '')
@@ -58,12 +58,12 @@ if __name__ == '__main__':
     assert os.path.exists(project_path), 'Path not found: %s' % project_path
     derivatives_path = os.path.join(project_path, 'derivatives')
     assert os.path.exists(derivatives_path), 'Path not found: %s' % derivatives_path
-    fmriprep_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label)
-    assert os.path.exists(fmriprep_path), 'Path not found: %s' % fmriprep_path
+    preprocess_path = os.path.join(derivatives_path, 'preprocess', preprocessing_label)
+    assert os.path.exists(preprocess_path), 'Path not found: %s' % preprocess_path
     modelfiles_path = MODELFILES_PATH
     assert os.path.exists(modelfiles_path), 'Path not found: %s' % modelfiles_path
 
-    stderr(f'Modeling outputs will be written to {os.path.join(derivatives_path, "firstlevels", model_label)}\n')
+    stderr(f'Modeling outputs will be written to {os.path.join(derivatives_path, "model", model_label)}\n')
 
     task_to_models = {}
     for model in os.listdir(modelfiles_path):
@@ -106,10 +106,10 @@ if __name__ == '__main__':
             session_str = '_ses-%s' % session
         else:
             session_str = ''
-        raw_path = os.path.join(project_path, subdir, 'func')
-        assert os.path.exists(raw_path), 'Path not found: %s' % raw_path
+        bids_path = os.path.join(project_path, subdir, 'func')
+        assert os.path.exists(bids_path), 'Path not found: %s' % bids_path
 
-        for path in os.listdir(raw_path):
+        for path in os.listdir(bids_path):
             if path.endswith('_bold.nii.gz'):
                 task = TASK_RE.match(path)
                 if task:
@@ -130,8 +130,8 @@ if __name__ == '__main__':
 
     for model in models:
         modelfile = os.path.join(modelfiles_path, '%s_model.json' % model)
-        out_path = os.path.join(project_path, 'derivatives', 'firstlevels', model_label, model)
-        work_path = os.path.join(WORK_PATH, project, participant, 'firstlevels', model_label, model)
+        out_path = os.path.join(project_path, 'derivatives', 'model', model_label, model)
+        work_path = os.path.join(WORK_PATH, project, 'derivatives', 'model', model_label, model, participant)
 
         kwarg_strings = []
         for key in config:
@@ -156,7 +156,7 @@ if __name__ == '__main__':
                    'participant',
                    f'--participant-label {participant}',
                    f'--model {modelfile}',
-                   f'--derivatives {fmriprep_path}',
+                   f'--derivatives {preprocess_path}',
                    f'--work-dir {work_path}'
                ] + kwarg_strings
         # database_path = os.path.join(project_path, 'code', 'pybids_dbcache')

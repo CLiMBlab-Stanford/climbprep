@@ -66,7 +66,7 @@ if __name__ == '__main__':
         stderr('  Updating pybids index\n')
         database_path = os.path.join(project_path, 'code', 'pybids_dbcache')
         indexer = bids.BIDSLayoutIndexer()
-        derivatives_path = os.path.join(project_path, 'derivatives', 'fmriprep')
+        derivatives_path = os.path.join(project_path, 'derivatives', 'preprocess')
         derivatives = [
             os.path.join(derivatives_path, x) for x in os.listdir(derivatives_path) if not x.startswith('.') and os.path.isdir(x)
         ]

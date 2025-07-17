@@ -24,14 +24,14 @@ from climbprep.util import *
 class PlotLib:
 
     CACHABLE = {
-        'get_statmap_surface_and_color',
+        # 'get_statmap_surface_and_color',
         'get_surface_mesh_hemi',
         'infer_midthickness_mesh_hemi',
         'get_surface_data',
         'get_plot_bgcolors',
         'get_mask',
         'get_functional',
-        'get_connectivity_from_seed',
+        # 'get_connectivity_from_seed',
         'make_sphere'
     }
 
@@ -768,7 +768,6 @@ class PlotLib:
         t0 = time.time()
         for functional_ in functionals_:
             std = np.std(functional_, axis=0)
-            print('Std quantiles: ', np.quantile(std, [0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99]))
         functionals_ = np.concatenate(functionals_, axis=0)  # shape (n_timepoints, n_kept_voxels)
         t1 = time.time()
         print(f'   Concatenating runs into shape {functionals_.shape} took {t1 - t0:.2f} seconds.' % ())
@@ -778,20 +777,19 @@ class PlotLib:
         return functionals_, mask
 
     # Cachable
-    def get_mask(self, mask_path, target_affine=None, mask_fwhm=2):
-        if target_affine is None:
-            target_affine = np.eye(3) * 2
+    def get_mask(self, mask_path, target_affine=DEFAULT_TARGET_AFFINE, mask_fwhm=DEFAULT_MASK_FWHM):
         mask = self.load_nii(mask_path)
         mask = image.new_img_like(mask, image.get_data(mask).astype(np.float32))
         if mask_fwhm:
             mask = image.smooth_img(mask, fwhm=mask_fwhm)
-        mask = image.resample_img(mask, target_affine=target_affine, interpolation='linear')
+        if target_affine is not None:
+            mask = image.resample_img(mask, target_affine=target_affine, interpolation='linear')
         mask = image.math_img('x > 0', x=mask)
 
         return mask
 
     # Cachable
-    def get_functional(self, path, mask_path, target_affine=None):
+    def get_functional(self, path, mask_path, target_affine=DEFAULT_TARGET_AFFINE):
         t0 = time.time()
         functional = self.load_nii(path)
         mask = self.get_mask(mask_path, target_affine=target_affine)
@@ -879,6 +877,7 @@ class PlotLib:
         statmap = surface.vol_to_surf(
             statmap_nii,
             pial.parts[hemi],
+            # mask_img=None if mask is None else self.get_mask(mask),
             mask_img=None if mask is None else self.get_mask(mask),
             inner_mesh=white.parts[hemi],
             depth=np.linspace(0.0, 1.0, 10)
@@ -1111,10 +1110,9 @@ if __name__ == '__main__':
                                                                           'If not specified, will plot all models '
                                                                           'available for the participant.'))
     argparser.add_argument('-c', '--config', default=PLOT_DEFAULT_KEY, help=('Keyword (currently `main`) '
-        'or YAML config file to used to parameterize preprocessing. If a keyword is provided, will '
+        'or YAML config file to used to parameterize plotting. If a keyword is provided, will '
         'the default settings for associated with that keyword. '
-        'The possible config fields and values are just the `fmriprep` command-line arguments and their possible'
-        'values. For details, see the `fmriprep` documentation.'))
+        'See `climbprep.constants.CONFIG["plot"]` for available config names and their settings.'))
     argparser.add_argument('--ncpus', type=int, default=8, help='Number of parallel processes to use.')
     args = argparser.parse_args()
 
@@ -1157,10 +1155,10 @@ if __name__ == '__main__':
     assert os.path.exists(project_path), 'Path not found: %s' % project_path
     derivatives_path = os.path.join(project_path, 'derivatives')
     assert os.path.exists(derivatives_path), 'Path not found: %s' % derivatives_path
-    models_path = os.path.join(derivatives_path, 'firstlevels', model_label)
+    models_path = os.path.join(derivatives_path, 'model', model_label)
     assert os.path.exists(models_path), 'Path not found: %s' % models_path
 
-    stderr(f'Plotting outputs will be written to {os.path.join(derivatives_path, "firstlevel_plots", plot_label)}\n')
+    stderr(f'Plotting outputs will be written to {os.path.join(derivatives_path, "plot", plot_label)}\n')
 
     for model_subdir in os.listdir(models_path):
         if models and model_subdir not in models:
@@ -1183,9 +1181,9 @@ if __name__ == '__main__':
             mni_space = True
         else:
             mni_space = False
-        fmriprep_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label)
-        assert os.path.exists(fmriprep_path), 'Path not found: %s' % fmriprep_path
-        anat_path = os.path.join(fmriprep_path, f'sub-{participant}', 'anat')
+        bids_path = os.path.join(derivatives_path, 'preprocess', preprocessing_label)
+        assert os.path.exists(bids_path), 'Path not found: %s' % bids_path
+        anat_path = os.path.join(bids_path, f'sub-{participant}', 'anat')
         assert os.path.exists(anat_path), 'Path not found: %s' % anat_path
 
         for node in ('subject', 'session', 'run'):
@@ -1207,7 +1205,7 @@ if __name__ == '__main__':
 
                 plot_path = os.path.join(
                     derivatives_path,
-                    'firstlevel_plots',
+                    'plot',
                     plot_label,
                     model_subdir,
                     f'node-{node}',

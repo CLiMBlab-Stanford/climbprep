@@ -70,18 +70,18 @@ if __name__ == '__main__':
         participant_dir = subdir
         if session:
             subdir = os.path.join(subdir, 'ses-%s' % session)
-        cleaned_path = os.path.join(derivatives_path, 'cleaned', cleaning_label, subdir)
-        cleaning_config_path = os.path.join(cleaned_path, 'config.yml')
+        clean_path = os.path.join(derivatives_path, 'clean', cleaning_label, subdir)
+        cleaning_config_path = os.path.join(clean_path, 'config.yml')
         assert os.path.exists(cleaning_config_path), 'Path not found: %s' % cleaning_config_path
         with open(cleaning_config_path, 'r') as f:
             cleaning_config = yaml.safe_load(f)
         preprocessing_label = cleaning_config['preprocessing_label']
-        fmriprep_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label, subdir)
-        assert os.path.exists(fmriprep_path), 'Path not found: %s' % fmriprep_path
-        anat_path = os.path.join(derivatives_path, 'fmriprep', preprocessing_label, participant_dir, 'anat')
+        preprocess_path = os.path.join(derivatives_path, 'preprocess', preprocessing_label, subdir)
+        assert os.path.exists(preprocess_path), 'Path not found: %s' % preprocess_path
+        anat_path = os.path.join(derivatives_path, 'preprocess', preprocessing_label, participant_dir, 'anat')
         anat_by_session = False
         if not os.path.exists(anat_path):
-            anat_path = os.path.join(fmriprep_path, 'anat')
+            anat_path = os.path.join(preprocess_path, 'anat')
             anat_by_session = True
         assert os.path.exists(anat_path), 'Path not found: %s' % anat_path
 
@@ -91,11 +91,11 @@ if __name__ == '__main__':
             ses_str = ''
 
         functional_paths = []
-        for path in os.listdir(cleaned_path):
+        for path in os.listdir(clean_path):
             if path.endswith('desc-clean_bold.nii.gz'):
                 space_ = SPACE_RE.match(path)
                 if space_ and space_.group(1) == space:
-                    functional_paths.append(os.path.join(cleaned_path, path))
+                    functional_paths.append(os.path.join(clean_path, path))
 
         xfm_path = None
         if 'mni' in space.lower():
