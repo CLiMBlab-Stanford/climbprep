@@ -63,18 +63,19 @@ if __name__ == '__main__':
         participants['tasks'] = tasks
         participants.to_csv(participants_path, index=False, sep='\t')
 
-        stderr('  Updating pybids index\n')
-        database_path = os.path.join(project_path, 'code', 'pybids_dbcache')
-        indexer = bids.BIDSLayoutIndexer()
-        derivatives_path = os.path.join(project_path, 'derivatives', 'preprocess')
-        derivatives = [
-            os.path.join(derivatives_path, x) for x in os.listdir(derivatives_path) if not x.startswith('.') and os.path.isdir(x)
-        ]
-        layout = bids.BIDSLayout(
-            project_path,
-            derivatives=derivatives,
-            database_path=database_path,
-            reset_database=True,
-            indexer=indexer
-        )
+        if False:
+            stderr('  Updating pybids index\n')
+            database_path = os.path.join(project_path, 'code', 'pybids_dbcache')
+            indexer = bids.BIDSLayoutIndexer()
+            derivatives_path = os.path.join(project_path, 'derivatives', 'preprocess')
+            derivatives = [
+                os.path.join(derivatives_path, x) for x in os.listdir(derivatives_path) if not x.startswith('.') and os.path.isdir(x)
+            ]
+            layout = bids.BIDSLayout(
+                project_path,
+                derivatives=derivatives,
+                database_path=database_path,
+                reset_database=True,
+                indexer=indexer
+            )
 

@@ -67,5 +67,5 @@ if __name__ == '__main__':
     cmd = f'fmriprep {" ".join(args)}'
     cmd = f'singularity exec {FMRIPREP_IMG} bash -c "{cmd}"'
 
-    print(cmd)
+    stderr(cmd + '\n')
     os.system(cmd)
