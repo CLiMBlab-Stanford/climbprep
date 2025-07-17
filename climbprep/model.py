@@ -131,7 +131,7 @@ if __name__ == '__main__':
     for model in models:
         modelfile = os.path.join(modelfiles_path, '%s_model.json' % model)
         out_path = os.path.join(project_path, 'derivatives', 'model', model_label, model)
-        work_path = os.path.join(WORK_PATH, project, 'derivatives', 'model', model_label, model, participant)
+        work_path = os.path.join(WORK_PATH, project, 'derivatives', 'model', model_label, model, f'sub-{participant}')
 
         kwarg_strings = []
         for key in config:

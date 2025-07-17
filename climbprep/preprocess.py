@@ -40,7 +40,7 @@ if __name__ == '__main__':
             config[key] = config_default[key]
 
     out_path = os.path.join(project_path, 'derivatives', 'preprocess', preprocessing_label)
-    work_path = os.path.join(WORK_PATH, project, 'derivatives', 'preprocess', preprocessing_label, participant)
+    work_path = os.path.join(WORK_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}')
 
     stderr(f'Preprocessing outputs will be written to {out_path}\n')
     stderr(f'Working directory will be {work_path}\n')
