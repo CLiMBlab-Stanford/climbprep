@@ -172,7 +172,8 @@ CONFIG = dict(
             fs_license_file=FS_LICENSE_PATH,
             output_space=['MNI152NLin2009cAsym', 'T1w', 'fsnative'],
             skull_strip_t1w='skip',
-            cifti_output='91k'
+            cifti_output='91k',
+            submm_recon=False
         )
     ),
     clean=dict(

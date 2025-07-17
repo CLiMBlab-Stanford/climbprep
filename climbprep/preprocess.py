@@ -49,9 +49,13 @@ if __name__ == '__main__':
     for key in config:
         key_str = '--%s' % key.replace('_', '-')
         val =  config[key]
-        if isinstance(val, list) or isinstance(val, tuple):
-            val = ' '.join(val)
-        kwarg_strings.append(f'{key_str} {val}')
+        if key == 'submm_recon':
+            if not val:
+                kwarg_strings.append('--no-submm-recon')
+        else:
+            if isinstance(val, list) or isinstance(val, tuple):
+                val = ' '.join(val)
+            kwarg_strings.append(f'{key_str} {val}')
 
     args = [
         project_path,
