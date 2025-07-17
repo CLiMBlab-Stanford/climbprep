@@ -117,6 +117,7 @@ if __name__ == '__main__':
                             'AcquisitionTime' in meta and 'AcquisitionTime' in descriptions[-1]['criteria'] and \
                             meta['AcquisitionTime'] == descriptions[-1]['criteria']['AcquisitionTime']:
                         continue
+                        
                     description = dict(
                         datatype=dtype,
                         suffix=suffix,
@@ -134,9 +135,25 @@ if __name__ == '__main__':
                         events_file = run_map.get(series_number, {}).get('EventsFile', None)
                         if events_file:
                             description['sidecar_changes']['EventsFile'] = events_file
+                        if 'sbref' in ''.join([x for x in meta['SeriesDescription'] if x.isalnum()]).lower():
+                            description['suffix'] = 'sbref'
                     descriptions.append(description)
 
             descriptions = dict(descriptions=descriptions)
+            descriptions_by_series_number = {}
+            for description in descriptions['descriptions']:
+                series_number = int(description['criteria']['SeriesNumber'])
+                assert not description['datatype'] == 'func' or series_number not in descriptions_by_series_number, 'Duplicate series number found: %d.\n%s\n%s' % (series_number, descriptions_by_series_number[series_number], description)
+                descriptions_by_series_number[series_number] = description
+            for series_number in descriptions_by_series_number:
+                description = descriptions_by_series_number[series_number]
+                if description['suffix'] == 'sbref':
+                    series_number_target = series_number + 1
+                    if series_number_target in descriptions_by_series_number:
+                        task_name = descriptions_by_series_number[series_number_target].get('sidecar_changes', {}).get('TaskName', None)
+                        if task_name:
+                            description['custom_entities'] = 'task-%s' % task_name
+                            description['sidecar_changes']['TaskName'] = task_name
 
             if not user_config:
                 config_path = os.path.join(src_path, 'dcm2bids_config.json')
