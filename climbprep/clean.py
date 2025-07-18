@@ -168,7 +168,7 @@ if __name__ == '__main__':
                     )
                     assert os.path.exists(confounds), 'Confounds file not found: %s' % confounds
                     func = os.path.join(func_path, img_path)
-                    sidecar_path = func.replace('.nii.gz', '.json')
+                    sidecar_path = func.replace('.func.gii', '.json')
                     assert os.path.exists(sidecar_path), 'Path not found: %s' % sidecar_path
                     with open(sidecar_path, 'r') as f:
                         sidecar = json.load(f)
