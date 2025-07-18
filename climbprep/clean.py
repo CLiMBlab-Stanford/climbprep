@@ -107,9 +107,10 @@ if __name__ == '__main__':
                         run_str = ''
                     task = task.group(1)
                     if space == 'T1w':
-                        mask = f'sub-{participant}{ses_str}_label-GM_probseg.nii.gz'
+                        mask = f'sub-{participant}{ses_str}{config.get("mask_suffix", DEFAULT_MASK_SUFFIX)}'
                     else:
-                        mask = f'sub-{participant}{ses_str}_space-{space}_label-GM_probseg.nii.gz'
+                        mask = f'sub-{participant}{ses_str}_space-{space}' \
+                               f'{config.get("mask_suffix", DEFAULT_MASK_SUFFIX)}'
                     mask = os.path.join(anat_path, mask)
                     if not os.path.exists(mask):
                         if space == 'T1w':
@@ -254,8 +255,7 @@ if __name__ == '__main__':
                         func = image.resample_to_img(func, mask_nii)
 
                         masker = maskers.NiftiMasker(
-                            mask_img=None,
-                            mask_strategy='background',
+                            mask_img=mask_nii,
                             standardize=config['standardize'],
                             detrend=config['detrend'],
                             t_r=TR,

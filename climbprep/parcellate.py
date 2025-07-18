@@ -5,15 +5,6 @@ import argparse
 from climbprep.constants import *
 from climbprep.util import *
 
-IMG_CACHE = {}
-
-def load_img(path, cache=IMG_CACHE):
-    if path in cache:
-        return cache[path]
-    img = image.load_img(path)
-    cache[path] = img
-    return img
-
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser("Clean (denoise) a participant's functional data")

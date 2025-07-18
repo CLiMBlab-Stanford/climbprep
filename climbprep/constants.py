@@ -21,7 +21,7 @@ CLEAN_DEFAULT_KEY = 'fc'
 MODEL_DEFAULT_KEY = 'T1w'
 PLOT_DEFAULT_KEY = MODEL_DEFAULT_KEY
 PARCELLATE_DEFAULT_KEY = 'T1w'
-DEFAULT_MASK_SUFFIX = '_desc-ribbon_mask.nii.gz'
+DEFAULT_MASK_SUFFIX = '_label-GM_probseg.nii.gz'
 DEFAULT_MASK_FWHM = 1
 DEFAULT_TARGET_AFFINE = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
 
@@ -178,8 +178,9 @@ CONFIG = dict(
     ),
     clean=dict(
         fc=dict(
-            clean_surf=False,
-            preprocessing_label='main',
+            clean_surf=True,
+            preprocessing_label=PREPROCESS_DEFAULT_KEY,
+            mask_suffix=DEFAULT_MASK_SUFFIX,
             # Matches all global_signal, white, trans, rot, and motion_outlier confounds, excluding redundant csf_wm
             confounds_regex=f'^(?!csf_wm)(global_signal|csf|white|trans|rot|motion_outlier).*',
             smoothing_fwhm=4,
@@ -191,7 +192,9 @@ CONFIG = dict(
             n_jobs=-1
         ),
         firstlevels_like=dict(
-            clean_surf=False,
+            clean_surf=True,
+            preprocessing_label=PREPROCESS_DEFAULT_KEY,
+            mask_suffix=DEFAULT_MASK_SUFFIX,
             # Matches all global_signal, white, trans, rot, and motion_outlier confounds, excluding redundant csf_wm
             confounds_regex=f'^(?!csf_wm)(global_signal|csf|white|trans|rot|motion_outlier).*',
             smoothing_fwhm=4,
@@ -205,38 +208,20 @@ CONFIG = dict(
     ),
     model=dict(
         mni=dict(
-            preprocessing_label='main',
+            preprocessing_label=PREPROCESS_DEFAULT_KEY,
             smoothing_fwhm=4,
             smoothing_method='iso',
             space='MNI152NLin2009cAsym',
             estimator='nilearn',
-            drift_model='cosine',
-            drop_missing=True
-        ),
-        mni_afni=dict(
-            preprocessing_label='main',
-            smoothing_fwhm=4,
-            smoothing_method='iso',
-            space='MNI152NLin2009cAsym',
-            estimator='afni',
             drift_model='cosine',
             drop_missing=True
         ),
         T1w=dict(
-            preprocessing_label='main',
+            preprocessing_label=PREPROCESS_DEFAULT_KEY,
             smoothing_fwhm=4,
             smoothing_method='iso',
             space='T1w',
             estimator='nilearn',
-            drift_model='cosine',
-            drop_missing=True
-        ),
-        T1w_afni=dict(
-            preprocessing_label='main',
-            smoothing_fwhm=4,
-            smoothing_method='iso',
-            space='T1w',
-            estimator='afni',
             drift_model='cosine',
             drop_missing=True
         )
@@ -247,7 +232,7 @@ CONFIG = dict(
     ),
     parcellate=dict(
         T1w=dict(
-            cleaning_label='fc',
+            cleaning_label=CLEAN_DEFAULT_KEY,
             space='T1w',
             sample=dict(
                 main=dict(
