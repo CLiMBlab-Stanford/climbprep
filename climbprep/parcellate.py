@@ -88,12 +88,16 @@ if __name__ == '__main__':
                 if space_ and space_.group(1) == space:
                     functional_paths.append(os.path.join(clean_path, path))
 
+        mask_path = None
+        mask_suffix = config.get('mask_suffix', DEFAULT_MASK_SUFFIX)
         xfm_path = None
         if 'mni' in space.lower():
             surface = None
         else:  # Get transform from MNI to native space, and native surface data
             for path in os.listdir(anat_path):
-                if path.endswith('_mode-image_xfm.h5'):
+                if space in path and path.endswith(mask_suffix):
+                    mask_path = os.path.join(anat_path, path)
+                elif path.endswith('_mode-image_xfm.h5'):
                     t = TO_RE.match(path)
                     f = FROM_RE.match(path)
                     if t and f:
@@ -102,6 +106,7 @@ if __name__ == '__main__':
                         if t == space and 'mni' in f.lower():
                             xfm_path = os.path.join(anat_path, path)
                             break
+            assert mask_path, f'Non-MNI space used but no matching mask (*{mask_suffix}) found in {anat_path}.'
             assert xfm_path, f'Non-MNI space used but no matching transform (*_xfm.h5) found in {anat_path}.'
 
             if anat_by_session:
@@ -128,6 +133,8 @@ if __name__ == '__main__':
             )
 
         parcellation_config = deepcopy(config)
+        if mask_path:
+            parcellation_config['mask_path'] = mask_path
         if xfm_path:
             parcellation_config['xfm_path'] = xfm_path
         if surface:
