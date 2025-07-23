@@ -95,6 +95,7 @@ class PlotLib:
             white,
             midthickness,
             sulc=None,
+            inflated=None,
             statmaps=None,
             statmap_labels=None,
             colors=None,  # Defaults to single color per statmap, only makes sense if statmap_scales_alpha=True
@@ -177,7 +178,7 @@ class PlotLib:
         incr_statmaps = (C / (3 + len(statmaps_in) * C) * T) / 2
 
         mesh_kwargs = {}
-        surf_types = dict(pial=pial, white=white, midthickness=midthickness, sulc=sulc)
+        surf_types = dict(pial=pial, white=white, midthickness=midthickness, inflated=inflated, sulc=sulc)
         for surf_type in surf_types:
             if surf_types[surf_type] is None:
                 for hemi in ('left', 'right'):
@@ -196,14 +197,17 @@ class PlotLib:
             progress_fn.incr = incr_meshes
             progress_fn('Loading surface meshes', 0)
         mesh_kwargs['progress_fn'] = progress_fn
-        pial, white, midthickness, sulc = self.get_surface_meshes(**mesh_kwargs)
+        pial, white, midthickness, inflated, sulc = self.get_surface_meshes(**mesh_kwargs)
 
+        is_inflated = display_surface == 'inflated'
         if display_surface == 'midthickness':
             display_surface = midthickness
         elif display_surface == 'white':
             display_surface = white
         elif display_surface == 'pial':
             display_surface = pial
+        elif display_surface == 'inflated':
+            display_surface = inflated
         else:
             raise ValueError(f'Invalid display_surface: {display_surface}. '
                              'Must be one of "midthickness", "white", or "pial".')
@@ -226,10 +230,14 @@ class PlotLib:
 
             # Source coordinates
             x, y, z = display_surface.parts[hemi].coordinates.T
+            if is_inflated:
+                x_src, y_src, z_src = midthickness.parts[hemi].coordinates.T
+            else:
+                x_src, y_src, z_src = x, y, z
             customdata = pd.DataFrame(dict(  # Store true coordinates for hover before messing with them
-                x=x,
-                y=y,
-                z=z,
+                x=x_src,
+                y=y_src,
+                z=z_src,
             ))
             coord_map = self.get_coord_map(x, y, z, hemi, turn_out_hemis=turn_out_hemis)
             x, y, z = coord_map(x, y, z)
@@ -524,6 +532,8 @@ class PlotLib:
             white_right=None,
             midthickness_left='infer',
             midthickness_right='infer',
+            inflated_left=None,
+            inflated_right=None,
             sulc_left=None,
             sulc_right=None,
             progress_fn=None
@@ -554,13 +564,24 @@ class PlotLib:
         )
 
         if progress_fn is not None:
+            progress_fn('Loading inflated meshes', 0)
+        if inflated_left is not None or inflated_right is not None:
+            inflated = self.get_surface_mesh(left=inflated_left, right=inflated_right)
+            if inflated.parts['left'] is not None:
+                inflated.parts['left'].coordinates[:, 0] -= inflated.parts['left'].coordinates[:, 0].max()
+            if inflated.parts['right'] is not None:
+                inflated.parts['right'].coordinates[:, 0] -= inflated.parts['right'].coordinates[:, 0].min()
+        else:
+            inflated = None
+
+        if progress_fn is not None:
             progress_fn('Loading sulcal depth', 0)
         if sulc_left is not None or sulc_right is not None:
             sulc = self.get_surface_data(left=sulc_left, right=sulc_right)
         else:
             sulc = None
 
-        return pial, white, midthickness, sulc
+        return pial, white, midthickness, inflated, sulc
 
     def get_surface_mesh(
             self,
@@ -874,7 +895,7 @@ class PlotLib:
             mesh_kwargs[f'white_{hemi}'] = white
         mesh_kwargs[f'midthickness_left'] = None
         mesh_kwargs[f'midthickness_right'] = None
-        pial, white, _, _ = self.get_surface_meshes(**mesh_kwargs)
+        pial, white, _, _, _ = self.get_surface_meshes(**mesh_kwargs)
 
         if progress_fn is not None:
             progress_fn(f'Projecting statmap to {hemi} surface', 0)

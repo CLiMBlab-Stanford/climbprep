@@ -5,9 +5,14 @@ import dash_mantine_components as dmc
 from dash import Dash, DiskcacheManager, html, dcc, Input, Output, State, Patch, callback_context
 import diskcache
 import argparse
+try:
+    import importlib.resources as pkg_resources
+except ImportError:
+    import importlib_resources as pkg_resources
 
 from climbprep.plot import PlotLibMemoized
 from climbprep.constants import *
+from climbprep import resources
 
 
 CACHE_PATH = os.path.join(os.getcwd(), '.cache', 'viz')
@@ -137,7 +142,8 @@ def menu():
                             [
                                 {'label': 'Pial', 'value': 'pial'},
                                 {'label': 'White', 'value': 'white'},
-                                {'label': 'Midthickness', 'value': 'midthickness'}
+                                {'label': 'Midthickness', 'value': 'midthickness'},
+                                {'label': 'Inflated', 'value': 'inflated'}
                             ],
                             'midthickness',
                             id='display-surface-dropdown',
@@ -146,8 +152,8 @@ def menu():
                     ],
                     id='display-surface-dropdown-wrapper'
                 ),
-                dmc.Switch(id='fsaverage',
-                           label="Use fsaverage", checked=False),
+                dmc.Switch(id='template-surface',
+                           label="Use template surface", checked=False),
                 html.Div(
                     children=[
                         dmc.TextInput(
@@ -239,6 +245,36 @@ def menu():
                                             [],
                                             'None',
                                             id='midthickness-right',
+                                            optionHeight=OPTION_HEIGHT,
+                                            clearable=True
+                                        )
+                                    ],
+                                    style={'width': '49%'}
+                                ),
+                            ]
+                        ),
+                        dmc.Flex(
+                            [
+                                html.Div(
+                                    [
+                                        html.Label('Inflated left'),
+                                        dcc.Dropdown(
+                                            [],
+                                            'None',
+                                            id='inflated-left',
+                                            optionHeight=OPTION_HEIGHT,
+                                            clearable=True
+                                        )
+                                    ],
+                                    style={'width': '49%'}
+                                ),
+                                html.Div(
+                                    [
+                                        html.Label('Inflated right'),
+                                        dcc.Dropdown(
+                                            [],
+                                            'None',
+                                            id='inflated-right',
                                             optionHeight=OPTION_HEIGHT,
                                             clearable=True
                                         )
@@ -393,13 +429,15 @@ def assign_callbacks(app, cache):
         State('turn-out-hemis', 'checked'),
         State('local-directory', 'value'),
         State('mask', 'value'),
-        State('fsaverage', 'checked'),
+        State('template-surface', 'checked'),
         State('pial-left', 'value'),
         State('pial-right', 'value'),
         State('white-left', 'value'),
         State('white-right', 'value'),
         State('midthickness-left', 'value'),
         State('midthickness-right', 'value'),
+        State('inflated-left', 'value'),
+        State('inflated-right', 'value'),
         State('sulc-left', 'value'),
         State('sulc-right', 'value'),
         State('statmap-list', 'children'),
@@ -459,13 +497,15 @@ def assign_callbacks(app, cache):
             turn_out_hemis,
             local_directory,
             local_mask,
-            use_fsaverage,
+            use_template_surface,
             pial_left,
             pial_right,
             white_left,
             white_right,
             midthickness_left,
             midthickness_right,
+            inflated_left,
+            inflated_right,
             sulc_left,
             sulc_right,
             statmap_list,
@@ -475,21 +515,43 @@ def assign_callbacks(app, cache):
             progress_fn = Progress(progress_fn)
             progress_fn('Initializing...', 0)
 
-        print('use_fsaverage:', use_fsaverage)
-
-        if use_fsaverage:
-            fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage')
+        if use_template_surface:
+            pial_left = pkg_resources.files(resources).joinpath('mni_lh.pial.gii')
+            pial_right = pkg_resources.files(resources).joinpath('mni_rh.pial.gii')
+            white_left = pkg_resources.files(resources).joinpath('mni_lh.white.gii')
+            white_right = pkg_resources.files(resources).joinpath('mni_rh.white.gii')
+            inflated_left = pkg_resources.files(resources).joinpath('mni_lh.inflated.gii')
+            inflated_right = pkg_resources.files(resources).joinpath('mni_rh.inflated.gii')
+            sulc_left = pkg_resources.files(resources).joinpath('mni_lh.sulc.gii')
+            sulc_right = pkg_resources.files(resources).joinpath('mni_rh.sulc.gii')
             surfaces = dict(
-                pial=dict(left=fsaverage['pial_left'], right=fsaverage['pial_right']),
-                white=dict(left=fsaverage['white_left'], right=fsaverage['white_right']),
+                pial=dict(
+                    left=pial_left,
+                    right=pial_right
+                ),
+                white=dict(
+                    left=white_left,
+                    right=white_right
+                ),
                 midthickness=dict(left='infer', right='infer'),
-                sulc=dict(left=fsaverage['sulc_left'], right=fsaverage['sulc_right'])
+                inflated=dict(
+                    left=inflated_left,
+                    right=inflated_right
+                ),
+                sulc=dict(
+                    left=sulc_left,
+                    right=sulc_right
+                )
             )
         else:
             surfaces = dict(
                 pial=dict(left=pial_left, right=pial_right),
                 white=dict(left=white_left, right=white_right),
-                midthickness=dict(left=midthickness_left, right=midthickness_right),
+                midthickness=dict(
+                    left='infer' if midthickness_left is None else midthickness_left,
+                    right='infer' if midthickness_right is None else midthickness_right
+                ),
+                inflated=dict(left=inflated_left, right=inflated_right),
                 sulc=dict(left=sulc_left, right=sulc_right)
             )
 
@@ -505,7 +567,7 @@ def assign_callbacks(app, cache):
                     if surf_type not in anat:
                         anat[surf_type] = {}
                     anat[surf_type][hemi] = surf_path
-            if local_mask:
+            if local_mask and not use_template_surface:
                 anat['mask'] = os.path.join(local_directory, local_mask)
         else:
             projects = sorted([x for x in os.listdir(BIDS_PATH) if os.path.isdir(os.path.join(BIDS_PATH, x))])
@@ -534,27 +596,42 @@ def assign_callbacks(app, cache):
                     BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}',
                     f'ses-{session}', 'anat', f'sub-{participant}_ses-{session}{DEFAULT_MASK_SUFFIX}'
                 )
-            anat['mask'] = mask_path
+            anat['mask'] = None if use_template_surface else mask_path
             for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
                 if surf_type == 'sulc':
                     suffix = '.shape.gii'
                 else:
                     suffix = '.surf.gii'
                 for hemi in ('left', 'right'):
-                    surf_path = os.path.join(
-                        BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}',
-                        'anat', f'sub-{participant}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
-                    )
-                    if not os.path.exists(surf_path) and session_subdirs:
-                        session = session_subdirs[0][4:]
+                    if use_template_surface:
+                        surf_path = surfaces[surf_type][hemi]
+                    else:
                         surf_path = os.path.join(
                             BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}',
-                            f'ses-{session}', 'anat',
-                            f'sub-{participant}_ses-{session}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
+                            'anat', f'sub-{participant}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
                         )
+                        if not os.path.exists(surf_path) and session_subdirs:
+                            session = session_subdirs[0][4:]
+                            surf_path = os.path.join(
+                                BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}',
+                                f'ses-{session}', 'anat',
+                                f'sub-{participant}_ses-{session}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
+                            )
                     if not surf_type in anat:
                         anat[surf_type] = dict()
                     anat[surf_type][hemi] = surf_path
+            surf_type = 'inflated'
+            for hemi in ('left', 'right'):
+                if use_template_surface:
+                    surf_path = surfaces[surf_type][hemi]
+                else:
+                    surf_path = os.path.join(
+                        BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, 'sourcedata',
+                        'freesurfer', f'sub-{participant}', 'surf', f'{hemi[0]}h.inflated'
+                    )
+                if not surf_type in anat:
+                    anat[surf_type] = dict()
+                anat[surf_type][hemi] = surf_path
 
         statmaps = statmap_list
         statmap_paths = []
@@ -629,6 +706,7 @@ def assign_callbacks(app, cache):
                     continue
                 statmap_in = dict(
                     path=statmap_path,
+                    mask=anat.get('mask', None)
                 )
                 statmap_label_default = f'{statmap_file.replace("nii.gz", "").replace("nii", "")}'
                 statmap_label = get_value(statmap, 'text') or statmap_label_default
@@ -700,7 +778,6 @@ def assign_callbacks(app, cache):
                 vmax_ = get_value(statmap, 'vmax') or 0.3
             else:
                 raise ValueError(f'Unknown statmap type: {stat_type}. Must be one of contrast or network.')
-            print(vmin_, vmax_)
             statmap_paths.append(statmap_in)
             statmap_labels.append(statmap_label)
             colors.append(get_value(statmap, 'color') or None)
@@ -723,7 +800,7 @@ def assign_callbacks(app, cache):
             additive_color=additive_color,
             turn_out_hemis=turn_out_hemis
         )
-        for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
+        for surf_type in ('pial', 'white', 'midthickness', 'inflated' ,'sulc'):
             for hemi in ('left', 'right'):
                 if not surf_type in plot_kwargs:
                     plot_kwargs[surf_type] = dict()
@@ -835,6 +912,8 @@ def assign_callbacks(app, cache):
                   Output('white-right', 'value'),
                   Output('midthickness-left', 'value'),
                   Output('midthickness-right', 'value'),
+                  Output('inflated-left', 'value'),
+                  Output('inflated-right', 'value'),
                   Output('sulc-left', 'value'),
                   Output('sulc-right', 'value'),
                   Output('mask', 'value'),
@@ -859,14 +938,16 @@ def assign_callbacks(app, cache):
                   Input('main', 'clickData'),
                   Input('store', 'data'),
                   Input('local-directory', 'value'),
-                  Input('fsaverage', 'n_clicks'),
-                  Input('fsaverage', 'value'),
+                  Input('template-surface', 'n_clicks'),
+                  Input('template-surface', 'value'),
                   Input('pial-left', 'value'),
                   Input('pial-right', 'value'),
                   Input('white-left', 'value'),
                   Input('white-right', 'value'),
                   Input('midthickness-left', 'value'),
                   Input('midthickness-right', 'value'),
+                  Input('inflated-left', 'value'),
+                  Input('inflated-right', 'value'),
                   Input('sulc-left', 'value'),
                   Input('sulc-right', 'value'),
                   Input('mask', 'value'),
@@ -880,14 +961,16 @@ def assign_callbacks(app, cache):
             click_data,
             store,
             local_directory,
-            fsaverage_n_clicks,
-            use_fsaverage,
+            template_surface_n_clicks,
+            use_template_surface,
             pial_left,
             pial_right,
             white_left,
             white_right,
             midthickness_left,
             midthickness_right,
+            inflated_left,
+            inflated_right,
             sulc_left,
             sulc_right,
             mask,
@@ -901,6 +984,7 @@ def assign_callbacks(app, cache):
             pial=dict(left=pial_left, right=pial_right),
             white=dict(left=white_left, right=white_right),
             midthickness=dict(left=midthickness_left, right=midthickness_right),
+            inflated=dict(left=inflated_left, right=inflated_right),
             sulc=dict(left=sulc_left, right=sulc_right)
         )
 
@@ -916,7 +1000,7 @@ def assign_callbacks(app, cache):
                 project = 'local'
         local_directory_files = []
         local_directory_options = []
-        mask = None
+        mask_path = None
         if project == 'local':
             participants = []
             statmap_type_data = [
@@ -946,7 +1030,7 @@ def assign_callbacks(app, cache):
                                 break
             for x in local_directory_files:
                 if x.endswith(DEFAULT_MASK_SUFFIX):
-                    mask = x
+                    mask_path = x
                     break
         else:
             participants = sorted(
@@ -1224,21 +1308,34 @@ def assign_callbacks(app, cache):
             else:
                 statmap.children = children
 
-        print(surfaces)
+        if callback_context.triggered_id == 'local-directory':
+            pial_left = surfaces['pial']['left']
+            pial_right = surfaces['pial']['right']
+            white_left = surfaces['white']['left']
+            white_right = surfaces['white']['right']
+            midthickness_left = surfaces['midthickness']['left']
+            midthickness_right = surfaces['midthickness']['right']
+            inflated_left = surfaces['inflated']['left']
+            inflated_right = surfaces['inflated']['right']
+            sulc_left = surfaces['sulc']['left']
+            sulc_right = surfaces['sulc']['right']
+            mask = mask_path
 
         return  [
             [{'label': p, 'value': p} for p in projects],
             project,
             [{'label': p, 'value': p} for p in participants],
             participant,
-            surfaces['pial']['left'],
-            surfaces['pial']['right'],
-            surfaces['white']['left'],
-            surfaces['white']['right'],
-            surfaces['midthickness']['left'],
-            surfaces['midthickness']['right'],
-            surfaces['sulc']['left'],
-            surfaces['sulc']['right'],
+            pial_left,
+            pial_right,
+            white_left,
+            white_right,
+            midthickness_left,
+            midthickness_right,
+            inflated_left,
+            inflated_right,
+            sulc_left,
+            sulc_right,
             mask,
             local_directory_options,
             local_directory_options,
