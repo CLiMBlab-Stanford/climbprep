@@ -38,7 +38,11 @@ if __name__ == '__main__':
     args = argparser.parse_args()
 
     participant = args.participant.replace('sub-', '')
-    target_sessions = set(args.sessions)
+    target_sessions = args.sessions
+    if target_sessions:
+        target_sessions = set(target_sessions)
+    else:
+        target_sessions = set()
     tmp_dir_ = args.tmp_dir
     config_path = args.config
     if config_path:
@@ -194,6 +198,15 @@ if __name__ == '__main__':
                             os.system('synthstrip-singularity -i %s -o %s' % (filepath, filepath_tmp))
                             shutil.move(filepath_tmp, filepath)
                     else:
+                        if not RUN_RE.match(path):
+                            for filetype in ('_bold', '_sbref'):
+                                for suffix in ('.json', '.nii.gz'):
+                                    suffix_ = filetype + suffix
+                                    if path.endswith(suffix_):
+                                        newpath = path[:-len(suffix_)] + '_run-01' + suffix_
+                                        shutil.move(os.path.join(dir_path, path), os.path.join(dir_path, newpath))
+                                        path = os.path.join(dir_path, newpath)
+                                        break
                         if path.endswith('.json'):
                             filepath = os.path.join(dir_path, path)
                             with open(filepath, 'r') as f:
