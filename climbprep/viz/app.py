@@ -153,7 +153,7 @@ def menu():
                     id='display-surface-dropdown-wrapper'
                 ),
                 dmc.Switch(id='template-surface',
-                           label="Use template surface", checked=False),
+                           label="Use MNI surface", checked=False),
                 html.Div(
                     children=[
                         dmc.TextInput(
@@ -829,8 +829,10 @@ def assign_callbacks(app, cache):
             participant_prev = fig_prev.get('layout', {}).get('meta', {}).get('participant', None)
             display_surface_prev = fig_prev.get('layout', {}).get('meta', {}).get('display_surface', None)
             turn_out_hemis_prev = fig_prev.get('layout', {}).get('meta', {}).get('turn_out_hemis', None)
+            use_template_surface_prev = fig_prev.get('layout', {}).get('meta', {}).get('use_template_surface', None)
             update_meshes = project != project_prev or participant != participant_prev or \
-                            display_surface != display_surface_prev or turn_out_hemis_prev != turn_out_hemis
+                            display_surface != display_surface_prev or turn_out_hemis_prev != turn_out_hemis or \
+                            use_template_surface != use_template_surface_prev
             left = None
             right = None
             if update_meshes:
@@ -894,6 +896,7 @@ def assign_callbacks(app, cache):
             fig_['layout']['meta']['participant'] = participant
             fig_['layout']['meta']['display_surface'] = display_surface
             fig_['layout']['meta']['turn_out_hemis'] = turn_out_hemis
+            fig_['layout']['meta']['use_template_surface'] = use_template_surface
             fig = fig_
 
         if progress_fn is not None:
@@ -939,7 +942,7 @@ def assign_callbacks(app, cache):
                   Input('store', 'data'),
                   Input('local-directory', 'value'),
                   Input('template-surface', 'n_clicks'),
-                  Input('template-surface', 'value'),
+                  Input('template-surface', 'checked'),
                   Input('pial-left', 'value'),
                   Input('pial-right', 'value'),
                   Input('white-left', 'value'),
@@ -987,6 +990,13 @@ def assign_callbacks(app, cache):
             inflated=dict(left=inflated_left, right=inflated_right),
             sulc=dict(left=sulc_left, right=sulc_right)
         )
+
+        if use_template_surface:
+            model_default = 'mni'
+            parcellate_default = 'mni'
+        else:
+            model_default = MODEL_DEFAULT_KEY
+            parcellate_default = PARCELLATE_DEFAULT_KEY
 
         if os.path.exists(BIDS_PATH):
             projects = sorted([x for x in os.listdir(BIDS_PATH) if os.path.isdir(os.path.join(BIDS_PATH, x))])
@@ -1086,7 +1096,8 @@ def assign_callbacks(app, cache):
                     ),
                     dmc.TextInput(
                         id={'type': 'statmap-model-label', 'index': statmap_ix},
-                        placeholder=f'Model label (default: {MODEL_DEFAULT_KEY})',
+                        placeholder=f'Model label (default: {model_default})',
+                        value=model_default,
                         style=dict(width='98%')
                     ),
                 ]
@@ -1099,7 +1110,8 @@ def assign_callbacks(app, cache):
                     ),
                     dmc.TextInput(
                         id={'type': 'statmap-parcellation-label', 'index': statmap_ix},
-                        placeholder=f'Parcellation label (default: {PARCELLATE_DEFAULT_KEY})',
+                        placeholder=f'Parcellation label (default: {parcellate_default})',
+                        value=parcellate_default,
                         style=dict(width='98%')
                     ),
                 ]
@@ -1274,6 +1286,19 @@ def assign_callbacks(app, cache):
                 children_src = statmap.children
             found = False
             for child in children_src:
+                # Update default model/parcellate labels if needed
+                if callback_context.triggered_id == 'template-surface':
+                    if is_dict:
+                        if child['props']['id']['type'] == 'statmap-model-label':
+                            child['props']['value'] = model_default
+                        elif child['props']['id']['type'] == 'statmap-parcellation-label':
+                            child['props']['value'] = parcellate_default
+                    else:
+                        if child.id['type'] == 'statmap-model-label':
+                            child.value = model_default
+                        elif child.id['type'] == 'statmap-parcellation-label':
+                            child.value = parcellate_default
+                # Remove the session selector if needed
                 if is_dict:
                     found_ = 'id' in child['props'] and child['props']['id']['type'] == 'statmap-session-wrapper'
                 else:

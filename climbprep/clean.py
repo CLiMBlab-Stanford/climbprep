@@ -245,6 +245,7 @@ if __name__ == '__main__':
                             mask_nii = image.resample_img(
                                 mask_nii, target_affine=target_affine, interpolation='linear'
                             )
+                        mask_nii = image.crop_img(mask_nii)
                         mask_nii = image.math_img('x > 0.', x=mask_nii)
 
                         func = load_img(func_path)
