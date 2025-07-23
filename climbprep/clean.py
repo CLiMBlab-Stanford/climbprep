@@ -49,6 +49,7 @@ if __name__ == '__main__':
                                             'Please provide a valid config file or keyword.'
     preprocessing_label = config['preprocessing_label']
     clean_surf = config['clean_surf']
+    min_T = config['min_T']
     mask_suffix = config.get('mask_suffix', DEFAULT_MASK_SUFFIX)
     mask_fwhm = config.get('mask_fwhm', DEFAULT_MASK_FWHM)
     target_affine = config.get('target_affine', DEFAULT_TARGET_AFFINE)
@@ -235,11 +236,6 @@ if __name__ == '__main__':
                             convolved.append(convolved_)
                     confounds = pd.concat(convolved + [confounds], axis=1)
 
-                    confounds_outpath = os.path.join(
-                        out_dir, func_file.replace('desc-preproc_bold.nii.gz', 'desc-confounds_timeseries.tsv')
-                    )
-                    confounds.to_csv(confounds_outpath, sep='\t', index=False)
-
                     if type_by_space[space] == 'vol':  # Volumetric data
                         mask_nii = load_img(mask)
                         mask_nii = image.new_img_like(mask_nii, image.get_data(mask_nii).astype(np.float32))
@@ -252,6 +248,8 @@ if __name__ == '__main__':
                         mask_nii = image.math_img('x > 0.', x=mask_nii)
 
                         func = load_img(func_path)
+                        if not len(func.shape) > 3 or func.shape[3] < min_T:
+                            continue
                         func = image.resample_to_img(func, mask_nii)
 
                         masker = maskers.NiftiMasker(
@@ -271,6 +269,9 @@ if __name__ == '__main__':
                             out_dir, func_file.replace('desc-preproc', desc)
                         )
                         run.to_filename(run_path)
+                        confounds_outpath = os.path.join(
+                            out_dir, func_file.replace('desc-preproc_bold.nii.gz', 'desc-confounds_timeseries.tsv')
+                        )
                     elif clean_surf and type_by_space[space] == 'surf':  # Surface data
                         mask_nii = None
                         if space == 'fsnative':
@@ -278,8 +279,12 @@ if __name__ == '__main__':
                         else:
                             space_str = '_space-%s' % space
                         surf_L_path = os.path.join(
-                            preprocess_path, 'anat', f'sub-{participant}{ses_str}{space_str}_hemi-L_pial.surf.gii'
+                            anat_path, f'sub-{participant}{space_str}_hemi-L_pial.surf.gii'
                         )
+                        if not os.path.exists(surf_L_path):
+                            surf_L_path = os.path.join(
+                                anat_path, f'sub-{participant}{ses_str}{space_str}_hemi-L_pial.surf.gii'
+                            )
                         surf_R_path = surf_L_path.replace('_hemi-L_', '_hemi-R_')
 
                         masker = maskers.SurfaceMasker(
@@ -295,6 +300,8 @@ if __name__ == '__main__':
                         desc = 'desc-clean'
                         mesh = surface.PolyMesh(left=surf_L_path, right=surf_R_path)
                         data = surface.PolyData(left=func_path, right=func_path.replace('_hemi-L_', '_hemi-R_'))
+                        if not len(data.shape) > 1 or data.shape[1] < min_T:
+                            continue
                         img = surface.SurfaceImage(mesh, data)
 
                         run = masker.fit_transform(img, **kwargs)
@@ -309,7 +316,12 @@ if __name__ == '__main__':
                                 out_dir, img_path_hemi.replace('_bold.func.gii', '_%s_bold.func.gii' % desc)
                             )
                             run.data.to_filename(run_path)
+                        confounds_outpath = os.path.join(
+                            out_dir, func_file.replace('_hemi-L', '').replace('_bold.func.gii', '_desc-confounds_timeseries.tsv')
+                        )
                     else:
                         raise ValueError('Unknown space: %s' % space)
+
+                    confounds.to_csv(confounds_outpath, sep='\t', index=False)
 
                     gc.collect()

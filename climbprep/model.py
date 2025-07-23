@@ -165,7 +165,7 @@ if __name__ == '__main__':
         cmd = " ".join(args)
         cmd = f'''singularity run {FITLINS_IMG} {cmd}'''
 
-        print(cmd)
+        stderr(cmd + '\n')
         status = os.system(cmd)
         if status:
             stderr('Command failed with status %d. Exiting.\n' % status)

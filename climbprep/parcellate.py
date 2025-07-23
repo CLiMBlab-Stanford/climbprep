@@ -97,6 +97,8 @@ if __name__ == '__main__':
             for path in os.listdir(anat_path):
                 if space in path and path.endswith(mask_suffix):
                     mask_path = os.path.join(anat_path, path)
+                elif '_space-' not in path and path.endswith(mask_suffix): 
+                    mask_path = os.path.join(anat_path, path)
                 elif path.endswith('_mode-image_xfm.h5'):
                     t = TO_RE.match(path)
                     f = FROM_RE.match(path)
@@ -105,7 +107,6 @@ if __name__ == '__main__':
                         f = f.group(1)
                         if t == space and 'mni' in f.lower():
                             xfm_path = os.path.join(anat_path, path)
-                            break
             assert mask_path, f'Non-MNI space used but no matching mask (*{mask_suffix}) found in {anat_path}.'
             assert xfm_path, f'Non-MNI space used but no matching transform (*_xfm.h5) found in {anat_path}.'
 
@@ -160,7 +161,7 @@ if __name__ == '__main__':
         else:
             sessions = set(nodes[node].keys())
         for session in sessions:
-            if session:
+            if node == 'session':
                 session_dir = os.path.join(participant_dir, f'ses-{session}')
                 config_ = nodes[node][session]
             else:
@@ -169,6 +170,7 @@ if __name__ == '__main__':
             if not os.path.exists(session_dir):
                 os.makedirs(session_dir)
             config_['output_dir'] = session_dir
+
             config_path = os.path.join(session_dir, 'config.yml')
             with open(config_path, 'w') as f:
                 yaml.dump(config_, f)
@@ -176,7 +178,7 @@ if __name__ == '__main__':
 
     for cliarg in cliargs:
         cmd = f'python -m parcellate.bin.train {cliarg}'
-        print(cmd)
+        stderr(cmd + '\n')
         status = os.system(cmd)
         if status:
             stderr('Error during parcellation. Exiting.\n')
