@@ -25,6 +25,7 @@ if __name__ == '__main__':
                                          'or the table is missing altogether, the taskname '
                                          'will be `UnknownTask`.'))
     argparser.add_argument('participant', help="BIDS participant ID.")
+    argparser.add_argument('-s', '--sessions', nargs='+', help="BIDS session ID(s).")
     argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", '
                                                                         '"evlab", etc.). Default: "climblab"'))
     argparser.add_argument('-t', '--tmp-dir', default=None, help=('Temporary directory to use for dcm2bids. '
@@ -37,6 +38,7 @@ if __name__ == '__main__':
     args = argparser.parse_args()
 
     participant = args.participant.replace('sub-', '')
+    target_sessions = set(args.sessions)
     tmp_dir_ = args.tmp_dir
     config_path = args.config
     if config_path:
@@ -60,6 +62,8 @@ if __name__ == '__main__':
     if not sessions:
         sessions = {None}
     for session in sessions:
+        if target_sessions and not session in target_sessions:
+            continue
         subdir = 'sub-%s' % participant
         if session:
             subdir = os.path.join(subdir, 'ses-%s' % session)

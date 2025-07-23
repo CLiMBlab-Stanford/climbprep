@@ -22,7 +22,7 @@ MODEL_DEFAULT_KEY = 'T1w'
 PLOT_DEFAULT_KEY = MODEL_DEFAULT_KEY
 PARCELLATE_DEFAULT_KEY = 'T1w'
 DEFAULT_MASK_SUFFIX = '_label-GM_probseg.nii.gz'
-DEFAULT_MASK_FWHM = 1
+DEFAULT_MASK_FWHM = 2
 DEFAULT_TARGET_AFFINE = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
 
 # Regex
@@ -37,16 +37,16 @@ TO_RE = re.compile('.+_to-([a-zA-Z0-9]+)_')
 
 # Modeling
 MODEL_CONFOUNDS = [
-    "global_signal*",
-    "csf*",
-    "white_matter*",
-    "rot_x*",
-    "rot_y*",
-    "rot_z*",
-    "trans_x*",
-    "trans_y*",
-    "trans_z*",
-    "motion_outlier*",
+    "framewise_displacement",
+    "rot_?",
+    "trans_?",
+    "a_comp_cor_00",
+    "a_comp_cor_01",
+    "a_comp_cor_02",
+    "a_comp_cor_03",
+    "a_comp_cor_04",
+    "cosine*",
+    "*_outlier*"
     1
 ]
 MODEL_TEMPLATE = {
@@ -172,6 +172,7 @@ CONFIG = dict(
             fs_license_file=FS_LICENSE_PATH,
             output_space=['MNI152NLin2009cAsym', 'T1w', 'fsnative'],
             skull_strip_t1w='skip',
+            dvars_spike_threshold=3,
             cifti_output='91k',
             submm_recon=False
         )
@@ -181,28 +182,30 @@ CONFIG = dict(
             clean_surf=True,
             preprocessing_label=PREPROCESS_DEFAULT_KEY,
             mask_suffix=DEFAULT_MASK_SUFFIX,
-            # Matches all global_signal, white, trans, rot, and motion_outlier confounds, excluding redundant csf_wm
-            confounds_regex=f'^(?!csf_wm)(global_signal|csf|white|trans|rot|motion_outlier).*',
+            # Matches 7 core motion regressors, acompcor + discrete cosine, and motion outliers 
+            confounds_regex=f'^(framewise_displacement|trans_[xyz]|rot_[xyz]|a_comp_cor_0[0-4]|cosine.*|.*_outlier.*)$',
             smoothing_fwhm=4,
             standardize=True,
             detrend=True,
             regress_out_task=True,
             low_pass=0.1,
             high_pass=0.01,
+            min_T=50,
             n_jobs=-1
         ),
         firstlevels_like=dict(
             clean_surf=True,
             preprocessing_label=PREPROCESS_DEFAULT_KEY,
             mask_suffix=DEFAULT_MASK_SUFFIX,
-            # Matches all global_signal, white, trans, rot, and motion_outlier confounds, excluding redundant csf_wm
-            confounds_regex=f'^(?!csf_wm)(global_signal|csf|white|trans|rot|motion_outlier).*',
+            # Matches 7 core motion regressors, acompcor + discrete cosine, and motion outliers 
+            confounds_regex=f'^(framewise_displacement|trans_[xyz]|rot_[xyz]|a_comp_cor_0[0-4]|cosine.*|.*_outlier.*)$',
             smoothing_fwhm=4,
             standardize=False,
             detrend=True,
             regress_out_task=False,
             low_pass=None,
             high_pass=0.01,
+            min_T=50,
             n_jobs=-1
         )
     ),
@@ -237,18 +240,17 @@ CONFIG = dict(
             sample=dict(
                 main=dict(
                     n_networks=100,
-                    n_samples=1000,
+                    n_samples=0,
+                    n_components_pca=None,
+                    n_components_ica='auto',
+                    use_connectivity_profile=False,
+                    standardize=False,
+                    detrend=False,
                     low_pass=None,
                     high_pass=None,
                     fwhm=None
                 )
             ),
-            align=dict(
-                main=dict(
-                    prealign=True,
-                    minmax_normalize=False
-                )
-            )
         )
     )
 )
