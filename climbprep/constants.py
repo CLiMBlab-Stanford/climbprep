@@ -46,7 +46,7 @@ MODEL_CONFOUNDS = [
     "a_comp_cor_03",
     "a_comp_cor_04",
     "cosine*",
-    "*_outlier*"
+    "*_outlier*",
     1
 ]
 MODEL_TEMPLATE = {
