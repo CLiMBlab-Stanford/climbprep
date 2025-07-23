@@ -12,6 +12,7 @@ from climbprep.constants import *
 
 CACHE_PATH = os.path.join(os.getcwd(), '.cache', 'viz')
 CACHE_SIZE = 1024 * 1024 * 1024 * 16  # 16GB
+OPTION_HEIGHT = 50
 
 
 class Progress:
@@ -145,6 +146,8 @@ def menu():
                     ],
                     id='display-surface-dropdown-wrapper'
                 ),
+                dmc.Switch(id='fsaverage',
+                           label="Use fsaverage", checked=False),
                 html.Div(
                     children=[
                         dmc.TextInput(
@@ -154,8 +157,6 @@ def menu():
                             label='Local directory',
                             required=True
                         ),
-                        dmc.Switch(id='fsaverage',
-                                   label="Use fsaverage", checked=False),
                         dmc.Flex(
                             [
                                 html.Div(
@@ -165,6 +166,7 @@ def menu():
                                             [],
                                             'None',
                                             id='pial-left',
+                                            optionHeight=OPTION_HEIGHT,
                                             clearable=True
                                         )
                                     ],
@@ -177,6 +179,7 @@ def menu():
                                             [],
                                             'None',
                                             id='pial-right',
+                                            optionHeight=OPTION_HEIGHT,
                                             clearable=True
                                         )
                                     ],
@@ -193,6 +196,7 @@ def menu():
                                             [],
                                             'None',
                                             id='white-left',
+                                            optionHeight=OPTION_HEIGHT,
                                             clearable=True
                                         )
                                     ],
@@ -205,6 +209,7 @@ def menu():
                                             [],
                                             'None',
                                             id='white-right',
+                                            optionHeight=OPTION_HEIGHT,
                                             clearable=True
                                         )
                                     ],
@@ -221,6 +226,7 @@ def menu():
                                             [],
                                             'None',
                                             id='midthickness-left',
+                                            optionHeight=OPTION_HEIGHT,
                                             clearable=True
                                         )
                                     ],
@@ -233,6 +239,7 @@ def menu():
                                             [],
                                             'None',
                                             id='midthickness-right',
+                                            optionHeight=OPTION_HEIGHT,
                                             clearable=True
                                         )
                                     ],
@@ -249,6 +256,7 @@ def menu():
                                             [],
                                             'None',
                                             id='sulc-left',
+                                            optionHeight=OPTION_HEIGHT,
                                             clearable=True
                                         )
                                     ],
@@ -261,6 +269,7 @@ def menu():
                                             [],
                                             'None',
                                             id='sulc-right',
+                                            optionHeight=OPTION_HEIGHT,
                                             clearable=True
                                         )
                                     ],
@@ -610,7 +619,7 @@ def assign_callbacks(app, cache):
                 statmap_label_default = f'p({network})' if not session else f'p({network}), {session}'
                 statmap_label = get_value(statmap, 'text') or statmap_label_default
                 vmin_ = get_value(statmap, 'vmin') or 0
-                vmax_ = get_value(statmap, 'vmax') or 0.5
+                vmax_ = get_value(statmap, 'vmax') or 1
             elif stat_type == 'file':
                 statmap_file = get_value(statmap, 'local_file') or None
                 if not statmap_file:
@@ -623,8 +632,8 @@ def assign_callbacks(app, cache):
                 )
                 statmap_label_default = f'{statmap_file.replace("nii.gz", "").replace("nii", "")}'
                 statmap_label = get_value(statmap, 'text') or statmap_label_default
-                vmin_ = get_value(statmap, 'vmin') or None
-                vmax_ = get_value(statmap, 'vmax') or None
+                vmin_ = get_value(statmap, 'vmin')
+                vmax_ = get_value(statmap, 'vmax')
             elif stat_type == 'connectivity':
                 seed = (
                     get_value(statmap, 'seed_x'),
@@ -691,6 +700,7 @@ def assign_callbacks(app, cache):
                 vmax_ = get_value(statmap, 'vmax') or 0.3
             else:
                 raise ValueError(f'Unknown statmap type: {stat_type}. Must be one of contrast or network.')
+            print(vmin_, vmax_)
             statmap_paths.append(statmap_in)
             statmap_labels.append(statmap_label)
             colors.append(get_value(statmap, 'color') or None)
@@ -884,7 +894,6 @@ def assign_callbacks(app, cache):
             statmap_type,
             statmap_list
     ):
-        print('Updating menu')
         if store is None:
             store = {}
 
@@ -959,12 +968,6 @@ def assign_callbacks(app, cache):
                              if x.startswith('ses-')]
             )
 
-        if use_fsaverage:
-            print('using fsaverage surfaces')
-            for surf_type in surfaces:
-                for hemi in surfaces[surf_type]:
-                    surfaces[surf_type][hemi] = None
-
         statmap_list_ = []
         for statmap in statmap_list:
             deleted = False
@@ -1023,6 +1026,7 @@ def assign_callbacks(app, cache):
                         options=local_directory_options,
                         value=None,
                         clearable=False,
+                        optionHeight=OPTION_HEIGHT,
                         style=dict(width='98%')
                     )
                 ]
@@ -1087,6 +1091,7 @@ def assign_callbacks(app, cache):
                                 clearable=False,
                                 multi=True,
                                 closeOnSelect=False,
+                                optionHeight=OPTION_HEIGHT,
                                 style=dict(width='98%')
                             )
                         ],

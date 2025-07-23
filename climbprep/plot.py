@@ -878,7 +878,16 @@ class PlotLib:
 
         if progress_fn is not None:
             progress_fn(f'Projecting statmap to {hemi} surface', 0)
-        nii_ref = None if mask else functional_paths[0]
+        if mask:
+            nii_ref = None
+        elif path:
+            nii_ref = path
+        else:
+            assert functional_paths is not None and len(functional_paths) > 0, \
+                'If `mask` is not provided, `path` or `functional_paths` must be provided to get the reference NIfTI.'
+            assert len(functional_paths), \
+                'If `mask` is not provided, `functional_paths` must be a list of at least one functional path.'
+            nii_ref = functional_paths[0]
         statmap = surface.vol_to_surf(
             statmap_nii,
             pial.parts[hemi],

@@ -244,11 +244,29 @@ CONFIG = dict(
                     n_components_pca=None,
                     n_components_ica='auto',
                     use_connectivity_profile=False,
-                    standardize=False,
-                    detrend=False,
-                    low_pass=None,
-                    high_pass=None,
-                    fwhm=None
+                    standardize=False,               # This is already done in the cleaning step
+                    detrend=False,                   # This is already done in the cleaning step
+                    low_pass=None,                   # This is already done in the cleaning step
+                    high_pass=None,                  # This is already done in the cleaning step
+                    fwhm=None                        # This is already done in the cleaning step
+                )
+            ),
+        ),
+        mni=dict(
+            cleaning_label=CLEAN_DEFAULT_KEY,
+            space='MNI152NLin2009cAsym',
+            sample=dict(
+                main=dict(
+                    n_networks=100,
+                    n_samples=0,
+                    n_components_pca=None,
+                    n_components_ica='auto',
+                    use_connectivity_profile=False,
+                    standardize=False,               # This is already done in the cleaning step
+                    detrend=False,                   # This is already done in the cleaning step
+                    low_pass=None,                   # This is already done in the cleaning step
+                    high_pass=None,                  # This is already done in the cleaning step
+                    fwhm=None                        # This is already done in the cleaning step
                 )
             ),
         )
