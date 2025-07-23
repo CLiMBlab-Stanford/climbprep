@@ -13,7 +13,7 @@ from plotly import graph_objects as go
 from tempfile import TemporaryDirectory
 from PIL import Image
 import pyvista
-from nilearn import image, surface, plotting, datasets, maskers
+from nilearn import image, surface, plotting, datasets, masking, maskers
 import diskcache
 import argparse
 
@@ -24,14 +24,14 @@ from climbprep.util import *
 class PlotLib:
 
     CACHABLE = {
-        # 'get_statmap_surface_and_color',
+        'get_statmap_surface_and_color',
         'get_surface_mesh_hemi',
         'infer_midthickness_mesh_hemi',
         'get_surface_data',
         'get_plot_bgcolors',
         'get_mask',
         'get_functional',
-        # 'get_connectivity_from_seed',
+        'get_connectivity_from_seed',
         'make_sphere'
     }
 
@@ -680,7 +680,6 @@ class PlotLib:
                                      'a tuple of paths to timecourses.'
             assert seed and len(seed) == 3, 'If `path` is not provided, `seed` must be a tuple of (x, y, z) ' \
                                             'coordinates.'
-            assert mask, 'If `path` is not provided, `mask` must be a path to a NIFTI image mask.'
             x, y, z = seed
             statmap = self.get_connectivity_from_seed(
                 x=x, y=y, z=z,
@@ -714,14 +713,14 @@ class PlotLib:
                 sessions = {None}
         functional_paths = []
         for session in sessions:
-            cleaned_dir = os.path.join(
-                BIDS_PATH, project, 'derivatives', 'cleaned', cleaning_label, f'sub-{participant}'
+            clean_dir = os.path.join(
+                BIDS_PATH, project, 'derivatives', 'clean', cleaning_label, f'sub-{participant}'
             )
             if session:
-                cleaned_dir = os.path.join(cleaned_dir, f'ses-{session}')
-            if os.path.exists(cleaned_dir):
-                for x in os.listdir(cleaned_dir):
-                    path_ = os.path.join(cleaned_dir, x)
+                clean_dir = os.path.join(clean_dir, f'ses-{session}')
+            if os.path.exists(clean_dir):
+                for x in os.listdir(clean_dir):
+                    path_ = os.path.join(clean_dir, x)
                     if not x.endswith(f'_space-{space}_desc-clean_bold.nii.gz'):
                         continue
                     if regex_filter is not None and not regex_filter.search(x):
@@ -746,7 +745,7 @@ class PlotLib:
 
         if progress_fn:
             progress_fn('Getting mask', 0)
-        mask = self.get_mask(mask_path)
+        mask = self.get_mask(mask_path, nii_ref=functional_paths[0])
         functionals_ = []
         incr = 0
         if progress_fn:
@@ -777,8 +776,13 @@ class PlotLib:
         return functionals_, mask
 
     # Cachable
-    def get_mask(self, mask_path, target_affine=DEFAULT_TARGET_AFFINE, mask_fwhm=DEFAULT_MASK_FWHM):
-        mask = self.load_nii(mask_path)
+    def get_mask(self, mask_path, target_affine=DEFAULT_TARGET_AFFINE, mask_fwhm=DEFAULT_MASK_FWHM, nii_ref=None):
+        if mask_path is None:
+            assert nii_ref is not None, \
+                'If `mask_path` is None, `nii_ref` must be provided to compute the mask.'
+            mask = masking.compute_brain_mask(nii_ref, connected=False, opening=False, mask_type='gm')
+        else:
+            mask = self.load_nii(mask_path)
         mask = image.new_img_like(mask, image.get_data(mask).astype(np.float32))
         if mask_fwhm:
             mask = image.smooth_img(mask, fwhm=mask_fwhm)
@@ -792,7 +796,7 @@ class PlotLib:
     def get_functional(self, path, mask_path, target_affine=DEFAULT_TARGET_AFFINE):
         t0 = time.time()
         functional = self.load_nii(path)
-        mask = self.get_mask(mask_path, target_affine=target_affine)
+        mask = self.get_mask(mask_path, target_affine=target_affine, nii_ref=path)
         t1 = time.time()
         print(f'    Loading data {path} took {t1 - t0:.2f} seconds.')
         t0 = time.time()
@@ -874,11 +878,11 @@ class PlotLib:
 
         if progress_fn is not None:
             progress_fn(f'Projecting statmap to {hemi} surface', 0)
+        nii_ref = None if mask else functional_paths[0]
         statmap = surface.vol_to_surf(
             statmap_nii,
             pial.parts[hemi],
-            # mask_img=None if mask is None else self.get_mask(mask),
-            mask_img=None if mask is None else self.get_mask(mask),
+            mask_img=self.get_mask(mask, nii_ref=nii_ref),
             inner_mesh=white.parts[hemi],
             depth=np.linspace(0.0, 1.0, 10)
         ).astype(np.float32)
@@ -1101,7 +1105,7 @@ class PlotLibMemoized(PlotLib):
 
 
 if __name__ == '__main__':
-    argparser = argparse.ArgumentParser('Plot firstlevels for a participant')
+    argparser = argparse.ArgumentParser('Plot firstlevel contrasts for a participant')
     argparser.add_argument('participant', help='BIDS participant ID')
     argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", '
                                                                         '"evlab", etc.). Default: "climblab"'))

@@ -1,4 +1,4 @@
-from uuid import uuid4
+from nilearn import datasets
 from plotly import graph_objects as go
 from dash_iconify import DashIconify
 import dash_mantine_components as dmc
@@ -154,6 +154,8 @@ def menu():
                             label='Local directory',
                             required=True
                         ),
+                        dmc.Switch(id='fsaverage',
+                                   label="Use fsaverage", checked=False),
                         dmc.Flex(
                             [
                                 html.Div(
@@ -163,7 +165,7 @@ def menu():
                                             [],
                                             'None',
                                             id='pial-left',
-                                            clearable=False
+                                            clearable=True
                                         )
                                     ],
                                     style={'width': '49%'}
@@ -175,7 +177,7 @@ def menu():
                                             [],
                                             'None',
                                             id='pial-right',
-                                            clearable=False
+                                            clearable=True
                                         )
                                     ],
                                     style={'width': '49%'}
@@ -191,7 +193,7 @@ def menu():
                                             [],
                                             'None',
                                             id='white-left',
-                                            clearable=False
+                                            clearable=True
                                         )
                                     ],
                                     style={'width': '49%'}
@@ -203,7 +205,7 @@ def menu():
                                             [],
                                             'None',
                                             id='white-right',
-                                            clearable=False
+                                            clearable=True
                                         )
                                     ],
                                     style={'width': '49%'}
@@ -382,6 +384,7 @@ def assign_callbacks(app, cache):
         State('turn-out-hemis', 'checked'),
         State('local-directory', 'value'),
         State('mask', 'value'),
+        State('fsaverage', 'checked'),
         State('pial-left', 'value'),
         State('pial-right', 'value'),
         State('white-left', 'value'),
@@ -447,6 +450,7 @@ def assign_callbacks(app, cache):
             turn_out_hemis,
             local_directory,
             local_mask,
+            use_fsaverage,
             pial_left,
             pial_right,
             white_left,
@@ -462,22 +466,33 @@ def assign_callbacks(app, cache):
             progress_fn = Progress(progress_fn)
             progress_fn('Initializing...', 0)
 
-        surfaces = dict(
-            pial=dict(left=pial_left, right=pial_right),
-            white=dict(left=white_left, right=white_right),
-            midthickness=dict(left=midthickness_left, right=midthickness_right),
-            sulc=dict(left=sulc_left, right=sulc_right)
-        )
+        print('use_fsaverage:', use_fsaverage)
+
+        if use_fsaverage:
+            fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage')
+            surfaces = dict(
+                pial=dict(left=fsaverage['pial_left'], right=fsaverage['pial_right']),
+                white=dict(left=fsaverage['white_left'], right=fsaverage['white_right']),
+                midthickness=dict(left='infer', right='infer'),
+                sulc=dict(left=fsaverage['sulc_left'], right=fsaverage['sulc_right'])
+            )
+        else:
+            surfaces = dict(
+                pial=dict(left=pial_left, right=pial_right),
+                white=dict(left=white_left, right=white_right),
+                midthickness=dict(left=midthickness_left, right=midthickness_right),
+                sulc=dict(left=sulc_left, right=sulc_right)
+            )
 
         if project == 'local':
             anat = {'mask': None}
             for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
                 for hemi in ('left', 'right'):
                     surf_path = surfaces[surf_type][hemi]
-                    if local_directory is not None and surf_path is not None:
+                    if local_directory is not None and (surf_path is not None and surf_path != 'infer'):
                         surf_path = os.path.join(local_directory, surf_path)
-                    assert os.path.exists(surf_path), f'Surface {surf_type} for {hemi} hemisphere does not exist: ' \
-                                                      f'{surf_path}'
+                        assert os.path.exists(surf_path), f'Surface {surf_type} for {hemi} hemisphere does not ' \
+                                                          f'exist: {surf_path}'
                     if surf_type not in anat:
                         anat[surf_type] = {}
                     anat[surf_type][hemi] = surf_path
@@ -563,7 +578,7 @@ def assign_callbacks(app, cache):
                 if task is None or contrast is None:
                     continue
                 statmap_path = os.path.join(
-                    BIDS_PATH, project, 'derivatives', 'firstlevels', model_label, task, f'node-{node}', subdir,
+                    BIDS_PATH, project, 'derivatives', 'model', model_label, task, f'node-{node}', subdir,
                     f'sub-{participant}{session_str}_contrast-{contrast}_stat-t_statmap.nii.gz'
                 )
                 if not os.path.exists(statmap_path):
@@ -834,6 +849,8 @@ def assign_callbacks(app, cache):
                   Input('main', 'clickData'),
                   Input('store', 'data'),
                   Input('local-directory', 'value'),
+                  Input('fsaverage', 'n_clicks'),
+                  Input('fsaverage', 'value'),
                   Input('pial-left', 'value'),
                   Input('pial-right', 'value'),
                   Input('white-left', 'value'),
@@ -853,6 +870,8 @@ def assign_callbacks(app, cache):
             click_data,
             store,
             local_directory,
+            fsaverage_n_clicks,
+            use_fsaverage,
             pial_left,
             pial_right,
             white_left,
@@ -939,6 +958,12 @@ def assign_callbacks(app, cache):
                 [x[4:] for x in os.listdir(os.path.join(BIDS_PATH, project, f'sub-{participant}'))
                              if x.startswith('ses-')]
             )
+
+        if use_fsaverage:
+            print('using fsaverage surfaces')
+            for surf_type in surfaces:
+                for hemi in surfaces[surf_type]:
+                    surfaces[surf_type][hemi] = None
 
         statmap_list_ = []
         for statmap in statmap_list:
@@ -1193,6 +1218,8 @@ def assign_callbacks(app, cache):
                 statmap['props']['children'] = children
             else:
                 statmap.children = children
+
+        print(surfaces)
 
         return  [
             [{'label': p, 'value': p} for p in projects],
