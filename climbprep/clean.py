@@ -245,8 +245,8 @@ if __name__ == '__main__':
                             mask_nii = image.resample_img(
                                 mask_nii, target_affine=target_affine, interpolation='linear'
                             )
-                        mask_nii = image.crop_img(mask_nii)
                         mask_nii = image.math_img('x > 0.', x=mask_nii)
+                        mask_nii = image.crop_img(mask_nii)
 
                         func = load_img(func_path)
                         if not len(func.shape) > 3 or func.shape[3] < min_T:
@@ -266,6 +266,7 @@ if __name__ == '__main__':
                         desc = 'desc-clean'
                         run = masker.fit_transform(func_path, **kwargs)
                         run = masker.inverse_transform(run)
+                        #run = image.crop_img(run)
                         run_path = os.path.join(
                             out_dir, func_file.replace('desc-preproc', desc)
                         )

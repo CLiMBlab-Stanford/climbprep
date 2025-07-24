@@ -37,7 +37,7 @@ if __name__ == '__main__':
     Generate SLURM batch jobs to run climbprep jobs
     ''')
     argparser.add_argument('participants', nargs='*', help='ID(s) of participant(s).')
-    argparser.add_argument('-p', '--project', default='climblab', help='BIDS project name (default `climblab`)')
+    argparser.add_argument('-p', '--projects', nargs='+', default=['climblab'], help='BIDS project name (default `climblab`)')
     argparser.add_argument('-j', '--job-types', nargs='+', default=JOB_TYPES, help=('Type(s) of job to run. One or '
         'more of ``["bidsify", "preprocess", "clean", "model", "plot", "parcellate"]``'))
     argparser.add_argument('-t', '--time', type=int, default=72, help='Maximum number of hours to train models')
@@ -62,16 +62,7 @@ if __name__ == '__main__':
                                                                       'specified, the default config will be used.'))
     args = argparser.parse_args()
 
-    participants = args.participants
-    project = args.project
-    sourcedata_path = os.path.join(BIDS_PATH, project, 'sourcedata')
-    if not participants:
-        participants = set([x for x in os.listdir(os.path.join(BIDS_PATH, project)) if x.startswith('sub-')])
-    else:
-        participants = set(participants)
-    if os.path.exists(sourcedata_path):
-        participants |= set([x for x in os.listdir(sourcedata_path) if x.startswith('sub-')])
-    participants = [x.replace('sub-', '') for x in participants]
+    projects = args.projects
     job_types = args.job_types
     time = args.time
     n_cores = args.n_cores
@@ -111,41 +102,51 @@ if __name__ == '__main__':
     if not os.path.exists(outdir):
         os.makedirs(outdir)
    
-    for participant in participants:
-        job_name = '_'.join([project, participant, '-'.join(job_types)])
-        filename = os.path.normpath(os.path.join(outdir, job_name + '.pbs'))
-        with open(filename, 'w') as f:
-            f.write(base % (job_name, job_name, time, memory, n_cores))
-            if partition:
-                f.write('#SBATCH --partition=%s\n' % partition)
-            if account:
-                f.write('#SBATCH --account=%s\n' % account)
-            if exclude:
-                f.write('#SBATCH --exclude=%s\n' % exclude)
-            f.write('\n\nset -e\n\n')
-            wrapper = '%s'
-            for job_type in JOB_ORDER:
-                if job_type not in job_types:
-                    continue
-                if job_type.lower() == 'bidsify':
-                    job_str = wrapper % ('python -m climbprep.bidsify %s -p %s%s\n' %
-                                         (participant, project, bidsify_config_str))
-                elif job_type.lower() == 'preprocess':
-                    job_str = wrapper % ('python -m climbprep.preprocess %s -p %s%s\n' %
-                                         (participant, project, preprocess_config_str))
-                elif job_type.lower() == 'clean':
-                    job_str = wrapper % ('python -m climbprep.clean %s -p %s%s\n' %
-                                         (participant, project, clean_config_str))
-                elif job_type.lower() == 'model':
-                    job_str = wrapper % ('python -m climbprep.model %s -p %s%s\n' %
-                                         (participant, project, model_config_str))
-                elif job_type.lower() == 'plot':
-                    job_str = wrapper % ('python -m climbprep.plot %s -p %s%s\n' %
-                                         (participant, project, plot_config_str))
-                elif job_type.lower() == 'parcellate':
-                    job_str = wrapper % ('python -m climbprep.parcellate %s -p %s%s\n' %
-                                         (participant, project, parcellate_config_str))
-                else:
-                    raise ValueError('Unrecognized job type: %s.' % job_type)
-                f.write(job_str)
-
+    for project in projects:
+        sourcedata_path = os.path.join(BIDS_PATH, project, 'sourcedata')
+        participants = args.participants
+        if not participants:
+            participants = set([x for x in os.listdir(os.path.join(BIDS_PATH, project)) if x.startswith('sub-')])
+            if os.path.exists(sourcedata_path):
+                participants |= set([x for x in os.listdir(sourcedata_path) if x.startswith('sub-')])
+        else:
+            participants = set(participants)
+        participants = [x.replace('sub-', '') for x in participants]
+        for participant in participants:
+            job_name = '_'.join([project, participant, '-'.join(job_types)])
+            filename = os.path.normpath(os.path.join(outdir, job_name + '.pbs'))
+            with open(filename, 'w') as f:
+                f.write(base % (job_name, job_name, time, memory, n_cores))
+                if partition:
+                    f.write('#SBATCH --partition=%s\n' % partition)
+                if account:
+                    f.write('#SBATCH --account=%s\n' % account)
+                if exclude:
+                    f.write('#SBATCH --exclude=%s\n' % exclude)
+                f.write('\n\nset -e\n\n')
+                wrapper = '%s'
+                for job_type in JOB_ORDER:
+                    if job_type not in job_types:
+                        continue
+                    if job_type.lower() == 'bidsify':
+                        job_str = wrapper % ('python -m climbprep.bidsify %s -p %s%s\n' %
+                                             (participant, project, bidsify_config_str))
+                    elif job_type.lower() == 'preprocess':
+                        job_str = wrapper % ('python -m climbprep.preprocess %s -p %s%s\n' %
+                                             (participant, project, preprocess_config_str))
+                    elif job_type.lower() == 'clean':
+                        job_str = wrapper % ('python -m climbprep.clean %s -p %s%s\n' %
+                                             (participant, project, clean_config_str))
+                    elif job_type.lower() == 'model':
+                        job_str = wrapper % ('python -m climbprep.model %s -p %s%s\n' %
+                                             (participant, project, model_config_str))
+                    elif job_type.lower() == 'plot':
+                        job_str = wrapper % ('python -m climbprep.plot %s -p %s%s\n' %
+                                             (participant, project, plot_config_str))
+                    elif job_type.lower() == 'parcellate':
+                        job_str = wrapper % ('python -m climbprep.parcellate %s -p %s%s\n' %
+                                             (participant, project, parcellate_config_str))
+                    else:
+                        raise ValueError('Unrecognized job type: %s.' % job_type)
+                    f.write(job_str)
+    
