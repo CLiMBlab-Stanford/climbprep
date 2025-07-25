@@ -926,15 +926,6 @@ class PlotLib:
         assert pial is not None, 'Pial mesh must be provided.'
         assert white is not None, 'White mesh must be provided.'
 
-        _, _, midthickness, _, _ = self.get_surface_meshes(
-            pial_left=pial['left'],
-            pial_right=pial['right'],
-            white_left=white['left'],
-            white_right=white['right'],
-            midthickness_left=midthickness['left'] if midthickness else 'infer',
-            midthickness_right=midthickness['right'] if midthickness else 'infer'
-        )
-
         seed_hemi = seed_ix = None
         if path is None:  # Connectivity
             assert functional_paths is not None and len(functional_paths), \
@@ -975,6 +966,15 @@ class PlotLib:
                 depth=np.linspace(0.0, 1.0, 10)
             ).astype(np.float32)
 
+        if midthickness is None or isinstance(midthickness, dict):
+            _, _, midthickness, _, _ = self.get_surface_meshes(
+                pial_left=pial['left'],
+                pial_right=pial['right'],
+                white_left=white['left'],
+                white_right=white['right'],
+                midthickness_left=midthickness['left'] if midthickness else 'infer',
+                midthickness_right=midthickness['right'] if midthickness else 'infer'
+            )
         statmap = self.smooth_metric_on_surface(
             statmap,
             midthickness.parts[hemi].faces,

@@ -16,7 +16,7 @@ New lab members can get everything initialized in one go by running:
 
 Note that this script is interactive and your responses will be required at points.
 
-Alternatively, you can set manually. This will involve setting up your `~/.profile` and 
+Alternatively, you can set up manually. This will involve setting up your `~/.profile` and 
 `~/.bashrc` files following the instructions in the 
 [cluster onboarding docs](https://docs.google.com/document/d/1nlpqFCRX4wo-gqa84rA9X0DaYYIPNFjB9dgFl3RUjlQ/edit),
 adding the environment variables from the `BASHRC` constant in 
@@ -378,11 +378,9 @@ specify in a YAML file.
 
 To generate a new model, run:
 
-    python -m climbprep.generate_model <PARTICIPANT_ID> <TASK>(<TASK>)* -c <CONFIG>
+    python -m climbprep.generate_model <TASK>(<TASK>)* -c <CONFIG>
 
-Where `<PARTICIPANT_ID>` is the ID of a BIDSified participant whose events files you
-want to use to populate the model's conditions. The `-c` argument is the path
-to a YAML file with the following structure:
+The `-c` argument is the path to a YAML file with the following structure:
 ```
 LEVEL:
   CONTRAST:
@@ -403,9 +401,10 @@ Some contrasts may compare conditions that do not appear in all runs,
 in which case it would not be possible to compute them at the run level
 and you need to specify them at the session and/or subject level.
 Somewhat counterintuitively, the session and subject levels are computed
-independently from the run level, so new contrasts at the session level
-do not propagate to the subject level. If you want the contrast to exist
-at both levels, you must specify it at both levels.
+independently of each other, each based on outputs from the run level.
+So new contrasts at the session level do not propagate to the subject level.
+If you want the contrast to exist at both levels, you must specify it at 
+both levels.
 
 Note that the weight magnitudes should sum to one, to facilitate comparison
 across contrasts.
@@ -446,6 +445,32 @@ only a subset of the data. To rescaffold, run:
 This tool will provide minimal BIDS metadata to the new project to pass
 validation, but it is strongly recommended to enrich the metadata before
 publication/release.
+
+
+### climbbatch and climbbcancel
+
+If your paths have been set up using `quickstart`, you'll be able to submit
+jobs using the `climbbatch` command, which simply is a wrapper around
+`sbatch` that lets you submit multiple jobs at once:
+
+    climbbatch <JOB1>.pbs <JOB2>.pbs ...
+
+Note that there will be a 1-minute delay before any job that contains
+the string `preprocess` in order to avoid known
+(concurrency issues)[https://neurostars.org/t/updated-fmriprep-workaround-for-running-subjects-in-parallel/6677]
+with `fMRIprep`.
+
+You can also cancel a range of jobs by ID using the `climbbcancel` command:
+
+    climbbcancel <START_JOB_ID> <END_JOB_ID>
+
+which is useful when you want to cancel only a subset of running jobs that
+can't be easily selected using SLURM's `scancel` command. You can find job
+ID's by running `squeue -u <USERNAME>` and looking at the `JOBID` column.
+The script will try to cancel all jobs within the specified range (inclusive).
+This can result in benign warnings if this includes jobs that have already
+terminated or jobs submitted by others, but you can't cancel other people's
+jobs even if you wanted to, so the script is safe to use.
 
 
 ## Modifying the pipeline
