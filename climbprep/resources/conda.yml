@@ -8,7 +8,7 @@ dependencies:
     - matplotlib
     - nibabel
     - nilearn
-    - git+https://github.com/nipy/nitransforms.git@master
+    - nitransforms<25
     - numpy
     - pandas
     - pymatreader
