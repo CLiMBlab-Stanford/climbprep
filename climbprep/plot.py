@@ -25,14 +25,14 @@ from climbprep.util import *
 class PlotLib:
 
     CACHABLE = {
-        # 'get_statmap_surface_and_color',
+        'get_statmap_surface_and_color',
         'get_surface_mesh_hemi',
         'infer_midthickness_mesh_hemi',
         'get_surface_data',
         'get_plot_bgcolors',
         'get_mask',
         'get_surface_functional',
-        # 'get_connectivity_from_seed',
+        'get_connectivity_from_seed',
         'make_sphere'
     }
 
@@ -925,6 +925,16 @@ class PlotLib:
         assert hemi in ('left', 'right'), 'Hemispheres must be "left" or "right".'
         assert pial is not None, 'Pial mesh must be provided.'
         assert white is not None, 'White mesh must be provided.'
+
+        _, _, midthickness, _, _ = self.get_surface_meshes(
+            pial_left=pial['left'],
+            pial_right=pial['right'],
+            white_left=white['left'],
+            white_right=white['right'],
+            midthickness_left=midthickness['left'] if midthickness else 'infer',
+            midthickness_right=midthickness['right'] if midthickness else 'infer'
+        )
+
         seed_hemi = seed_ix = None
         if path is None:  # Connectivity
             assert functional_paths is not None and len(functional_paths), \
@@ -967,7 +977,7 @@ class PlotLib:
 
         statmap = self.smooth_metric_on_surface(
             statmap,
-            pial.parts[hemi].faces,
+            midthickness.parts[hemi].faces,
             depth=smoothing_depth
         )
 

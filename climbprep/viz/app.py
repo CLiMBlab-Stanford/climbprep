@@ -748,7 +748,7 @@ def assign_callbacks(app, cache):
                     statmap_label_default += f', {session}'
                 statmap_label = get_value(statmap, 'text') or statmap_label_default
                 vmin_ = get_value(statmap, 'vmin') or 0
-                vmax_ = get_value(statmap, 'vmax') or 0.75
+                vmax_ = get_value(statmap, 'vmax') or 0.5
             elif stat_type == 'connectivity_local':
                 seed = (
                     get_value(statmap, 'seed_x'),
@@ -775,7 +775,7 @@ def assign_callbacks(app, cache):
                     statmap_label_default += f', {session}'
                 statmap_label = get_value(statmap, 'text') or statmap_label_default
                 vmin_ = get_value(statmap, 'vmin') or 0
-                vmax_ = get_value(statmap, 'vmax') or 0.75
+                vmax_ = get_value(statmap, 'vmax') or 0.5
             else:
                 raise ValueError(f'Unknown statmap type: {stat_type}. Must be one of contrast or network.')
             statmap_paths.append(statmap_in)
