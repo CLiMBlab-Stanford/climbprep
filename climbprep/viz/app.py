@@ -557,7 +557,7 @@ def assign_callbacks(app, cache):
 
         if project == 'local':
             anat = {'mask': None}
-            for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
+            for surf_type in ('pial', 'white', 'midthickness', 'inflated', 'sulc'):
                 for hemi in ('left', 'right'):
                     surf_path = surfaces[surf_type][hemi]
                     if local_directory is not None and (surf_path is not None and surf_path != 'infer'):
@@ -748,7 +748,7 @@ def assign_callbacks(app, cache):
                     statmap_label_default += f', {session}'
                 statmap_label = get_value(statmap, 'text') or statmap_label_default
                 vmin_ = get_value(statmap, 'vmin') or 0
-                vmax_ = get_value(statmap, 'vmax') or 0.3
+                vmax_ = get_value(statmap, 'vmax') or 0.75
             elif stat_type == 'connectivity_local':
                 seed = (
                     get_value(statmap, 'seed_x'),
@@ -775,7 +775,7 @@ def assign_callbacks(app, cache):
                     statmap_label_default += f', {session}'
                 statmap_label = get_value(statmap, 'text') or statmap_label_default
                 vmin_ = get_value(statmap, 'vmin') or 0
-                vmax_ = get_value(statmap, 'vmax') or 0.3
+                vmax_ = get_value(statmap, 'vmax') or 0.75
             else:
                 raise ValueError(f'Unknown statmap type: {stat_type}. Must be one of contrast or network.')
             statmap_paths.append(statmap_in)
@@ -872,21 +872,16 @@ def assign_callbacks(app, cache):
                 extra_traces.append(pl.make_colorbar(**colorbar, cbar_x=cbar_x))
                 cbar_x += cbar_step
             for seed in plot_data['seeds']:
-                # Add any seed traces
-                x, y, z = seed
-                if turn_out_hemis:
-                    if x > 0:  # Proxy for RH, may not work well on the midline. TODO: fix
-                        x = -x
-                        y = -y
-                        trace = right
-                    else:
-                        trace = left
-                    if isinstance(trace['customdata'][0], dict):
-                        y_src = trace['customdata'][0]['y']
-                    else:
-                        y_src = trace['customdata'][0][1]
-                    y_delta = trace['y'][0] - y_src
-                    y += y_delta
+                seed_hemi = seed['hemi']
+                seed_ix = seed['ix']
+                if seed_hemi == 'left':
+                    trace = left
+                    x, y, z = trace['x'][seed_ix], trace['y'][seed_ix], trace['z'][seed_ix]
+                elif seed_hemi == 'right':
+                    trace = right
+                    x, y, z = trace['x'][seed_ix], trace['y'][seed_ix], trace['z'][seed_ix]
+                else:
+                    raise ValueError(f'Invalid seed hemisphere: {seed_hemi}. Must be "left" or "right".')
                 extra_traces.append(pl.make_sphere((x, y, z)))
             fig_['data'].extend(extra_traces)
 
