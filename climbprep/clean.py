@@ -254,7 +254,8 @@ if __name__ == '__main__':
                         func = image.resample_to_img(func, mask_nii)
 
                         masker = maskers.NiftiMasker(
-                            mask_img=mask_nii,
+                            mask_img=None,
+                            mask_strategy='background',
                             standardize=config['standardize'],
                             detrend=config['detrend'],
                             t_r=TR,
@@ -266,7 +267,6 @@ if __name__ == '__main__':
                         desc = 'desc-clean'
                         run = masker.fit_transform(func_path, **kwargs)
                         run = masker.inverse_transform(run)
-                        #run = image.crop_img(run)
                         run_path = os.path.join(
                             out_dir, func_file.replace('desc-preproc', desc)
                         )
