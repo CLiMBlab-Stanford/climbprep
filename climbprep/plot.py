@@ -4,6 +4,7 @@ import yaml
 import traceback
 import numpy as np
 import pandas as pd
+from scipy import sparse
 import matplotlib
 matplotlib.use("Agg", force=True)
 from matplotlib import pyplot as plt
@@ -24,14 +25,14 @@ from climbprep.util import *
 class PlotLib:
 
     CACHABLE = {
-        'get_statmap_surface_and_color',
+        # 'get_statmap_surface_and_color',
         'get_surface_mesh_hemi',
         'infer_midthickness_mesh_hemi',
         'get_surface_data',
         'get_plot_bgcolors',
         'get_mask',
-        'get_functional',
-        'get_connectivity_from_seed',
+        'get_surface_functional',
+        # 'get_connectivity_from_seed',
         'make_sphere'
     }
 
@@ -121,11 +122,6 @@ class PlotLib:
         elif not hasattr(statmaps_in, '__iter__') or isinstance(statmaps_in, str):
             statmaps_in = [statmaps_in]
         seeds = []
-        for statmap_in in statmaps_in:
-            if isinstance(statmap_in, dict) and 'functionals' in statmap_in:
-                assert 'seed' in statmap_in, \
-                    'If statmap is connectivity, it must contain a key "seed" with the seed coordinates (x, y, z).'
-                seeds.append(statmap_in['seed'])
 
         if statmap_labels is None:
             statmap_labels = [None] * len(statmaps_in)
@@ -254,6 +250,7 @@ class PlotLib:
                     zip(statmaps_in, colors, statmap_labels, vmin, vmax, thresholds, statmap_scales_alpha, skip):
                 if progress_fn is not None:
                     progress_fn(f'Computing {hemi} vertex colors for statmap {label}', 0)
+                seed = None
                 if isinstance(statmap_in, dict):
                     if 'functionals' in statmap_in:
                         assert 'seed' in statmap_in, \
@@ -263,30 +260,21 @@ class PlotLib:
                         assert len(functional_paths) > 0, \
                             'If statmap is connectivity, it must contain a key "functionals" with a list of ' \
                             'at least one functional path.'
-                        mask = statmap_in.get('mask', functional_paths[0])
                         seed = statmap_in['seed']
                         statmap_kwargs = dict(
                             functional_paths=functional_paths,
-                            mask=mask,
-                            seed=seed,
-                            fwhm=statmap_in.get('fwhm', None)
+                            seed=seed
                         )
                     elif 'path' in statmap_in:
-                        statmap_kwargs = dict(path=statmap_in['path'], mask=statmap_in.get('mask', None))
+                        statmap_kwargs = dict(path=statmap_in['path'])
                     else:
                         raise ValueError('`statmaps` dict must contain either "functionals" or "path" key.')
                 elif isinstance(statmap_in, str):
                     statmap_kwargs = dict(path=statmap_in)
                 else:
                     raise ValueError('`statmaps` must be a list of strings or dicts, not %s.' % type(statmap_in))
-                if surf_types['pial'] is None:
-                    statmap_kwargs['pial'] = None
-                else:
-                    statmap_kwargs['pial'] = surf_types['pial'][hemi]
-                if surf_types['white'] is None:
-                    statmap_kwargs['white'] = None
-                else:
-                    statmap_kwargs['white'] = surf_types['white'][hemi]
+                for surf_type in ('pial', 'white', 'midthickness'):
+                    statmap_kwargs[surf_type] = surf_types[surf_type]
                 statmap_kwargs['hemi'] = hemi
 
                 if progress_fn is not None:
@@ -302,7 +290,9 @@ class PlotLib:
                 if skip_:
                     continue
 
-                statmap, vertexcolor_, vertexalpha_, cmap, cmin, cmax = self.get_statmap_surface_and_color(
+                statmap, vertexcolor_, vertexalpha_, \
+                cmap, cmin, cmax, \
+                seed_hemi, seed_ix = self.get_statmap_surface_and_color(
                     color,
                     vmin_=vmin_,
                     vmax_=vmax_,
@@ -313,6 +303,13 @@ class PlotLib:
                     progress_fn=progress_fn,
                     **statmap_kwargs
                 )
+
+                if seed:
+                    seeds.append(dict(
+                        seed=seed,
+                        hemi=seed_hemi,
+                        ix=seed_ix
+                    ))
 
                 col = label if label else 'val'
                 customdata[col] = statmap
@@ -404,16 +401,14 @@ class PlotLib:
         if not seeds:
             seeds = []
         for seed in seeds:
-            x, y, z = seed
-            if turn_out_hemis:
-                if x > 0:
-                    x = -x
-                    y = -y
-                    trace = traces[1]
-                else:
-                    trace = traces[0]
-                y_delta = trace.y[0] - data['customdata'].y.values[0]
-                y += y_delta
+            seed_hemi = seed['hemi']
+            seed_ix = seed['ix']
+            if seed_hemi == 'left':
+                x, y, z = left['mesh'].coordinates[seed_ix]
+            elif seed_hemi == 'right':
+                x, y, z = right['mesh'].coordinates[seed_ix]
+            else:
+                raise ValueError(f'Invalid seed hemisphere: {seed_hemi}. Must be "left" or "right".')
             traces.append(self.make_sphere((x, y, z)))
 
         fig = go.Figure()
@@ -689,28 +684,20 @@ class PlotLib:
 
         return bgcolors
 
-    def get_statmap(self, path=None, functional_paths=None, mask=None, seed=None, fwhm=None, progress_fn=None):
-        if path is None and functional_paths is None:
-            raise ValueError('Either `path` or `functional_paths` must be provided.')
-        if path is not None:
-            if progress_fn is not None:
-                progress_fn(f'Loading statmap {path}')
-            statmap = self.load_nii(path)
-        else:
-            assert functional_paths is not None, 'If `path` is not provided, `functional_paths` must be ' \
-                                     'a tuple of paths to timecourses.'
-            assert seed and len(seed) == 3, 'If `path` is not provided, `seed` must be a tuple of (x, y, z) ' \
-                                            'coordinates.'
-            x, y, z = seed
-            statmap = self.get_connectivity_from_seed(
-                x=x, y=y, z=z,
-                functional_paths=functional_paths,
-                mask_path=mask,
-                fwhm=fwhm,
-                progress_fn=progress_fn
-            )
+    def get_statmap(
+            self,
+            path,
+            progress_fn=None
+    ):
+        assert isinstance(path, str), \
+            '`path` must be a string representing the path to the statmap file.'
+        if progress_fn is not None:
+            progress_fn(f'Loading statmap {path}')
+        statmap = self.load_nii(path)
 
         return statmap
+
+
 
     def get_functional_paths(
             self,
@@ -751,10 +738,13 @@ class PlotLib:
         return tuple(sorted(functional_paths))
 
     # Cachable
-    def get_functionals_and_mask(
+    def get_surface_functionals(
             self,
             functional_paths,
-            mask_path,
+            pial_left,
+            pial_right,
+            white_left,
+            white_right,
             debug=False,
             progress_fn=None
     ):
@@ -766,8 +756,8 @@ class PlotLib:
 
         if progress_fn:
             progress_fn('Getting mask', 0)
-        mask = self.get_mask(mask_path, nii_ref=functional_paths[0])
-        functionals_ = []
+        functionals_left = []
+        functionals_right = []
         incr = 0
         if progress_fn:
             incr = progress_fn.incr
@@ -782,19 +772,50 @@ class PlotLib:
             print('  ' + msg)
             if progress_fn:
                 progress_fn(msg)
-            functionals_.append(self.get_functional(functional, mask_path))
+            functional_ = self.get_surface_functional(
+                functional, pial_left, pial_right, white_left, white_right
+            )
+            functionals_left.append(functional_.parts['left'])
+            functionals_right.append(functional_.parts['right'])
         if progress_fn:
             progress_fn(f'Concatenating {len(functional_paths)} timecourses', 0)
         t0 = time.time()
-        for functional_ in functionals_:
-            std = np.std(functional_, axis=0)
-        functionals_ = np.concatenate(functionals_, axis=0)  # shape (n_timepoints, n_kept_voxels)
+        functionals_left = np.concatenate(functionals_left, axis=1)  # shape (n_timepoints, n_vertices)
+        functionals_right = np.concatenate(functionals_right, axis=1)  # shape (n_timepoints, n_vertices)
+        functionals = surface.PolyData(
+            left=functionals_left,
+            right=functionals_right
+        )
         t1 = time.time()
-        print(f'   Concatenating runs into shape {functionals_.shape} took {t1 - t0:.2f} seconds.' % ())
+        print(f'   Concatenating runs into shapes {functionals_left.shape}, {functionals_right.shape} '
+              f'took {t1 - t0:.2f} seconds.' % ())
         if progress_fn:
             progress_fn.incr = incr
 
-        return functionals_, mask
+        return functionals
+
+    # Cachable
+    def get_surface_functional(self, path, pial_left, pial_right, white_left, white_right):
+        t0 = time.time()
+        functional = self.load_nii(path)
+        t1 = time.time()
+        print(f'    Loading data {path} took {t1 - t0:.2f} seconds.')
+        t0 = time.time()
+        pial = self.get_surface_mesh(pial_left, pial_right)
+        white = self.get_surface_mesh(white_left, white_right)
+        functional_kwargs = dict()
+        for hemi in ('left', 'right'):
+            functional_kwargs[hemi] = surface.vol_to_surf(
+                functional,
+                pial.parts[hemi],
+                inner_mesh=white.parts[hemi],
+                depth=np.linspace(0.0, 1.0, 10)
+            )
+        functional = surface.PolyData(**functional_kwargs)
+        t1 = time.time()
+        print(f'    Projecting functional image {path} to surface took {t1 - t0:.2f} seconds.')
+
+        return functional
 
     # Cachable
     def get_mask(self, mask_path, target_affine=DEFAULT_TARGET_AFFINE, mask_fwhm=DEFAULT_MASK_FWHM, nii_ref=None):
@@ -813,111 +834,144 @@ class PlotLib:
 
         return mask
 
-    # Cachable
-    def get_functional(self, path, mask_path, target_affine=DEFAULT_TARGET_AFFINE):
-        t0 = time.time()
-        functional = self.load_nii(path)
-        mask = self.get_mask(mask_path, target_affine=target_affine, nii_ref=path)
-        t1 = time.time()
-        print(f'    Loading data {path} took {t1 - t0:.2f} seconds.')
-        t0 = time.time()
-        functional = image.resample_to_img(functional, mask)
-        functional = self.apply_mask(functional, mask)
-        t1 = time.time()
-        print(f'    Resampling functional image {path} took {t1 - t0:.2f} seconds.')
-
-        return functional
-
     def load_nii(self, path, fwhm=None):
         if fwhm:
             return image.smooth_img(path, fwhm=fwhm)
         return image.load_img(path)
 
     # Cachable
-    def get_connectivity_from_seed(self, x, y, z, functional_paths, mask_path, fwhm=None, progress_fn=None):
+    def get_connectivity_from_seed(
+            self,
+            x, y, z,
+            functional_paths,
+            pial_left,
+            pial_right,
+            white_left,
+            white_right,
+            midthickness_left,
+            midthickness_right,
+            progress_fn=None
+    ):
         incr = load_incr = conn_incr = 0
         if progress_fn is not None:
             incr = progress_fn.incr
             load_incr = incr * 0.9
             conn_incr = incr - load_incr
             progress_fn.incr = load_incr
-        functionals, mask_img = self.get_functionals_and_mask(
-            functional_paths, mask_path=mask_path, progress_fn=progress_fn
+        functionals = self.get_surface_functionals(
+            functional_paths,
+            pial_left=pial_left,
+            pial_right=pial_right,
+            white_left=white_left,
+            white_right=white_right,
+            progress_fn=progress_fn
+        )
+
+        _, _, midthickness, _, _ = self.get_surface_meshes(
+            pial_left=pial_left,
+            pial_right=pial_right,
+            white_left=white_left,
+            white_right=white_right,
+            midthickness_left=midthickness_left,
+            midthickness_right=midthickness_right,
+            progress_fn=progress_fn
         )
         if progress_fn is not None:
             progress_fn.incr = conn_incr
             progress_fn(f'Calculating connectivity from seed ({x}, {y}, {z})')
-        ix = np.where(image.get_data(mask_img))
-        X, Y, Z = image.coord_transform(*ix, mask_img.affine)
+        n_left = len(midthickness.parts['left'].coordinates)
+        X, Y, Z = np.concatenate(
+            [midthickness.parts['left'].coordinates, midthickness.parts['right'].coordinates],
+            axis=0
+        ).T
         seed = np.array([x, y, z])
         distances = np.sqrt(np.sum((np.array([X, Y, Z]).T - seed) ** 2, axis=1))
-        if fwhm:
-            sigma = fwhm / (2 * np.sqrt(2 * np.log(2)))
-            weights = np.exp(-(distances ** 2) / (2 * sigma ** 2))
-            seed_timecourse = functionals @ weights
+        ix = np.argmin(distances)
+        if ix < n_left:
+            hemi = 'left'
+            seed_timecourse = functionals.parts['left'][ix]
         else:
-            ix = np.argmin(distances)
-            seed_timecourse = functionals[:, ix]
+            hemi = 'right'
+            ix -= n_left
+            seed_timecourse = functionals.parts['right'][ix]
         seed_timecourse = self.standardize_timecourse(seed_timecourse)
-        other_timecourses = self.standardize_timecourse(functionals)
+        other_timecourses_left = self.standardize_timecourse(functionals.parts['left'])
+        other_timecourses_right = self.standardize_timecourse(functionals.parts['right'])
         n = len(seed_timecourse)
 
-        connectivity = (other_timecourses.T @ seed_timecourse / n).astype(np.float32)
-        connectivity = self.invert_mask(connectivity, mask_img)
+        connectivity = surface.PolyData(
+            left=(other_timecourses_left @ seed_timecourse / n).astype(np.float32),
+            right=(other_timecourses_right @ seed_timecourse / n).astype(np.float32)
+        )
 
         if progress_fn is not None:
             progress_fn.incr = incr
 
-        return connectivity
-
+        return connectivity, hemi, ix
 
     # Cachable
     def get_statmap_surface(
             self,
             path=None,
             functional_paths=None,
-            mask=None,
             seed=None,
-            fwhm=None,
             pial=None,
             white=None,
+            midthickness=None,
             hemi='left',
+            smoothing_depth=None,
             progress_fn=None
     ):
         assert hemi in ('left', 'right'), 'Hemispheres must be "left" or "right".'
-        statmap_nii = self.get_statmap(
-            path=path, functional_paths=functional_paths, mask=mask, seed=seed, fwhm=fwhm, progress_fn=progress_fn
+        assert pial is not None, 'Pial mesh must be provided.'
+        assert white is not None, 'White mesh must be provided.'
+        seed_hemi = seed_ix = None
+        if path is None:  # Connectivity
+            assert functional_paths is not None and len(functional_paths), \
+                'If `path` is None, at least one functional_path must be provided.'
+            assert seed is not None and len(seed) == 3, \
+                'If `path` is None, `seed` must be a tuple of (x, y, z) coordinates.'
+            statmap_bilateral, seed_hemi, seed_ix = self.get_connectivity_from_seed(
+                x=seed[0], y=seed[1], z=seed[2],
+                functional_paths=functional_paths,
+                pial_left=pial['left'],
+                pial_right=pial['right'],
+                white_left=white['left'],
+                white_right=white['right'],
+                midthickness_left=midthickness['left'] if midthickness else 'infer',
+                midthickness_right=midthickness['right'] if midthickness else 'infer',
+                progress_fn=progress_fn
+            )
+            statmap = statmap_bilateral.parts[hemi]
+        else:             # Statmap
+            statmap_nii = self.get_statmap(
+                path=path, progress_fn=progress_fn
+            )
+            mesh_kwargs = {}
+            for surf_type, surf in zip(
+                    ('pial', 'white'),
+                    (pial, white)
+            ):
+                mesh_kwargs[f'{surf_type}_{hemi}'] = surf[hemi]
+            mesh_kwargs['midthickness_left'] = mesh_kwargs['midthickness_right'] = None
+            pial, white, _, _, _ = self.get_surface_meshes(**mesh_kwargs)
+
+            if progress_fn is not None:
+                progress_fn(f'Projecting statmap to {hemi} surface', 0)
+            statmap = surface.vol_to_surf(
+                statmap_nii,
+                pial.parts[hemi],
+                inner_mesh=white.parts[hemi],
+                depth=np.linspace(0.0, 1.0, 10)
+            ).astype(np.float32)
+
+        statmap = self.smooth_metric_on_surface(
+            statmap,
+            pial.parts[hemi].faces,
+            depth=smoothing_depth
         )
-        mesh_kwargs = {
-            f'pial_{hemi}': pial,
-        }
-        if white is not None:
-            mesh_kwargs[f'white_{hemi}'] = white
-        mesh_kwargs[f'midthickness_left'] = None
-        mesh_kwargs[f'midthickness_right'] = None
-        pial, white, _, _, _ = self.get_surface_meshes(**mesh_kwargs)
 
-        if progress_fn is not None:
-            progress_fn(f'Projecting statmap to {hemi} surface', 0)
-        if mask:
-            nii_ref = None
-        elif path:
-            nii_ref = path
-        else:
-            assert functional_paths is not None and len(functional_paths) > 0, \
-                'If `mask` is not provided, `path` or `functional_paths` must be provided to get the reference NIfTI.'
-            assert len(functional_paths), \
-                'If `mask` is not provided, `functional_paths` must be a list of at least one functional path.'
-            nii_ref = functional_paths[0]
-        statmap = surface.vol_to_surf(
-            statmap_nii,
-            pial.parts[hemi],
-            mask_img=self.get_mask(mask, nii_ref=nii_ref),
-            inner_mesh=white.parts[hemi],
-            depth=np.linspace(0.0, 1.0, 10)
-        ).astype(np.float32)
-
-        return statmap
+        return statmap, seed_hemi, seed_ix
 
     # Cachable
     def get_statmap_surface_and_color(
@@ -932,7 +986,7 @@ class PlotLib:
             progress_fn=None,
             **statmap_kwargs
     ):
-        statmap_src = self.get_statmap_surface(**statmap_kwargs, progress_fn=progress_fn)
+        statmap_src, seed_hemi, seed_ix = self.get_statmap_surface(**statmap_kwargs, progress_fn=progress_fn)
         statmap = statmap_src.copy()
         if vmin_ is None:
             vmin_ = np.nanmin(statmap)
@@ -987,7 +1041,7 @@ class PlotLib:
         else:
             vertexalpha_ = np.isfinite(statmap_abs)[..., None].astype(statmap_abs.dtype)
 
-        return statmap_src, vertexcolor_, vertexalpha_, cmap, cmin, cmax
+        return statmap_src, vertexcolor_, vertexalpha_, cmap, cmin, cmax, seed_hemi, seed_ix
 
     def make_plot_Mesh3d(self, surface):
         x, y, z = surface.coordinates.T
@@ -1085,7 +1139,7 @@ class PlotLib:
 
         return x, y, z
 
-    def standardize_timecourse(self, arr, axis=0):
+    def standardize_timecourse(self, arr, axis=-1):
         return (arr - np.mean(arr, axis=axis, keepdims=True)) / np.std(arr, axis=axis, keepdims=True)
 
     def apply_mask(self, arr, mask_nii):
@@ -1112,6 +1166,73 @@ class PlotLib:
 
         return nii
 
+    def get_sparse_adjacency(self, faces, depth=3):
+        """
+        Get a sparse adjacency matrix from the faces of a mesh.
+        :param faces: Faces of the mesh as a numpy array of shape (n_faces, 3).
+        :param depth: Depth of adjacency to compute (1 for direct neighbors, 2 for neighbors of neighbors, etc.).
+        :return: Sparse adjacency matrix as a scipy CSR matrix.
+        """
+        n_vertices = np.max(faces) + 1
+        rows = np.concatenate([faces[:, 0], faces[:, 1], faces[:, 2]])
+        cols = np.concatenate([faces[:, 1], faces[:, 2], faces[:, 0]])
+        data = np.ones_like(rows, dtype=np.uint8)
+        adjacency_matrix = sparse.coo_matrix((data, (rows, cols)), shape=(n_vertices, n_vertices))\
+            .astype(bool).tocsr()
+
+        adjacency_matrix_ = adjacency_matrix
+        for i in range(depth - 1):
+            adjacency_matrix_ += adjacency_matrix_ @ adjacency_matrix
+
+        return adjacency_matrix_
+
+    def get_sparse_squared_diff(self, x, adjacency_matrix):
+        n = len(x)
+        X = sparse.coo_matrix((x, (np.arange(n), np.arange(n))), shape=(n, n))
+        X = X.tocsr()
+        D = X @ adjacency_matrix - adjacency_matrix @ X
+        D2 = D.multiply(D)
+
+        return D2
+
+    def get_geodesic_smoothing_weights(self, faces, coordinates=None, fwhm=None, depth=3):
+        if not depth:
+            return sparse.eye(len(coordinates))
+
+        M = self.get_sparse_adjacency(faces, depth=depth)
+
+        if coordinates is not None and fwhm is not None:
+            X2 = self.get_sparse_squared_diff(coordinates[:, 0], M)
+            Y2 = self.get_sparse_squared_diff(coordinates[:, 1], M)
+            Z2 = self.get_sparse_squared_diff(coordinates[:, 2], M)
+
+            s = (fwhm / 2.3548) ** 2  # Convert FWHM to standard deviation
+
+            W = (-((X2 + Y2 + Z2).sqrt() / (2 * s**2))).expm1() + M
+            W /= np.sqrt(2*np.pi) * s
+        else:
+            W = M.astype(np.float32)  # If no coordinates or fwhm, use adjacency matrix as weights
+
+        return W
+
+    def smooth_metric_on_surface(self, metric, faces, coordinates=None, fwhm=None, depth=3):
+        """
+        Smooth a metric on a surface using geodesic smoothing.
+        :param metric: Metric to smooth as a numpy array of shape (n_vertices,).
+        :param faces: Faces of the mesh as a numpy array of shape (n_faces, 3).
+        :param coordinates: Coordinates of the vertices as a numpy array of shape (n_vertices, 3).
+        :param fwhm: Full-width at half-maximum for smoothing. If None, no smoothing is applied.
+        :param depth: Depth of adjacency to compute for smoothing.
+        :return: Smoothed metric as a numpy array of shape (n_vertices,).
+        """
+        if not depth or fwhm == 0:
+            smoothed_metric = metric
+        else:
+            W = self.get_geodesic_smoothing_weights(faces, coordinates=coordinates, fwhm=fwhm, depth=depth)
+            denom = np.array(W.sum(axis=1))[:, 0]
+            smoothed_metric = W @ metric / denom
+
+        return smoothed_metric
 
 class PlotLibMemoized(PlotLib):
 

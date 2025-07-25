@@ -115,7 +115,7 @@ PLOT_COLORS = [
     'Lime',
     'Cyan',
     'Magenta',
-    'Yellow'
+    'Yellow',
     'Orange',
     'Pink',
     'Green',
