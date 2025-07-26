@@ -8,6 +8,7 @@ import argparse
 
 from climbprep.constants import *
 from climbprep.util import *
+from climbprep.core import get_geodesic_smoothing_weights, apply_geodesic_smoothing_weights
 
 IMG_CACHE = {}
 
@@ -203,6 +204,7 @@ if __name__ == '__main__':
             yaml.safe_dump(config, f, sort_keys=False)
 
         for space in datasets:
+            geodesic_smoothing_weights = None
             for task in datasets[space]:
                 for run in datasets[space][task]:
                     confounds = datasets[space][task][run]['confounds']
@@ -294,13 +296,18 @@ if __name__ == '__main__':
                             standardize=config['standardize'],
                             detrend=config['detrend'],
                             t_r=TR,
-                            smoothing_fwhm=config['smoothing_fwhm'],
                             low_pass=config['low_pass'],
                             high_pass=config['high_pass']
                         )
                         kwargs = dict(confounds=confounds.fillna(0))
                         desc = 'desc-clean'
                         mesh = surface.PolyMesh(left=surf_L_path, right=surf_R_path)
+                        if config['smoothing_fwhm'] and geodesic_smoothing_weights is None:
+                            geodesic_smoothing_weights = {}
+                            for hemi in ('left', 'right'):
+                                geodesic_smoothing_weights[hemi] = get_geodesic_smoothing_weights(
+                                    mesh.parts[hemi].faces, mesh.parts[hemi].coordinates, fwhm=config['smoothing_fwhm']
+                                )
                         data = surface.PolyData(left=func_path, right=func_path.replace('_hemi-L_', '_hemi-R_'))
                         if not len(data.shape) > 1 or data.shape[1] < min_T:
                             continue
@@ -309,6 +316,10 @@ if __name__ == '__main__':
                         run = masker.fit_transform(img, **kwargs)
                         run = masker.inverse_transform(run)
                         for hemi in ('left', 'right'):
+                            if geodesic_smoothing_weights is not None:
+                                run.data.parts[hemi] = apply_geodesic_smoothing_weights(
+                                    run.parts.data[hemi], geodesic_smoothing_weights[hemi]
+                                )
                             if hemi == 'left':
                                 desc_hemi = '_hemi-L_'
                             else:

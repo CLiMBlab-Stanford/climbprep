@@ -20,6 +20,7 @@ import argparse
 
 from climbprep.constants import *
 from climbprep.util import *
+from climbprep.core import get_geodesic_smoothing_weights, apply_geodesic_smoothing_weights, smooth_metric_on_surface
 
 
 class PlotLib:
@@ -245,6 +246,7 @@ class PlotLib:
             vertexalpha = None
             vertexscale = None
             colorbars = []
+            geodesic_smoothing_weights = None
 
             for statmap_in, color, label, vmin_, vmax_, threshold_, statmap_scales_alpha_, skip_ in \
                     zip(statmaps_in, colors, statmap_labels, vmin, vmax, thresholds, statmap_scales_alpha, skip):
@@ -276,6 +278,13 @@ class PlotLib:
                 for surf_type in ('pial', 'white', 'midthickness'):
                     statmap_kwargs[surf_type] = surf_types[surf_type]
                 statmap_kwargs['hemi'] = hemi
+                geodesic_fwhm = statmap_kwargs.get('geodesic_fwhm', None)
+                if geodesic_fwhm and geodesic_smoothing_weights is None:
+                    geodesic_smoothing_weights = get_geodesic_smoothing_weights(
+                        midthickness.parts[hemi].faces,
+                        coordinates=midthickness.parts[hemi].coordinates,
+                        fwhm=geodesic_fwhm
+                    )
 
                 if progress_fn is not None:
                     progress_fn(f'Projecting statmap {label} to {hemi} surface', 0)
@@ -300,6 +309,7 @@ class PlotLib:
                     statmap_scales_alpha_=statmap_scales_alpha_,
                     hide_min=hide_min,
                     hide_max=hide_max,
+                    geodesic_smoothing_weights=geodesic_smoothing_weights,
                     progress_fn=progress_fn,
                     **statmap_kwargs
                 )
@@ -697,8 +707,6 @@ class PlotLib:
 
         return statmap
 
-
-
     def get_functional_paths(
             self,
             participant,
@@ -919,7 +927,6 @@ class PlotLib:
             white=None,
             midthickness=None,
             hemi='left',
-            smoothing_depth=None,
             progress_fn=None
     ):
         assert hemi in ('left', 'right'), 'Hemispheres must be "left" or "right".'
@@ -944,18 +951,21 @@ class PlotLib:
                 progress_fn=progress_fn
             )
             statmap = statmap_bilateral.parts[hemi]
-        else:             # Statmap
+        else:  # Statmap
             statmap_nii = self.get_statmap(
                 path=path, progress_fn=progress_fn
             )
             mesh_kwargs = {}
-            for surf_type, surf in zip(
-                    ('pial', 'white'),
-                    (pial, white)
-            ):
-                mesh_kwargs[f'{surf_type}_{hemi}'] = surf[hemi]
             mesh_kwargs['midthickness_left'] = mesh_kwargs['midthickness_right'] = None
-            pial, white, _, _, _ = self.get_surface_meshes(**mesh_kwargs)
+            for surf_type, surf in zip(
+                    ('pial', 'white', 'midthickness'),
+                    (pial, white, midthickness)
+            ):
+                if surf_type == 'midthickness' and surf is None or surf == 'infer':
+                    mesh_kwargs[f'{surf_type}_{hemi}'] = surf
+                else:
+                    mesh_kwargs[f'{surf_type}_{hemi}'] = surf[hemi]
+            pial, white, midthickness, _, _ = self.get_surface_meshes(**mesh_kwargs)
 
             if progress_fn is not None:
                 progress_fn(f'Projecting statmap to {hemi} surface', 0)
@@ -965,21 +975,6 @@ class PlotLib:
                 inner_mesh=white.parts[hemi],
                 depth=np.linspace(0.0, 1.0, 10)
             ).astype(np.float32)
-
-        if midthickness is None or isinstance(midthickness, dict):
-            _, _, midthickness, _, _ = self.get_surface_meshes(
-                pial_left=pial['left'],
-                pial_right=pial['right'],
-                white_left=white['left'],
-                white_right=white['right'],
-                midthickness_left=midthickness['left'] if midthickness else 'infer',
-                midthickness_right=midthickness['right'] if midthickness else 'infer'
-            )
-        statmap = self.smooth_metric_on_surface(
-            statmap,
-            midthickness.parts[hemi].faces,
-            depth=smoothing_depth
-        )
 
         return statmap, seed_hemi, seed_ix
 
@@ -993,10 +988,13 @@ class PlotLib:
             statmap_scales_alpha_=True,
             hide_min=None,
             hide_max=None,
+            geodesic_smoothing_weights=None,
             progress_fn=None,
             **statmap_kwargs
     ):
         statmap_src, seed_hemi, seed_ix = self.get_statmap_surface(**statmap_kwargs, progress_fn=progress_fn)
+        if geodesic_smoothing_weights is not None:
+            statmap_src = apply_geodesic_smoothing_weights(statmap_src, geodesic_smoothing_weights)
         statmap = statmap_src.copy()
         if vmin_ is None:
             vmin_ = np.nanmin(statmap)
@@ -1175,74 +1173,6 @@ class PlotLib:
         nii = image.new_img_like(mask_nii, out)
 
         return nii
-
-    def get_sparse_adjacency(self, faces, depth=3):
-        """
-        Get a sparse adjacency matrix from the faces of a mesh.
-        :param faces: Faces of the mesh as a numpy array of shape (n_faces, 3).
-        :param depth: Depth of adjacency to compute (1 for direct neighbors, 2 for neighbors of neighbors, etc.).
-        :return: Sparse adjacency matrix as a scipy CSR matrix.
-        """
-        n_vertices = np.max(faces) + 1
-        rows = np.concatenate([faces[:, 0], faces[:, 1], faces[:, 2]])
-        cols = np.concatenate([faces[:, 1], faces[:, 2], faces[:, 0]])
-        data = np.ones_like(rows, dtype=np.uint8)
-        adjacency_matrix = sparse.coo_matrix((data, (rows, cols)), shape=(n_vertices, n_vertices))\
-            .astype(bool).tocsr()
-
-        adjacency_matrix_ = adjacency_matrix
-        for i in range(depth - 1):
-            adjacency_matrix_ += adjacency_matrix_ @ adjacency_matrix
-
-        return adjacency_matrix_
-
-    def get_sparse_squared_diff(self, x, adjacency_matrix):
-        n = len(x)
-        X = sparse.coo_matrix((x, (np.arange(n), np.arange(n))), shape=(n, n))
-        X = X.tocsr()
-        D = X @ adjacency_matrix - adjacency_matrix @ X
-        D2 = D.multiply(D)
-
-        return D2
-
-    def get_geodesic_smoothing_weights(self, faces, coordinates=None, fwhm=None, depth=3):
-        if not depth:
-            return sparse.eye(len(coordinates))
-
-        M = self.get_sparse_adjacency(faces, depth=depth)
-
-        if coordinates is not None and fwhm is not None:
-            X2 = self.get_sparse_squared_diff(coordinates[:, 0], M)
-            Y2 = self.get_sparse_squared_diff(coordinates[:, 1], M)
-            Z2 = self.get_sparse_squared_diff(coordinates[:, 2], M)
-
-            s = (fwhm / 2.3548) ** 2  # Convert FWHM to standard deviation
-
-            W = (-((X2 + Y2 + Z2).sqrt() / (2 * s**2))).expm1() + M
-            W /= np.sqrt(2*np.pi) * s
-        else:
-            W = M.astype(np.float32)  # If no coordinates or fwhm, use adjacency matrix as weights
-
-        return W
-
-    def smooth_metric_on_surface(self, metric, faces, coordinates=None, fwhm=None, depth=3):
-        """
-        Smooth a metric on a surface using geodesic smoothing.
-        :param metric: Metric to smooth as a numpy array of shape (n_vertices,).
-        :param faces: Faces of the mesh as a numpy array of shape (n_faces, 3).
-        :param coordinates: Coordinates of the vertices as a numpy array of shape (n_vertices, 3).
-        :param fwhm: Full-width at half-maximum for smoothing. If None, no smoothing is applied.
-        :param depth: Depth of adjacency to compute for smoothing.
-        :return: Smoothed metric as a numpy array of shape (n_vertices,).
-        """
-        if not depth or fwhm == 0:
-            smoothed_metric = metric
-        else:
-            W = self.get_geodesic_smoothing_weights(faces, coordinates=coordinates, fwhm=fwhm, depth=depth)
-            denom = np.array(W.sum(axis=1))[:, 0]
-            smoothed_metric = W @ metric / denom
-
-        return smoothed_metric
 
 class PlotLibMemoized(PlotLib):
 
