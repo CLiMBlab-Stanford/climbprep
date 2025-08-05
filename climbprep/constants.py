@@ -20,7 +20,7 @@ PREPROCESS_DEFAULT_KEY = 'main'
 CLEAN_DEFAULT_KEY = 'fc'
 MODEL_DEFAULT_KEY = 'T1w'
 PLOT_DEFAULT_KEY = MODEL_DEFAULT_KEY
-PARCELLATE_DEFAULT_KEY = 'T1w'
+PARCELLATE_DEFAULT_KEY = 'fsnative'
 DEFAULT_MASK_SUFFIX = '_label-GM_probseg.nii.gz'
 DEFAULT_MASK_FWHM = 2
 DEFAULT_TARGET_AFFINE = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
@@ -256,6 +256,17 @@ CONFIG = dict(
         mni=dict()
     ),
     parcellate=dict(
+        fsnative=dict(
+            cleaning_label=CLEAN_DEFAULT_KEY,
+            space='fsnative',
+            sample=dict(
+                main=dict(
+                    n_networks=100,
+                    n_components_pca='auto',
+                    surface=True
+                )
+            ),
+        ),
         T1w=dict(
             cleaning_label=CLEAN_DEFAULT_KEY,
             space='T1w',
@@ -266,7 +277,7 @@ CONFIG = dict(
                     n_components_pca='auto',
                     n_components_ica='auto',
                     use_connectivity_profile=False,
-                    surface=True,
+                    surface=False,
                     standardize=False,               # This is already done in the cleaning step
                     detrend=False,                   # This is already done in the cleaning step
                     low_pass=None,                   # This is already done in the cleaning step
