@@ -318,7 +318,7 @@ if __name__ == '__main__':
                         for hemi in ('left', 'right'):
                             if geodesic_smoothing_weights is not None:
                                 run.data.parts[hemi] = apply_geodesic_smoothing_weights(
-                                    run.parts.data[hemi], geodesic_smoothing_weights[hemi]
+                                    run.data.parts[hemi], geodesic_smoothing_weights[hemi]
                                 )
                             if hemi == 'left':
                                 desc_hemi = '_hemi-L_'
