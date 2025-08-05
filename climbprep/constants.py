@@ -259,13 +259,9 @@ CONFIG = dict(
         fsnative=dict(
             cleaning_label=CLEAN_DEFAULT_KEY,
             space='fsnative',
-            sample=dict(
-                main=dict(
-                    n_networks=100,
-                    n_components_pca='auto',
-                    surface=True
-                )
-            ),
+            n_networks=100,
+            n_components_pca='auto',
+            surface=True
         ),
         T1w=dict(
             cleaning_label=CLEAN_DEFAULT_KEY,

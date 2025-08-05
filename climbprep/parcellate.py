@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA, FastICA
 from nilearn import image, surface
-from nitransforms import resampling, manip
+from nitransforms import resampling, manip, linear
 import argparse
 
 from climbprep.constants import *
@@ -77,7 +77,11 @@ def get_atlas(name, resampling_target_nii=None, xfm_path=None):
     if xfm_path is not None:
         assert resampling_target_nii is not None, \
             'If xfm_path is provided, resampling_target_nii must also be provided.'
-        xfm = manip.load(xfm_path)
+        if isinstance(xfm_path, str):
+            xfm = manip.load(xfm_path)
+        else:
+            xfms = [manip.load(x) if x.endswith('.h5') else linear.load(x) for x in xfm_path]
+            xfm = manip.TransformChain(xfms)
         val = resampling.apply(
             xfm,
             val,
@@ -359,6 +363,7 @@ if __name__ == '__main__':
                     break
             T1 = None
         else:  # Get transform from MNI to native space, and native surface data
+            xfm_path = []
             for path in os.listdir(anat_path):
                 if space in path and path.endswith(mask_suffix):
                     mask_path = os.path.join(anat_path, path)
@@ -370,8 +375,18 @@ if __name__ == '__main__':
                     if t and f:
                         t = t.group(1)
                         f = f.group(1)
-                        if t == space and 'mni' in f.lower():
+                        if 'mni' in f.lower() and (t == space or (t == 'T1w' and space == 'fsnative')):
+                            xfm_path.append(os.path.join(anat_path, path))
+                        elif f == 'T1w' and space == 'fsnative' and t == space:
                             xfm_path = os.path.join(anat_path, path)
+            if len(xfm_path) == 1:
+                xfm_path = xfm_path[0]
+            else:
+                assert len(xfm_path) == 2, \
+                    f'Expected one or two transforms from MNI to {space} space, found {len(xfm_path)}.'
+                if space in xfm_path[0]:
+                    # Reverse the order
+                    xfm_path = xfm_path[::-1]
             assert xfm_path, f'Non-MNI space used but no matching transform (*_xfm.h5) found in {anat_path}.'
 
             if anat_by_session:
@@ -410,16 +425,25 @@ if __name__ == '__main__':
                 parcellation_config['surface_right_path'] = surfaces['midthickness']['right']
         if T1 is not None:
             parcellation_config['reference_image_path'] = T1
-        parcellation_config['sample']['main']['functional_paths'] = []
+        if is_surface:
+            parcellation_config['functional_paths'] = []
+        else:
+            parcellation_config['sample']['main']['functional_paths'] = []
 
         if not 'session' in nodes:
             nodes['session'] = {}
         if not session in nodes['session']:
             nodes['session'][session] = deepcopy(parcellation_config)
-        nodes['session'][session]['sample']['main']['functional_paths'] = functional_paths
+        if is_surface:
+            nodes['session'][session]['functional_paths'] = functional_paths
+        else:
+            nodes['session'][session]['sample']['main']['functional_paths'] = functional_paths
         if not 'subject' in nodes:
             nodes['subject'] = deepcopy(parcellation_config)
-        nodes['subject']['sample']['main']['functional_paths'] += functional_paths
+        if is_surface:
+            nodes['subject']['functional_paths'] += functional_paths
+        else:
+            nodes['subject']['sample']['main']['functional_paths'] += functional_paths
 
     parcellation_dir = os.path.join(derivatives_path, 'parcellate', parcellation_label)
     cliargs = []
@@ -441,8 +465,6 @@ if __name__ == '__main__':
                 os.makedirs(session_dir)
             config_['output_dir'] = session_dir
             if is_surface:
-                config_['functional_paths'] = config_['sample']['main']['functional_paths']
-                del config_['sample']
                 del config_['surface']
                 del config_['mask_path']
 
