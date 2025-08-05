@@ -6,11 +6,10 @@ import pickle
 
 
 
-def get_sparse_adjacency(faces, adjacency_depth=None):
+def get_sparse_adjacency(faces):
     """
     Get a sparse adjacency matrix from the faces of a mesh.
     :param faces: Faces of the mesh as a numpy array of shape (n_faces, 3).
-    :param adjacency_depth: Depth of adjacency to compute (1 for direct neighbors, 2 for neighbors of neighbors, etc.).
     :return: Sparse adjacency matrix as a scipy CSR matrix.
     """
     n_vertices = np.max(faces) + 1
@@ -19,12 +18,10 @@ def get_sparse_adjacency(faces, adjacency_depth=None):
     data = np.ones_like(rows, dtype=np.uint8)
     adjacency_matrix = sparse.coo_matrix((data, (rows, cols)), shape=(n_vertices, n_vertices)) \
         .astype(bool).tocsr()
+    # Make it symmetric
+    adjacency_matrix += adjacency_matrix.T
 
-    adjacency_matrix_ = adjacency_matrix
-    for i in range(adjacency_depth - 1):
-        adjacency_matrix_ += adjacency_matrix_ @ adjacency_matrix
-
-    return adjacency_matrix_
+    return adjacency_matrix
 
 
 def get_sparse_squared_diff(x, adjacency_matrix):
@@ -37,33 +34,49 @@ def get_sparse_squared_diff(x, adjacency_matrix):
     return D2
 
 
-def get_geodesic_smoothing_weights(faces, coordinates=None, fwhm=None, adjacency_depth=None):
+def get_geodesic_smoothing_weights(faces, coordinates=None, fwhm=None):
     if not fwhm:
         return sparse.eye(len(coordinates))
 
-    if not adjacency_depth:
-        # Infer adjacency depth from FWHM assuming ~1mm per edge
-        ratio = 6 / 2.3548  # We want to cover 6 (+-3) sds with a fwhm to sd ratio of 2.3548
-        adjacency_depth = int(np.ceil(fwhm * ratio))
+    # Adjacency matrix
+    A = get_sparse_adjacency(faces)
 
-    M = get_sparse_adjacency(faces, adjacency_depth=adjacency_depth)
+    # Distance-weighted adjacency matrix
+    X2 = get_sparse_squared_diff(coordinates[:, 0], A)
+    Y2 = get_sparse_squared_diff(coordinates[:, 1], A)
+    Z2 = get_sparse_squared_diff(coordinates[:, 2], A)
+    D = (X2 + Y2 + Z2).sqrt()
 
+    # Mean edge length
+    d = D.sum() / A.sum()
+    s = (fwhm / 2.3548)  # Convert FWHM to standard deviation
+    n_iter = int(np.ceil(3 * s / d))  # Number of iterations to cover 3 standard deviations
+
+    print('n_iter:', n_iter)
+
+    # Add in diagonal
+    A += sparse.eye(A.shape[0]).astype(bool).tocsr()
+
+    # Find topographic neighbors up to depth n_iter
+    M = sparse.eye(len(coordinates), dtype=np.float32)
+    for _ in range(n_iter):
+        M += M @ A
+
+    # Compute Euclidean distances among neighbors (efficient approximation to geodesic distance)
     if coordinates is not None and fwhm is not None:
         X2 = get_sparse_squared_diff(coordinates[:, 0], M)
         Y2 = get_sparse_squared_diff(coordinates[:, 1], M)
         Z2 = get_sparse_squared_diff(coordinates[:, 2], M)
-
-        s = (fwhm / 2.3548)  # Convert FWHM to standard deviation
-
         D = (X2 + Y2 + Z2).sqrt()
 
-        W = (-(D / (2 * s ** 2))).expm1() + M
+        W = (-(D / (2 * s ** 2))).expm1() + A
         W /= np.sqrt(2 * np.pi) * s
         W = W.astype(np.float32)
     else:
-        W = M.astype(np.float32)  # If no coordinates or fwhm, use adjacency matrix as weights
+        W = A.astype(np.float32)  # If no coordinates or fwhm, use adjacency matrix as weights
 
     return W
+
 
 
 def apply_geodesic_smoothing_weights(metric, W):
@@ -85,14 +98,13 @@ def apply_geodesic_smoothing_weights(metric, W):
     return W @ metric / denom
 
 
-def smooth_metric_on_surface(metric, faces, coordinates=None, fwhm=None, adjacency_depth=None):
+def smooth_metric_on_surface(metric, faces, coordinates=None, fwhm=None):
     """
     Smooth a metric on a surface using geodesic smoothing.
     :param metric: Metric to smooth as a numpy array of shape (n_vertices,) or (n_vertices, n_timepoints).
     :param faces: Faces of the mesh as a numpy array of shape (n_faces, 3).
     :param coordinates: Coordinates of the vertices as a numpy array of shape (n_vertices, 3).
     :param fwhm: Full-width at half-maximum for smoothing. If None, no smoothing is applied.
-    :param adjacency_depth: Depth of adjacency to compute for smoothing. If None, inferred from fwhm.
     :return: Smoothed metric as a numpy array of shape (n_vertices,) or (n_vertices, n_timepoints).
     """
     if not fwhm:
@@ -100,7 +112,7 @@ def smooth_metric_on_surface(metric, faces, coordinates=None, fwhm=None, adjacen
     else:
         assert len(metric.shape) < 3, 'Metric must be a 1D or 2D array.'
         t0 = time.time()
-        W = get_geodesic_smoothing_weights(faces, coordinates=coordinates, fwhm=fwhm, adjacency_depth=adjacency_depth)
+        W = get_geodesic_smoothing_weights(faces, coordinates=coordinates, fwhm=fwhm)
         t1 = time.time()
         print(f'Computed geodesic smoothing weights in {t1 - t0:.2f} seconds.')
         t0 = time.time()

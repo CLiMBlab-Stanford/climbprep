@@ -714,8 +714,11 @@ class PlotLib:
             session=None,
             cleaning_label=CLEAN_DEFAULT_KEY,
             space=PARCELLATE_DEFAULT_KEY,
-            regex_filter=None
+            regex_filter=None,
+            as_surface=True
     ):
+        if as_surface and space.lower() in ('t1w', 'anat'):
+            space = 'fsnative'
         if regex_filter is not None:
             regex_filter = re.compile(regex_filter)
         if session:
@@ -737,8 +740,12 @@ class PlotLib:
             if os.path.exists(clean_dir):
                 for x in os.listdir(clean_dir):
                     path_ = os.path.join(clean_dir, x)
-                    if not x.endswith(f'_space-{space}_desc-clean_bold.nii.gz'):
-                        continue
+                    if as_surface:
+                        if not ('hemi-L' in x and x.endswith(f'_space-{space}_desc-clean_bold.func.gii')):
+                            continue
+                    else:
+                        if not x.endswith(f'_space-{space}_desc-clean_bold.nii.gz'):
+                            continue
                     if regex_filter is not None and not regex_filter.search(x):
                         continue
                     functional_paths.append(path_)
@@ -776,7 +783,7 @@ class PlotLib:
                 functional_str = '...' + functional[-75:]
             else:
                 functional_str = functional
-            msg = f'Loading and resampling functional image {i+1}/{len(functional_paths)}: {functional_str}'
+            msg = f'Loading functional image {i+1}/{len(functional_paths)}: {functional_str}'
             print('  ' + msg)
             if progress_fn:
                 progress_fn(msg)
@@ -803,25 +810,51 @@ class PlotLib:
         return functionals
 
     # Cachable
-    def get_surface_functional(self, path, pial_left, pial_right, white_left, white_right):
+    def get_surface_functional(self, path, pial_left=None, pial_right=None, white_left=None, white_right=None):
         t0 = time.time()
-        functional = self.load_nii(path)
-        t1 = time.time()
-        print(f'    Loading data {path} took {t1 - t0:.2f} seconds.')
-        t0 = time.time()
-        pial = self.get_surface_mesh(pial_left, pial_right)
-        white = self.get_surface_mesh(white_left, white_right)
-        functional_kwargs = dict()
-        for hemi in ('left', 'right'):
-            functional_kwargs[hemi] = surface.vol_to_surf(
-                functional,
-                pial.parts[hemi],
-                inner_mesh=white.parts[hemi],
-                depth=np.linspace(0.0, 1.0, 10)
-            )
-        functional = surface.PolyData(**functional_kwargs)
-        t1 = time.time()
-        print(f'    Projecting functional image {path} to surface took {t1 - t0:.2f} seconds.')
+        if path.endswith('.gii') or path.endswith('.gifti') or path.endswith('.gii.gz'):
+            hemi = HEMI_RE.search(path)
+            assert hemi, 'Path must contain a hemi entity (i.e. "hemi-L" or "hemi-R").'
+            hemi = hemi.group(1)
+            if hemi == 'L':
+                left = path
+                right = path.replace('hemi-L', 'hemi-R')
+            else:
+                left = path.replace('hemi-R', 'hemi-L')
+                right = path
+            left = surface.load_surf_data(left)
+            right = surface.load_surf_data(right)
+            if len(left.shape) > 1 and len(right.shape) > 1 and left.shape[1] != right.shape[1]:
+                # Axes may have been swapped during GIFTI save/load
+                left = left.T
+                right = right.T
+            functional = surface.PolyData(left=left, right=right)
+            t1 = time.time()
+            print(f'    Loading data {path} took {t1 - t0:.2f} seconds.')
+        else:
+            assert pial_left is not None or pial_right is not None, \
+                'If path is not a GIFTI file, pial meshes must be provided to project the functional image to the ' \
+                'surface.'
+            assert white_left is not None or white_right is not None, \
+                'If path is not a GIFTI file, white meshes must be provided to project the functional image to the ' \
+                'surface.'
+            functional = self.load_nii(path)
+            t1 = time.time()
+            print(f'    Loading data {path} took {t1 - t0:.2f} seconds.')
+            t0 = time.time()
+            pial = self.get_surface_mesh(pial_left, pial_right)
+            white = self.get_surface_mesh(white_left, white_right)
+            functional_kwargs = dict()
+            for hemi in ('left', 'right'):
+                functional_kwargs[hemi] = surface.vol_to_surf(
+                    functional,
+                    pial.parts[hemi],
+                    inner_mesh=white.parts[hemi],
+                    depth=np.linspace(0.0, 1.0, 10)
+                )
+            functional = surface.PolyData(**functional_kwargs)
+            t1 = time.time()
+            print(f'    Projecting functional image {path} to surface took {t1 - t0:.2f} seconds.')
 
         return functional
 
