@@ -26,6 +26,8 @@ DEFAULT_MASK_FWHM = 2
 DEFAULT_TARGET_AFFINE = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
 
 # Regex
+SUB_RE = re.compile('sub-([a-zA-Z0-9]+)_')
+SES_RE = re.compile('.+_ses-([a-zA-Z0-9]+)_')
 SPACE_RE = re.compile('.+_space-([a-zA-Z0-9]+)_')
 RUN_RE = re.compile('.+_run-([0-9]+)_')
 TASK_RE = re.compile('.+_task-([a-zA-Z0-9]+)_')
@@ -107,6 +109,26 @@ MODEL_TEMPLATE = {
         {"Source": "run", "Destination": "subject"}
     ]
 }
+
+# Parcellation
+ATLAS_NAME_TO_FILE = dict(
+    lana='LanA_n806.nii',
+    aud='DU15_AUD.nii.gz',
+    cg_op='DU15_CG_OP.nii.gz',
+    datn_a='DU15_dATN_A.nii.gz',
+    datn_b='DU15_dATN_B.nii.gz',
+    dn_a='DU15_DN_A.nii.gz',
+    dn_b='DU15_DN_B.nii.gz',
+    fpn_a='DU15_FPN_A.nii.gz',
+    fpn_b='DU15_FPN_B.nii.gz',
+    lang='DU15_LANG.nii.gz',
+    pm_ppr='DU15_PM_PPr.nii.gz',
+    sal_pmn='DU15_SAL_PMN.nii.gz',
+    smot_a='DU15_SMOT_A.nii.gz',
+    smot_b='DU15_SMOT_B.nii.gz',
+    vis_c='DU15_VIS_C.nii.gz',
+    vis_p='DU15_VIS_P.nii.gz',
+)
 
 # Plotting
 PLOT_COLORS = [
@@ -244,6 +266,7 @@ CONFIG = dict(
                     n_components_pca='auto',
                     n_components_ica='auto',
                     use_connectivity_profile=False,
+                    surface=True,
                     standardize=False,               # This is already done in the cleaning step
                     detrend=False,                   # This is already done in the cleaning step
                     low_pass=None,                   # This is already done in the cleaning step
@@ -262,6 +285,7 @@ CONFIG = dict(
                     n_components_pca='auto',
                     n_components_ica='auto',
                     use_connectivity_profile=False,
+                    surface=False,
                     standardize=False,               # This is already done in the cleaning step
                     detrend=False,                   # This is already done in the cleaning step
                     low_pass=None,                   # This is already done in the cleaning step

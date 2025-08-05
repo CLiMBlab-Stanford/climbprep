@@ -1,9 +1,253 @@
 import yaml
 from copy import deepcopy
+try:
+    import importlib.resources as pkg_resources
+except ImportError:
+    import importlib_resources as pkg_resources
+from climbprep import resources
+import numpy as np
+import pandas as pd
+from sklearn.decomposition import PCA, FastICA
+from nilearn import image, surface
+from nitransforms import resampling, manip
 import argparse
 
 from climbprep.constants import *
 from climbprep.util import *
+
+
+NII_CACHE = {}  # Map from paths to NII objects
+
+
+def get_nii(path, add_to_cache=True, nii_cache=NII_CACHE, threshold=None):
+    """
+    Load a Nifti image from a path, optionally smoothing and thresholding it.
+
+    :param path: ``str``; path to Nifti image
+    :param add_to_cache: ``bool``; whether to add the image to the cache for fast reloading
+    :param nii_cache: ``dict``; cache of Nifti images
+    :param threshold: ``float`` or ``None``; threshold value for binarizing the image. If ``None``, no thresholding is
+        applied.
+    :return: ``nibabel.Nifti1Image``; Nifti image
+    """
+
+    if path not in nii_cache:
+        img = image.smooth_img(path, None)
+        if add_to_cache:
+            nii_cache[path] = img
+    else:
+        img = nii_cache[path]
+
+    return img
+
+
+def resample_to(nii, template):
+    """
+    Resample a Nifti image to match the shape of a template image.
+
+    :param nii: ``nibabel.Nifti1Image``; Nifti image to resample.
+    :param template: ``nibabel.Nifti1Image``; template image.
+    :return: ``nibabel.Nifti1Image``; resampled Nifti image.
+    """
+
+    nii = image.math_img('nii * (1 + 1e-6)', nii=nii)  # Hack to force conversion to float
+    return image.resample_to_img(nii, template, copy_header=True, force_resample=True)
+
+
+def get_atlas(name, resampling_target_nii=None, xfm_path=None):
+    """
+    Load an atlas from a path or a dictionary containing a path and a value.
+
+    :param atlas: ``str``, ``dict``, or ``tuple``; atlas name to retriev, dictionary containing atlas name and either
+        a path or a value, or tuple containing atlas name and either a path or a value.
+    :param resampling_target_nii: ``nibabel.Nifti1Image`` or ``None``; template image for resampling. If ``None``,
+        no resampling is applied.
+    :param xfm_path: ``str`` or ``None``; if the parcellation is not in MNI space, path to
+        transformation from MNI to the parcellation space (e.g., native).
+        If ``None``, parcellation is assumed to be in MNI space.
+    :return: ``str``, ``str``, ``nibabel.Nifti1Image``; atlas name, atlas path, atlas Nifti image
+    """
+
+    filename = ATLAS_NAME_TO_FILE.get(name.lower(), None)
+    if filename is None:
+        raise ValueError('Unrecognized atlas name: %s' % name)
+    with pkg_resources.as_file(pkg_resources.files(resources).joinpath(filename)) as path:
+        val = get_nii(path)
+
+    if xfm_path is not None:
+        assert resampling_target_nii is not None, \
+            'If xfm_path is provided, resampling_target_nii must also be provided.'
+        xfm = manip.load(xfm_path)
+        val = resampling.apply(
+            xfm,
+            val,
+            resampling_target_nii,
+        )
+    elif resampling_target_nii is not None:
+        val = resample_to(val, resampling_target_nii)
+
+    return val
+
+
+def parcellate_surface(
+        functional_paths,
+        surface_left_path,
+        surface_right_path,
+        reference_image_path,
+        xfm_path,
+        output_dir,
+        reference_target_affine=2,
+        n_networks=100,
+        n_components_pca=None,
+        **ignored
+):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    config = dict(
+        functional_paths=functional_paths,
+        surface_left=surface_left_path,
+        surface_right=surface_right_path,
+        reference_image_path=reference_image_path,
+        xfm_path=xfm_path,
+        output_dir=output_dir,
+        reference_target_affine=reference_target_affine,
+        n_networks=n_networks,
+        n_components_pca=n_components_pca,
+        ignored=ignored
+    )
+    with open(os.path.join(output_dir, 'config.yml'), 'w') as f:
+        yaml.safe_dump(config, f, sort_keys=False)
+
+    stderr('Loading atlases')
+    reference = image.load_img(reference_image_path)
+    if reference_target_affine is not None:
+        if isinstance(reference_target_affine, int):
+            reference_target_affine = np.eye(3) * reference_target_affine
+        elif isinstance(reference_target_affine, tuple) or isinstance(reference_target_affine, list):
+            reference_target_affine = np.diag(reference_target_affine)
+        reference = image.resample_img(reference, target_affine=reference_target_affine)
+    surf_anat = surface.PolyMesh(
+        left=surface_left_path,
+        right=surface_right_path
+    )
+    v_left = len(surf_anat.parts['left'].vertices)
+    v_right = len(surf_anat.parts['right'].vertices)
+    v = v_left + v_right
+    atlas_surfaces = {}
+    for atlas_name in ATLAS_NAME_TO_FILE:
+        atlas = get_atlas(
+            atlas_name,
+            resampling_target_nii=reference,
+            xfm_path=xfm_path
+        )
+        atlas_surface_L = surface.vol_to_surf(
+            atlas,
+            surf_anat.parts['left']
+        )
+        atlas_surface_R = surface.vol_to_surf(
+            atlas,
+            surf_anat.parts['right']
+        )
+        atlas_surfaces[atlas_name] = surface.PolyData(
+            left=atlas_surface_L,
+            right=atlas_surface_R
+        )
+
+    stderr('Loading timecourses\n')
+    X = []
+    sub = None
+    ses = None
+    for functional_path in functional_paths:
+        assert functional_path.endswith('.gii') or functional_path.endswith('.gii.gz'), \
+            'Functional data must be in GIFTI format.'
+        hemi = HEMI_RE.match(functional_path)
+        if sub is None:
+            sub = SUB_RE.match(functional_path)
+            assert sub, 'Functional data file name must contain a subject identifier (e.g., "sub-01").'
+            sub = sub.group(1)
+        if ses is None:
+            ses = SES_RE.match(functional_path)
+            if ses:
+                ses = ses.group(1)
+        assert hemi, 'Functional data file name must contain a hemisphere identifier (e.g., "hemi-L" or "hemi-R").'
+        hemi = hemi.group(1)
+        if hemi == 'L':
+            left = functional_path
+            right = functional_path.replace('hemi-L', 'hemi-R')
+        else:
+            left = functional_path.replace('hemi-R', 'hemi-L')
+            right = functional_path
+        functional = surface.PolyData(left=left, right=right)
+        left = functional.parts['left']
+        assert len(left.shape) == 2, 'Functional data must be a 2D array (vertices x timepoints).'
+        if left.shape[0] != v_left:
+            left = left.T
+        assert left.shape[0] == v_left, 'Left hemisphere functional data must have %d vertices.' % v_left
+        right = functional.parts['right']
+        assert len(right.shape) == 2, 'Functional data must be a 2D array (vertices x timepoints).'
+        if right.shape[0] != v_right:
+            right = right.T
+        assert right.shape[0] == v_right, 'Right hemisphere functional data must have %d vertices.' % v_right
+        X_ = np.concatenate([left, right], axis=0)
+        X.append(X_)
+    X = np.concatenate(X, axis=1)
+
+    if n_components_pca is not None:
+        stderr('Applying PCA\n')
+        pca = PCA(n_components=n_components_pca)
+        X = pca.fit_transform(X)
+
+    stderr('Parcellating\n')
+    X = FastICA(n_components=n_networks).fit_transform(X)
+
+    # Assume a network covers < half the mask volume, flip sign accordingly
+    X = np.where(np.median(X, axis=0, keepdims=True) > 0, -X, X)
+    # Clip and normalize (scale is arbitrary)
+    uq = np.quantile(X, 0.99, axis=0, keepdims=True)
+    X = np.clip(X, 0, uq) / uq
+    parcellation = X.astype(np.float32)
+
+    df = []
+    remaining = set(range(parcellation.shape[1]))
+    for atlas_name in atlas_surfaces:
+        atlas_surface = atlas_surfaces[atlas_name]
+        atlas = np.concatenate([atlas_surface.parts['left'], atlas_surface.parts['right']], axis=0)
+        max_r = -np.inf
+        max_ix = None
+        for ix in range(parcellation.shape[1]):
+            network = parcellation[:, ix]
+            r = np.corrcoef(atlas, network)[0, 1]
+            if r > max_r:
+                max_r = r
+                max_ix = ix
+        assert max_ix is not None, 'No matching network found for atlas %s.' % atlas_name
+        df.append(dict(
+            network=atlas_name,
+            index=max_ix,
+            score=max_r
+        ))
+        network = parcellation[:, max_ix]
+        network = surface.PolyData(
+            left=network[:v_left],
+            right=network[v_left:]
+        )
+        for hemi in ('left', 'right'):
+            network.to_filename(
+                os.path.join(output_dir, f'sub-{sub}_ses-{ses}_hemi-{hemi}_network-{max_ix:03d}_label-{atlas_name}.gii')
+            )
+
+        remaining.remove(max_ix)
+
+    for ix in remaining:
+        df.append(dict(
+            network='other',
+            index=ix,
+            score=np.nan
+        ))
+
+    df = pd.DataFrame(df)
+    df = df.sort_values('index')
+    df.to_csv(os.path.join(output_dir, f'sub-{sub}_ses-{ses}_parcellation.tsv'), index=False, sep='\t')
 
 
 if __name__ == '__main__':
@@ -32,6 +276,7 @@ if __name__ == '__main__':
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
     config = {x: config.get(x, config_default[x]) for x in config_default}
+    is_surface = config.get('is_surface', False)
     assert 'cleaning_label' in config, 'Required field `cleaning_label` not found in config. ' \
                                        'Please provide a valid config file or keyword.'
     cleaning_label = config.pop('cleaning_label')
@@ -83,20 +328,36 @@ if __name__ == '__main__':
 
         functional_paths = []
         for path in os.listdir(clean_path):
-            if path.endswith('desc-clean_bold.nii.gz'):
+            if not is_surface and path.endswith('desc-clean_bold.nii.gz'):
                 space_ = SPACE_RE.match(path)
                 if space_ and space_.group(1) == space:
                     functional_paths.append(os.path.join(clean_path, path))
+            elif is_surface and path.endswith('desc-clean_bold.gii') or path.endswith('desc-clean_bold.gii.gz'):
+                space_ = SPACE_RE.match(path)
+                hemi = HEMI_RE.match(path)
+                if space_ and space_.group(1) == space and hemi and hemi.group(1) == 'L':
+                    functional_paths.append(os.path.join(clean_path, path))
+
+        gii = set()
+        nii = set()
+        for path in functional_paths:
+            if path.endswith('.gii') or path.endswith('.gii.gz'):
+                gii.add(path)
+            else:
+                nii.add(path)
+        assert not (len(nii) and len(gii)), 'Cannot mix GIFTI and NIfTI files in functional_paths.'
 
         mask_path = None
         mask_suffix = config.get('mask_suffix', DEFAULT_MASK_SUFFIX)
         xfm_path = None
         if 'mni' in space.lower():
-            surface = None
+            assert not is_surface, 'Surface parcellation in MNI space not currently supported'
+            surfaces = None
             for path in os.listdir(anat_path):
                 if space in path and path.endswith(mask_suffix):
                     mask_path = os.path.join(anat_path, path)
                     break
+            T1 = None
         else:  # Get transform from MNI to native space, and native surface data
             for path in os.listdir(anat_path):
                 if space in path and path.endswith(mask_suffix):
@@ -117,7 +378,7 @@ if __name__ == '__main__':
                 ses_str_ = ses_str
             else:
                 ses_str_ = ''
-            surface = dict(
+            surfaces = dict(
                 pial=dict(
                     left=os.path.join(anat_path, f'sub-{participant}{ses_str_}_hemi-L_pial.surf.gii'),
                     right=os.path.join(anat_path, f'sub-{participant}{ses_str_}_hemi-R_pial.surf.gii')
@@ -135,14 +396,20 @@ if __name__ == '__main__':
                     right=os.path.join(anat_path, f'sub-{participant}{ses_str_}_hemi-R_sulc.shape.gii')
                 )
             )
+            T1 = os.path.join(anat_path, f'sub-{participant}{ses_str_}_desc-preproc_T1w.nii.gz')
 
         parcellation_config = deepcopy(config)
         if mask_path:
             parcellation_config['mask_path'] = mask_path
         if xfm_path:
             parcellation_config['xfm_path'] = xfm_path
-        if surface:
-            parcellation_config['surface'] = surface
+        if surfaces:
+            parcellation_config['surface'] = surfaces
+            if is_surface:
+                parcellation_config['surface_left_path'] = surfaces['midthickness']['left']
+                parcellation_config['surface_right_path'] = surfaces['midthickness']['right']
+        if T1 is not None:
+            parcellation_config['reference_image_path'] = T1
         parcellation_config['sample']['main']['functional_paths'] = []
 
         if not 'session' in nodes:
@@ -173,6 +440,13 @@ if __name__ == '__main__':
             if not os.path.exists(session_dir):
                 os.makedirs(session_dir)
             config_['output_dir'] = session_dir
+            if is_surface:
+                config_['functional_paths'] = config_['sample']['main']['functional_paths']
+                del config_['sample']
+                del config_['surface']
+                del config_['mask_path']
+
+            parcellate_surface(**config_)
 
             config_path = os.path.join(session_dir, 'config.yml')
             with open(config_path, 'w') as f:
@@ -180,11 +454,17 @@ if __name__ == '__main__':
             cliargs.append(config_path)
 
     for cliarg in cliargs:
-        cmd = f'python -m parcellate.bin.train {cliarg}'
-        stderr(cmd + '\n')
-        status = os.system(cmd)
-        if status:
-            stderr('Error during parcellation. Exiting.\n')
-            exit(status)
+        if is_surface:
+            # Surface parcellation
+            with open(cliarg, 'r') as f:
+                config_ = yaml.safe_load(f)
+            parcellate_surface(**config_)
+        else:
+            cmd = f'python -m parcellate.bin.train {cliarg}'
+            stderr(cmd + '\n')
+            status = os.system(cmd)
+            if status:
+                stderr('Error during parcellation. Exiting.\n')
+                exit(status)
 
 
