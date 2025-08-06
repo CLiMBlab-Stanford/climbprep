@@ -75,6 +75,8 @@ if __name__ == '__main__':
         assert os.path.exists(src_path), 'Path not found: %s' % src_path
         run_table_path = os.path.join(src_path, 'runs.csv')
         out_path = os.path.join(project_path, subdir)
+        assert not os.path.exists(out_path), 'Output path already exists: %s. ' \
+            'It must be manually removed prior to re-BIDSifying, in order ensure correctness of results.'
 
         if os.path.exists(run_table_path):
             run_table = pd.read_csv(run_table_path)

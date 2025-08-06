@@ -129,6 +129,12 @@ If you are BIDSifying the first-ever session from a new subject,
 make sure to add their ID to the project's `participants.tsv`
 file.
 
+*IMPORTANT NOTE:* If you are re-BIDSifying a session that has already
+been BIDSified (e.g., because something in the source has changed), 
+you should first remove the existing session directory
+unless you really know what you're doing. Otherwise, unexpected
+behaviors can result.
+
 
 ### preprocess
 

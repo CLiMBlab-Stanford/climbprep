@@ -703,7 +703,7 @@ class PlotLib:
             '`path` must be a string representing the path to the statmap file.'
         if progress_fn is not None:
             progress_fn(f'Loading statmap {path}')
-        statmap = self.load_nii(path)
+        statmap = self.load_img(path)
 
         return statmap
 
@@ -838,7 +838,7 @@ class PlotLib:
             assert white_left is not None or white_right is not None, \
                 'If path is not a GIFTI file, white meshes must be provided to project the functional image to the ' \
                 'surface.'
-            functional = self.load_nii(path)
+            functional = self.load_img(path)
             t1 = time.time()
             print(f'    Loading data {path} took {t1 - t0:.2f} seconds.')
             t0 = time.time()
@@ -865,7 +865,7 @@ class PlotLib:
                 'If `mask_path` is None, `nii_ref` must be provided to compute the mask.'
             mask = masking.compute_brain_mask(nii_ref, connected=False, opening=False, mask_type='gm')
         else:
-            mask = self.load_nii(mask_path)
+            mask = self.load_img(mask_path)
         mask = image.new_img_like(mask, image.get_data(mask).astype(np.float32))
         if mask_fwhm:
             mask = image.smooth_img(mask, fwhm=mask_fwhm)
@@ -875,10 +875,24 @@ class PlotLib:
 
         return mask
 
-    def load_nii(self, path, fwhm=None):
-        if fwhm:
-            return image.smooth_img(path, fwhm=fwhm)
-        return image.load_img(path)
+    def load_img(self, path):
+        if path.endswith('.gii') or path.endswith('gii.gz'):
+            hemi = HEMI_RE.search(path)
+            assert hemi, 'Path must contain a hemi entity (i.e. "hemi-L" or "hemi-R").'
+            hemi = hemi.group(1)
+            if hemi == 'L':
+                left = path
+                right = path.replace('hemi-L', 'hemi-R')
+            else:
+                left = path.replace('hemi-R', 'hemi-L')
+                right = path
+            left = surface.load_surf_data(left).astype(np.float32)
+            assert len(left.shape) == 1, 'Left surface data must be 1D.'
+            right = surface.load_surf_data(right).astype(np.float32)
+            assert len(right.shape) == 1, 'Right surface data must be 1D.'
+            return surface.PolyData(left=left, right=right)
+        else:
+            return image.load_img(path)
 
     # Cachable
     def get_connectivity_from_seed(
@@ -985,29 +999,32 @@ class PlotLib:
             )
             statmap = statmap_bilateral.parts[hemi]
         else:  # Statmap
-            statmap_nii = self.get_statmap(
+            statmap_img = self.get_statmap(
                 path=path, progress_fn=progress_fn
             )
-            mesh_kwargs = {}
-            mesh_kwargs['midthickness_left'] = mesh_kwargs['midthickness_right'] = None
-            for surf_type, surf in zip(
-                    ('pial', 'white', 'midthickness'),
-                    (pial, white, midthickness)
-            ):
-                if surf_type == 'midthickness' and surf is None or surf == 'infer':
-                    mesh_kwargs[f'{surf_type}_{hemi}'] = surf
-                else:
-                    mesh_kwargs[f'{surf_type}_{hemi}'] = surf[hemi]
-            pial, white, midthickness, _, _ = self.get_surface_meshes(**mesh_kwargs)
+            if isinstance(statmap_img, surface.PolyData):
+                statmap = statmap_img.parts[hemi]
+            else:
+                mesh_kwargs = {}
+                mesh_kwargs['midthickness_left'] = mesh_kwargs['midthickness_right'] = None
+                for surf_type, surf in zip(
+                        ('pial', 'white', 'midthickness'),
+                        (pial, white, midthickness)
+                ):
+                    if surf_type == 'midthickness' and surf is None or surf == 'infer':
+                        mesh_kwargs[f'{surf_type}_{hemi}'] = surf
+                    else:
+                        mesh_kwargs[f'{surf_type}_{hemi}'] = surf[hemi]
+                pial, white, midthickness, _, _ = self.get_surface_meshes(**mesh_kwargs)
 
-            if progress_fn is not None:
-                progress_fn(f'Projecting statmap to {hemi} surface', 0)
-            statmap = surface.vol_to_surf(
-                statmap_nii,
-                pial.parts[hemi],
-                inner_mesh=white.parts[hemi],
-                depth=np.linspace(0.0, 1.0, 10)
-            ).astype(np.float32)
+                if progress_fn is not None:
+                    progress_fn(f'Projecting statmap to {hemi} surface', 0)
+                statmap = surface.vol_to_surf(
+                    statmap_img,
+                    pial.parts[hemi],
+                    inner_mesh=white.parts[hemi],
+                    depth=np.linspace(0.0, 1.0, 10)
+                ).astype(np.float32)
 
         return statmap, seed_hemi, seed_ix
 

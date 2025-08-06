@@ -683,11 +683,15 @@ def assign_callbacks(app, cache):
                     continue
                 parcellation_label = get_value(statmap, 'parcellation_label') or PARCELLATE_DEFAULT_KEY
                 node = 'session' if session else 'subject'
-                statmap_path = os.path.join(
+                statmap_dir = os.path.join(
                     BIDS_PATH, project, 'derivatives', 'parcellate', parcellation_label, f'node-{node}', subdir,
-                    'parcellation', 'main', f'{network}.nii.gz'
                 )
-                if not os.path.exists(statmap_path):
+                statmap_path = None
+                for x in os.listdir(statmap_dir):
+                    if ('_hemi-L' in x and x.endswith(f'{network}.gii')) or x.endswith(f'{network}.nii.gz'):
+                        statmap_path = os.path.join(statmap_dir, x)
+                        break
+                if not statmap_path or not os.path.exists(statmap_path):
                     continue
                 statmap_in = dict(
                     path=statmap_path,
