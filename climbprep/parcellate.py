@@ -17,29 +17,7 @@ from climbprep.util import *
 
 
 NII_CACHE = {}  # Map from paths to NII objects
-
-
-def get_nii(path, add_to_cache=True, nii_cache=NII_CACHE, threshold=None):
-    """
-    Load a Nifti image from a path, optionally smoothing and thresholding it.
-
-    :param path: ``str``; path to Nifti image
-    :param add_to_cache: ``bool``; whether to add the image to the cache for fast reloading
-    :param nii_cache: ``dict``; cache of Nifti images
-    :param threshold: ``float`` or ``None``; threshold value for binarizing the image. If ``None``, no thresholding is
-        applied.
-    :return: ``nibabel.Nifti1Image``; Nifti image
-    """
-
-    if path not in nii_cache:
-        img = image.smooth_img(path, None)
-        if add_to_cache:
-            nii_cache[path] = img
-    else:
-        img = nii_cache[path]
-
-    return img
-
+GII_CACHE = {}
 
 def resample_to(nii, template):
     """
@@ -54,7 +32,7 @@ def resample_to(nii, template):
     return image.resample_to_img(nii, template, copy_header=True, force_resample=True)
 
 
-def get_atlas(name, resampling_target_nii=None, xfm_path=None):
+def get_atlas(name, resampling_target_nii=None, xfm_path=None, nii_cache=NII_CACHE):
     """
     Load an atlas from a path or a dictionary containing a path and a value.
 
@@ -71,24 +49,30 @@ def get_atlas(name, resampling_target_nii=None, xfm_path=None):
     filename = ATLAS_NAME_TO_FILE.get(name.lower(), None)
     if filename is None:
         raise ValueError('Unrecognized atlas name: %s' % name)
+    if nii_cache is None:
+        nii_cache = {}
     with pkg_resources.as_file(pkg_resources.files(resources).joinpath(filename)) as path:
-        val = get_nii(path)
+        if path not in nii_cache:
+            val = image.smooth_img(path, None)
 
-    if xfm_path is not None:
-        assert resampling_target_nii is not None, \
-            'If xfm_path is provided, resampling_target_nii must also be provided.'
-        if isinstance(xfm_path, str):
-            xfm = manip.load(xfm_path)
-        else:
-            xfms = [manip.load(x) if x.endswith('.h5') else linear.load(x) for x in xfm_path]
-            xfm = manip.TransformChain(xfms)
-        val = resampling.apply(
-            xfm,
-            val,
-            resampling_target_nii,
-        )
-    elif resampling_target_nii is not None:
-        val = resample_to(val, resampling_target_nii)
+            if xfm_path is not None:
+                assert resampling_target_nii is not None, \
+                    'If xfm_path is provided, resampling_target_nii must also be provided.'
+                if isinstance(xfm_path, str):
+                    xfm = manip.load(xfm_path)
+                else:
+                    xfms = [manip.load(x) if x.endswith('.h5') else linear.load(x) for x in xfm_path]
+                    xfm = manip.TransformChain(xfms)
+                val = resampling.apply(
+                    xfm,
+                    val,
+                    resampling_target_nii,
+                )
+            elif resampling_target_nii is not None:
+                val = resample_to(val, resampling_target_nii)
+            nii_cache[path] = val
+
+        val = nii_cache[path]
 
     return val
 
@@ -105,6 +89,7 @@ def parcellate_surface(
         n_components_pca=None,
         **ignored
 ):
+    gii_cache = GII_CACHE
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     config = dict(
@@ -134,8 +119,8 @@ def parcellate_surface(
         left=surface_left_path,
         right=surface_right_path
     )
-    v_left = len(surf_anat.parts['left'].vertices)
-    v_right = len(surf_anat.parts['right'].vertices)
+    v_left = len(surf_anat.parts['left'].coordinates)
+    v_right = len(surf_anat.parts['right'].coordinates)
     v = v_left + v_right
     atlas_surfaces = {}
     for atlas_name in ATLAS_NAME_TO_FILE:
@@ -181,23 +166,37 @@ def parcellate_surface(
         else:
             left = functional_path.replace('hemi-R', 'hemi-L')
             right = functional_path
-        functional = surface.PolyData(left=left, right=right)
-        left = functional.parts['left']
-        assert len(left.shape) == 2, 'Functional data must be a 2D array (vertices x timepoints).'
-        if left.shape[0] != v_left:
-            left = left.T
-        assert left.shape[0] == v_left, 'Left hemisphere functional data must have %d vertices.' % v_left
-        right = functional.parts['right']
-        assert len(right.shape) == 2, 'Functional data must be a 2D array (vertices x timepoints).'
-        if right.shape[0] != v_right:
-            right = right.T
-        assert right.shape[0] == v_right, 'Right hemisphere functional data must have %d vertices.' % v_right
+        left_path = left
+        if left_path not in gii_cache:
+            left = surface.load_surf_data(left_path)
+            assert len(left.shape) == 2, 'Functional data must be a 2D array (vertices x timepoints).'
+            if left.shape[0] != v_left:
+                left = left.T
+            assert left.shape[0] == v_left, 'Left hemisphere functional data must have %d vertices, got %d.' % (v_left, left.shape[0])
+            gii_cache[left_path] = left
+        left = gii_cache[left_path]
+        right_path = right
+        if right_path not in gii_cache:
+            right = surface.load_surf_data(right_path)
+            assert len(right.shape) == 2, 'Functional data must be a 2D array (vertices x timepoints).'
+            if right.shape[0] != v_right:
+                right = right.T
+            assert right.shape[0] == v_right, 'Right hemisphere functional data must have %d vertices, got %d.' % (v_right, right.shae[0])
+            gii_cache[right_path] = right
+        right = gii_cache[right_path]
         X_ = np.concatenate([left, right], axis=0)
         X.append(X_)
     X = np.concatenate(X, axis=1)
 
+    if ses is None or ses == 'None':
+        ses_str = ''
+    else:
+        ses_str = f'_ses-{ses}'
+
     if n_components_pca is not None:
         stderr('Applying PCA\n')
+        if n_components_pca.lower() == 'auto':
+            n_components_pca = n_networks
         pca = PCA(n_components=n_components_pca)
         X = pca.fit_transform(X)
 
@@ -211,6 +210,7 @@ def parcellate_surface(
     X = np.clip(X, 0, uq) / uq
     parcellation = X.astype(np.float32)
 
+    stderr('Labeling and saving results\n')
     df = []
     remaining = set(range(parcellation.shape[1]))
     for atlas_name in atlas_surfaces:
@@ -235,23 +235,33 @@ def parcellate_surface(
             left=network[:v_left],
             right=network[v_left:]
         )
-        for hemi in ('left', 'right'):
+        for hemi in ('L', 'R'):
             network.to_filename(
-                os.path.join(output_dir, f'sub-{sub}_ses-{ses}_hemi-{hemi}_network-{max_ix:03d}_label-{atlas_name}.gii')
+                os.path.join(output_dir, f'sub-{sub}{ses_str}_hemi-{hemi}_network-{max_ix:03d}_label-{atlas_name}.gii')
             )
 
-        remaining.remove(max_ix)
+        if max_ix in remaining:
+            remaining.remove(max_ix)
 
-    for ix in remaining:
+    for i, ix in enumerate(sorted(list(remaining))):
         df.append(dict(
             network='other',
             index=ix,
             score=np.nan
         ))
+        network = parcellation[:, ix]
+        network = surface.PolyData(
+            left=network[:v_left],
+            right=network[v_left:]
+        )
+        for hemi in ('L', 'R'):
+            network.to_filename(
+                    os.path.join(output_dir, f'sub-{sub}{ses_str}_hemi-{hemi}_network-{ix:03d}_label-other{i:03d}.gii')
+            )
 
     df = pd.DataFrame(df)
     df = df.sort_values('index')
-    df.to_csv(os.path.join(output_dir, f'sub-{sub}_ses-{ses}_parcellation.tsv'), index=False, sep='\t')
+    df.to_csv(os.path.join(output_dir, f'sub-{sub}{ses_str}_parcellation.tsv'), index=False, sep='\t')
 
 
 if __name__ == '__main__':
@@ -280,7 +290,7 @@ if __name__ == '__main__':
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
     config = {x: config.get(x, config_default[x]) for x in config_default}
-    is_surface = config.get('is_surface', False)
+    is_surface = config.get('surface', False)
     assert 'cleaning_label' in config, 'Required field `cleaning_label` not found in config. ' \
                                        'Please provide a valid config file or keyword.'
     cleaning_label = config.pop('cleaning_label')
@@ -336,7 +346,7 @@ if __name__ == '__main__':
                 space_ = SPACE_RE.match(path)
                 if space_ and space_.group(1) == space:
                     functional_paths.append(os.path.join(clean_path, path))
-            elif is_surface and path.endswith('desc-clean_bold.gii') or path.endswith('desc-clean_bold.gii.gz'):
+            elif is_surface and path.endswith('desc-clean_bold.func.gii') or path.endswith('desc-clean_bold.func.gii.gz'):
                 space_ = SPACE_RE.match(path)
                 hemi = HEMI_RE.match(path)
                 if space_ and space_.group(1) == space and hemi and hemi.group(1) == 'L':
@@ -369,16 +379,17 @@ if __name__ == '__main__':
                     mask_path = os.path.join(anat_path, path)
                 elif '_space-' not in path and path.endswith(mask_suffix): 
                     mask_path = os.path.join(anat_path, path)
-                elif path.endswith('_mode-image_xfm.h5'):
+                elif path.endswith('_mode-image_xfm.h5') or path.endswith('_mode-image_xfm.txt'):
                     t = TO_RE.match(path)
                     f = FROM_RE.match(path)
                     if t and f:
                         t = t.group(1)
                         f = f.group(1)
-                        if 'mni' in f.lower() and (t == space or (t == 'T1w' and space == 'fsnative')):
+                        if f == 'MNI152NLin2009cAsym' and (t == space or (t == 'T1w' and space == 'fsnative')):
                             xfm_path.append(os.path.join(anat_path, path))
                         elif f == 'T1w' and space == 'fsnative' and t == space:
-                            xfm_path = os.path.join(anat_path, path)
+                            xfm_path.append(os.path.join(anat_path, path))
+            assert xfm_path, 'No transform found in %s' % anat_path
             if len(xfm_path) == 1:
                 xfm_path = xfm_path[0]
             else:
@@ -456,7 +467,10 @@ if __name__ == '__main__':
             sessions = set(nodes[node].keys())
         for session in sessions:
             if node == 'session':
-                session_dir = os.path.join(participant_dir, f'ses-{session}')
+                if session:
+                    session_dir = os.path.join(participant_dir, f'ses-{session}')
+                else:
+                    session_dir = participant_dir
                 config_ = nodes[node][session]
             else:
                 session_dir = participant_dir
@@ -467,8 +481,6 @@ if __name__ == '__main__':
             if is_surface:
                 del config_['surface']
                 del config_['mask_path']
-
-            parcellate_surface(**config_)
 
             config_path = os.path.join(session_dir, 'config.yml')
             with open(config_path, 'w') as f:
