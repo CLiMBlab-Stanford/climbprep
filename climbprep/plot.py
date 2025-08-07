@@ -1164,20 +1164,25 @@ class PlotLib:
 
         return sphere
 
-    def get_coord_map(self, x, y, z, hemi, spacer=5, turn_out_hemis=False):
+    def get_coord_map(self, x, y, z, hemi, spacing_factor=0.01, turn_out_hemis=False):
         if turn_out_hemis:
+            spacer = spacing_factor * (y.max() - y.min())
             if hemi == 'left':
                 x_a = 1
-                x_b = 0
+                x_b = -x.max()
                 y_a = 1
                 y_b = -y.min() + spacer
+                z_a = 1
+                z_b = 0
             else:
                 x_a = -1
-                x_b = 0
+                x_b = x.min()
                 y_a = -1
-                y_b = -y.max() - spacer
-            def coord_map (x, y, z):
-                return x * x_a + x_b, y * y_a + y_b, z
+                y_b = y.min() - spacer
+                z_a = 1
+                z_b = 0
+            def coord_map (x, y, z, x_a=x_a, x_b=x_b, y_a=y_a, y_b=y_b, z_a=z_a, z_b=z_b):
+                return x * x_a + x_b, y * y_a + y_b, z * z_a + z_b
         else:
             def coord_map(x, y, z):
                 return x, y, z

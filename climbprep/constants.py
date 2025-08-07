@@ -233,30 +233,6 @@ CONFIG = dict(
             n_jobs=-1
         )
     ),
-    model=dict(
-        mni=dict(
-            preprocessing_label=PREPROCESS_DEFAULT_KEY,
-            smoothing_fwhm=4,
-            smoothing_method='iso',
-            space='MNI152NLin2009cAsym',
-            estimator='nilearn',
-            drift_model='cosine',
-            drop_missing=True
-        ),
-        T1w=dict(
-            preprocessing_label=PREPROCESS_DEFAULT_KEY,
-            smoothing_fwhm=4,
-            smoothing_method='iso',
-            space='T1w',
-            estimator='nilearn',
-            drift_model='cosine',
-            drop_missing=True
-        )
-    ),
-    plot=dict(
-        T1w=dict(),
-        mni=dict()
-    ),
     parcellate=dict(
         fsnative=dict(
             cleaning_label=CLEAN_DEFAULT_KEY,
@@ -302,8 +278,32 @@ CONFIG = dict(
                     fwhm=None                        # This is already done in the cleaning step
                 )
             ),
+        ),
+    ),
+    model=dict(
+        mni=dict(
+            preprocessing_label=PREPROCESS_DEFAULT_KEY,
+            smoothing_fwhm=4,
+            smoothing_method='iso',
+            space='MNI152NLin2009cAsym',
+            estimator='nilearn',
+            drift_model='cosine',
+            drop_missing=True
+        ),
+        T1w=dict(
+            preprocessing_label=PREPROCESS_DEFAULT_KEY,
+            smoothing_fwhm=4,
+            smoothing_method='iso',
+            space='T1w',
+            estimator='nilearn',
+            drift_model='cosine',
+            drop_missing=True
         )
-    )
+    ),
+    plot=dict(
+        T1w=dict(),
+        mni=dict()
+    ),
 )
 for key in CONFIG['model']:
     CONFIG['plot'][key] = dict(

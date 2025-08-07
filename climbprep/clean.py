@@ -25,12 +25,18 @@ if __name__ == '__main__':
     argparser.add_argument('participant', help='BIDS participant ID')
     argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", '
                                                                         '"evlab", etc.). Default: "climblab"'))
+    argparser.add_argument('-s', '--sessions', nargs='+', help="BIDS session ID(s).")
     argparser.add_argument('-c', '--config', default=CLEAN_DEFAULT_KEY, help=('Config name (default `fc`) '
         'or YAML config file to used to parameterize cleaning. '
         'See `climbprep.constants.CONFIG["clean"]` for available config names and their settings. '))
     args = argparser.parse_args()
 
     participant = args.participant.replace('sub-', '')
+    target_sessions = args.sessions
+    if target_sessions:
+        target_sessions = set(target_sessions)
+    else:
+        target_sessions = set()
     config = args.config
     if config in CONFIG['clean']:
         cleaning_label = config
@@ -70,6 +76,8 @@ if __name__ == '__main__':
     if not sessions:
         sessions = {None}
     for session in sorted(list(sessions)):
+        if target_sessions and not session in target_sessions:
+            continue
         # Set session-dependent paths
         subdir = 'sub-%s' % participant
         participant_dir = subdir
