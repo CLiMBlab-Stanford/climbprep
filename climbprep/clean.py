@@ -223,6 +223,9 @@ if __name__ == '__main__':
                     )
                     convolved = []
                     if config['regress_out_task'] and os.path.exists(eventfile_path):
+                        events = pd.read_csv(eventfile_path, sep='\t')
+                        if 'trial_type' not in events:
+                            events['trial_type'] = 'dummy'
                         events = pd.read_csv(eventfile_path, sep='\t')[['trial_type', 'onset', 'duration']]
                         dummies = pd.get_dummies(events.trial_type, prefix='trial_type', prefix_sep='.')
                         events = pd.concat([dummies, events[['onset', 'duration']]], axis=1)
@@ -261,7 +264,7 @@ if __name__ == '__main__':
                             standardize=config['standardize'],
                             detrend=config['detrend'],
                             t_r=TR,
-                            smoothing_fwhm=config['smoothing_fwhm'],
+                            smoothing_fwhm=config['volume_fwhm'],
                             low_pass=config['low_pass'],
                             high_pass=config['high_pass']
                         )
@@ -302,11 +305,11 @@ if __name__ == '__main__':
                         kwargs = dict(confounds=confounds.fillna(0))
                         desc = 'desc-clean'
                         mesh = surface.PolyMesh(left=surf_L_path, right=surf_R_path)
-                        if config['smoothing_fwhm'] and geodesic_smoothing_weights is None:
+                        if config['surface_fwhm'] and geodesic_smoothing_weights is None:
                             geodesic_smoothing_weights = {}
                             for hemi in ('left', 'right'):
                                 geodesic_smoothing_weights[hemi] = get_geodesic_smoothing_weights(
-                                    mesh.parts[hemi].faces, mesh.parts[hemi].coordinates, fwhm=config['smoothing_fwhm']
+                                    mesh.parts[hemi].faces, mesh.parts[hemi].coordinates, fwhm=config['surface_fwhm']
                                 )
                         data = surface.PolyData(left=func_path, right=func_path.replace('_hemi-L_', '_hemi-R_'))
                         if not len(data.shape) > 1 or data.shape[1] < min_T:

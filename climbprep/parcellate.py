@@ -54,6 +54,7 @@ def get_atlas(name, resampling_target_nii=None, xfm_path=None, nii_cache=NII_CAC
     with pkg_resources.as_file(pkg_resources.files(resources).joinpath(filename)) as path:
         if path not in nii_cache:
             val = image.smooth_img(path, None)
+            val = image.math_img('x * (1 + 1e-6)', x=val)  # Hack to force conversion to float
 
             if xfm_path is not None:
                 assert resampling_target_nii is not None, \
@@ -119,6 +120,13 @@ def parcellate_surface(
         left=surface_left_path,
         right=surface_right_path
     )
+    sub = SUB_RE.match(surface_left_path)
+    assert sub, 'Surface data file name must contain a subject identifier (e.g., "sub-01").'
+    sub = sub.group(1)
+    for hemi in ('L', 'R'):
+        surf_anat.to_filename(
+            os.path.join(output_dir, f'sub-{sub}_hemi-{hemi}_surface.gii')
+        )
     v_left = len(surf_anat.parts['left'].coordinates)
     v_right = len(surf_anat.parts['right'].coordinates)
     v = v_left + v_right
@@ -141,23 +149,22 @@ def parcellate_surface(
             left=atlas_surface_L,
             right=atlas_surface_R
         )
+        for hemi in ('L', 'R'):
+            atlas_surfaces[atlas_name].to_filename(
+                    os.path.join(output_dir, f'sub-{sub}_hemi-{hemi}_label-{atlas_name}REF.gii')
+            )
 
     stderr('Loading timecourses\n')
     X = []
-    sub = None
     ses = None
     for functional_path in functional_paths:
         assert functional_path.endswith('.gii') or functional_path.endswith('.gii.gz'), \
             'Functional data must be in GIFTI format.'
-        hemi = HEMI_RE.match(functional_path)
-        if sub is None:
-            sub = SUB_RE.match(functional_path)
-            assert sub, 'Functional data file name must contain a subject identifier (e.g., "sub-01").'
-            sub = sub.group(1)
         if ses is None:
             ses = SES_RE.match(functional_path)
             if ses:
                 ses = ses.group(1)
+        hemi = HEMI_RE.match(functional_path)
         assert hemi, 'Functional data file name must contain a hemisphere identifier (e.g., "hemi-L" or "hemi-R").'
         hemi = hemi.group(1)
         if hemi == 'L':
@@ -432,8 +439,8 @@ if __name__ == '__main__':
         if surfaces:
             parcellation_config['surface'] = surfaces
             if is_surface:
-                parcellation_config['surface_left_path'] = surfaces['midthickness']['left']
-                parcellation_config['surface_right_path'] = surfaces['midthickness']['right']
+                parcellation_config['surface_left_path'] = surfaces['pial']['left']
+                parcellation_config['surface_right_path'] = surfaces['pial']['right']
         if T1 is not None:
             parcellation_config['reference_image_path'] = T1
         if is_surface:

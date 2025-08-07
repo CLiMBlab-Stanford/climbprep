@@ -204,9 +204,10 @@ CONFIG = dict(
             clean_surf=True,
             preprocessing_label=PREPROCESS_DEFAULT_KEY,
             mask_suffix=DEFAULT_MASK_SUFFIX,
-            # Matches 7 core motion regressors, acompcor + discrete cosine, and motion outliers 
+            # Matches 7 core motion regressors, acompcor + discrete cosine, and motion and non-steady-state outliers 
             confounds_regex=f'^(framewise_displacement|trans_[xyz]|rot_[xyz]|a_comp_cor_0[0-4]|cosine.*|.*_outlier.*)$',
-            smoothing_fwhm=4,
+            volume_fwhm=4,
+            surface_fwhm=4,
             standardize=True,
             detrend=True,
             regress_out_task=True,
@@ -219,9 +220,10 @@ CONFIG = dict(
             clean_surf=True,
             preprocessing_label=PREPROCESS_DEFAULT_KEY,
             mask_suffix=DEFAULT_MASK_SUFFIX,
-            # Matches 7 core motion regressors, acompcor + discrete cosine, and motion outliers 
+            # Matches 7 core motion regressors, acompcor + discrete cosine, and motion and non-stead-state outliers 
             confounds_regex=f'^(framewise_displacement|trans_[xyz]|rot_[xyz]|a_comp_cor_0[0-4]|cosine.*|.*_outlier.*)$',
-            smoothing_fwhm=4,
+            volume_fwhm=4,
+            surface_fwhm=4,
             standardize=False,
             detrend=True,
             regress_out_task=False,
@@ -259,7 +261,7 @@ CONFIG = dict(
         fsnative=dict(
             cleaning_label=CLEAN_DEFAULT_KEY,
             space='fsnative',
-            n_networks=100,
+            n_networks=50,
             n_components_pca='auto',
             surface=True
         ),
