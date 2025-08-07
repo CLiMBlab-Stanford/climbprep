@@ -125,7 +125,7 @@ if __name__ == '__main__':
                     session_str = ' -s %s' % session
                 else:
                     session_str = ''
-                name_parts += '-'.join(job_types)
+                name_parts.append('-'.join(job_types))
                 job_name = '_'.join(name_parts)
                 filename = os.path.normpath(os.path.join(outdir, job_name + '.pbs'))
                 with open(filename, 'w') as f:
