@@ -7,16 +7,19 @@ from climbprep.constants import *
 from climbprep.util import stderr
 
 if __name__ ==  '__main__':
-    argparser = argparse.ArgumentParser('Make a new multisession BIDS dataset from a subset of climblab sessions.')
-    argparser.add_argument('project',  help='Name of BIDS project to create from climblab data.')
+    argparser = argparse.ArgumentParser('Make a new multisession BIDS dataset from a subset of sessions in a '
+                                        'project with sessions as subjects (e.g., climblab and evlab).')
+    argparser.add_argument('project',  help='Name of BIDS project to create from the source data.')
+    argparser.add_argument('-p', '--source_project', default='climblab',  help='Name of BIDS project to rescaffold '
+                                                                               '(default `climblab`.')
     argparser.add_argument('participants', nargs='*', help=('Space-delimited list of participants or a `*.tsv` table '
                                                             'containing a list of participants. IMPORTANT: the '
-                                                            'BIDS `participant` field in the `climblab` directory '
+                                                            'BIDS `participant` field in the source directory '
                                                             'indexes the *session*, the the participant. Participants '
-                                                            'are indexed via the `climblab_id` column of '
+                                                            'are indexed via the `<SOURCE>_id` column of '
                                                             '`participants.tsv`. Values passed to this argument '
-                                                            'should be valid CLiMB Lab IDs or they will be ignored. '
-                                                            'If this argument is empty, all `climblab` participants '
+                                                            'should be valid source IDs or they will be ignored. '
+                                                            'If this argument is empty, all source participants '
                                                             'will be included.'))
     argparser.add_argument('-T', '--tasks', nargs='*', help=('Space-delimited list of tasks to include or a `*.tsv` '
                                                               'table containing a list of tasks. If this argument is '
@@ -24,6 +27,7 @@ if __name__ ==  '__main__':
     args = argparser.parse_args()
 
     project = args.project
+    source = args.source_project
 
     # Infer relevant participants and sessions
     participants = set(args.participants) or None
@@ -46,30 +50,30 @@ if __name__ ==  '__main__':
 
     stderr(f'Rescaffolded project will be written to {os.path.join(BIDS_PATH, project)}\n')
 
-    climblab_project_path = os.path.join(BIDS_PATH, 'climblab')
-    participants_table = pd.read_csv(os.path.join(climblab_project_path, 'participants.tsv'), sep='\t')
+    source_project_path = os.path.join(BIDS_PATH, source)
+    participants_table = pd.read_csv(os.path.join(source_project_path, 'participants.tsv'), sep='\t')
     participants_table.participant_id = participants_table.participant_id.str.replace('^sub-', '', regex=True)
-    session_to_id = {x: y for x, y in zip(participants_table['participant_id'], participants_table['climblab_id'])}
+    session_to_id = {x: y for x, y in zip(participants_table['participant_id'], participants_table[f'{source}_id'])}
     id_to_sessions = {}
     for session in session_to_id:
-        climblab_id = session_to_id[session]
-        if climblab_id not in id_to_sessions:
-            id_to_sessions[climblab_id] = set()
-        id_to_sessions[climblab_id].add(session)
+        source_id = session_to_id[session]
+        if source_id not in id_to_sessions:
+            id_to_sessions[source_id] = set()
+        id_to_sessions[source_id].add(session)
     available_participants = set(id_to_sessions.keys())
     if participants:
         missing = participants - available_participants
         if missing:
-            stderr((f'WARNING: The following participants were not found in the CLiMB Lab dataset: '
+            stderr((f'WARNING: The following participants were not found in the {source} dataset: '
                     f"{' '.join(sorted(list(missing)))}. "
                     f'These participants will be ignored. If you are receiving this message in error, either the '
-                    f'participant has no BIDSified sessions or `{BIDS_PATH}/climblab/participants.tsv` has not '
-                    f'been updated to include their `climblab_id`. Check to make sure (1) that their session data can '
-                    f'be found at `{BIDS_PATH}/climblab/sub-<SESSION_ID> (if not, run `python -m climbprep.bidsify '
-                    f'<SESSION_ID>) and (2) that `{BIDS_PATH}/climblab/participants.tsv` has been updated to '
-                    f'include the `climblab_id` for the relevant sessions (if not, run `python -m climbprep.repair` '
-                    f'and then manually add their `climblab_id` to the relevant rows of `{BIDS_PATH}/climblab/'
-                    f'participants.tsv`. If you do not know their `climblab_id`, contact Cory or another lab member '
+                    f'participant has no BIDSified sessions or `{BIDS_PATH}/{source}/participants.tsv` has not '
+                    f'been updated to include their `{source}_id`. Check to make sure (1) that their session data can '
+                    f'be found at `{BIDS_PATH}/{source}/sub-<SESSION_ID> (if not, run `python -m climbprep.bidsify '
+                    f'<SESSION_ID> -p {source}) and (2) that `{BIDS_PATH}/{source}/participants.tsv` has been updated '
+                    f'to include the `{source}_id` for the relevant sessions (if not, run `python -m climbprep.repair` '
+                    f'and then manually add their `{source}_id` to the relevant rows of `{BIDS_PATH}/{source}/'
+                    f'participants.tsv`. If you do not know their `{source}_id`, contact Cory or another lab member '
                     f'who has access to the high-risk database.\n'))
         participants &= available_participants
     else:
@@ -80,7 +84,7 @@ if __name__ ==  '__main__':
     task_to_sessions = {}
     session_to_tasks = {}
     for session in sessions:
-        func_path = os.path.join(climblab_project_path, f'sub-{session}', 'func')
+        func_path = os.path.join(source_project_path, f'sub-{session}', 'func')
         for func in os.listdir(func_path):
             task = TASK_RE.match(func)
             if task:
@@ -95,11 +99,11 @@ if __name__ ==  '__main__':
     if tasks:
         missing = set(tasks) - available_tasks
         if missing:
-            stderr((f'WARNING: The following tasks were not found in the CLiMB Lab dataset: '
+            stderr((f'WARNING: The following tasks were not found in the {source} dataset: '
                     f'{", ".join(sorted(list(missing)))}. These tasks will be ignored. If you are receiving this '
                     f'message in error, make sure that (1) you have requested an exact string match to the desired '
                     f'task name, and (2) that the relevant session data can be found at '
-                    f'`{BIDS_PATH}/climblab/sub-<SESSION_ID> (if not, run `python -m climbprep.bidsify '
+                    f'`{BIDS_PATH}/{source}/sub-<SESSION_ID> (if not, run `python -m climbprep.bidsify '
                     f'<SESSION_ID>).\n'))
         tasks = set(tasks) & available_tasks
     else:
@@ -145,9 +149,10 @@ if __name__ ==  '__main__':
         participants_tsv.to_csv(os.path.join(BIDS_PATH, project, 'participants.tsv'), index=False, sep='\t')
 
         participants_json = {
-            "climblab_id" :{
+            f"{source}_id" :{
                 "LongName": "",
-                "Description": "Unique participant-level identifier (BIDS `participant_id` used for sessions in this project)"
+                "Description": "Unique participant-level identifier (BIDS `participant_id` used for sessions in "
+                               "this project)"
             },
             "tasks": {
                 "LongName": "",
@@ -170,7 +175,7 @@ if __name__ ==  '__main__':
 
         for session in id_to_sessions[participant]:
             session_path = os.path.join(participant_path, f'ses-{session}')
-            source_path = os.path.join(climblab_project_path, 'sourcedata', f'sub-{session}')
+            source_path = os.path.join(source_project_path, 'sourcedata', f'sub-{session}')
             if not os.path.exists(session_path):
                 stderr(f'Session path {session_path} not found, creating.\n')
                 os.symlink(source_path, session_path, target_is_directory=True)
