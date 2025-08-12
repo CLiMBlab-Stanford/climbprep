@@ -143,7 +143,7 @@ if __name__ ==  '__main__':
                 tasks_ |= session_to_tasks[session]
             tasks_ = ','.join(sorted(list(tasks_)))
             participants_tsv.append(
-                dict(participant_id='sub-' + participant, tasks=tasks_)
+                dict(participant_id='sub-' + str(participant), tasks=tasks_)
             )
         participants_tsv = pd.DataFrame(participants_tsv)
         participants_tsv.to_csv(os.path.join(BIDS_PATH, project, 'participants.tsv'), index=False, sep='\t')
