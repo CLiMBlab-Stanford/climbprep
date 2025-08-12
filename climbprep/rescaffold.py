@@ -150,10 +150,9 @@ if __name__ ==  '__main__':
         participants_tsv.to_csv(os.path.join(BIDS_PATH, project, 'participants.tsv'), index=False, sep='\t')
 
         participants_json = {
-            f"{source}_id" :{
+            f"participant_id" :{
                 "LongName": "",
-                "Description": "Unique participant-level identifier (BIDS `participant_id` used for sessions in "
-                               "this project)"
+                "Description": "Unique participant-level identifier"
             },
             "tasks": {
                 "LongName": "",
