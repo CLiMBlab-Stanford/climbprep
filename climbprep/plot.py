@@ -1,3 +1,4 @@
+import shutil
 import time
 import json
 import yaml
@@ -1275,15 +1276,6 @@ if __name__ == '__main__':
     argparser.add_argument('--ncpus', type=int, default=8, help='Number of parallel processes to use.')
     args = argparser.parse_args()
 
-    cache = diskcache.Cache(
-        os.path.join(os.getcwd(), '.cache', 'viz'),
-        size_limit=1024 * 1024 * 1024 * 16,  # 16GB
-    )
-
-    pl = PlotLibMemoized(
-        cache.memoize(ignore={'progress_fn', 'masker'})
-    )
-
     participant = args.participant
     project = args.project
     models = args.models
@@ -1318,6 +1310,20 @@ if __name__ == '__main__':
     assert os.path.exists(models_path), 'Path not found: %s' % models_path
 
     stderr(f'Plotting outputs will be written to {os.path.join(derivatives_path, "plot", plot_label)}\n')
+
+    cache_dir = os.path.join(derivatives_path, "plot", plot_label, participant)
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
+    cache_path = os.path.join(cache_dir, '.cache')
+
+    cache = diskcache.Cache(
+        cache_path,
+        size_limit=1024 * 1024 * 1024 * 32,  # 32GB
+    )
+
+    pl = PlotLibMemoized(
+        cache.memoize(ignore={'progress_fn', 'masker'})
+    )
 
     for model_subdir in os.listdir(models_path):
         if models and model_subdir not in models:
@@ -1452,3 +1458,5 @@ if __name__ == '__main__':
                         vtrim=config['vtrim']
                     )
                     stderr(f'  Finished plotting: {plot_path_}\n')
+
+    shutil.rmtree(cache_path)
