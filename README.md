@@ -35,6 +35,15 @@ which you can activate by running:
 conda activate climbprep
 ```
 
+*Note*: To run any plotting utilities, after installing and activating your conda environment,
+you will need to run the following command:
+
+```bash
+plotly_get_chrome
+```
+
+
+
 
 ## Preliminaries
 
@@ -145,7 +154,7 @@ lab members are encouraged to use this codebase for preprocessing whenever
 possible, rather than running fMRIprep directly. To preprocess a participant,
 run:
 
-    python -m climblab.preprocess <PARTICIPANT_ID> -p <PROJECT_ID> -c <CONFIG>
+    python -m climbprep.preprocess <PARTICIPANT_ID> -p <PROJECT_ID> -c <CONFIG>
 
 (the `-p` option can be omitted if the project is `climblab`).
 The optional `-c` argument can be used to specify a YAML configuration
@@ -177,7 +186,7 @@ high-motion volumes. The cleaning step can only be run after
 preprocessing is complete. To clean a participant's data,
 run:
 
-    python -m climblab.clean <PARTICIPANT_ID> -p <PROJECT_ID> -c <CONFIG>
+    python -m climbprep.clean <PARTICIPANT_ID> -p <PROJECT_ID> -c <CONFIG>
 
 (the `-p` option can be omitted if the project is `climblab`).
 The `-c` argument can be omitted (defaulting to FC standard settings),
@@ -208,7 +217,7 @@ statmaps) from task fMRI data. Modeling uses the
 It can only be run after preprocessing is complete. To model a participant,
 run:
 
-    python -m climblab.model <PARTICIPANT_ID> -p <PROJECT_ID>
+    python -m climbprep.model <PARTICIPANT_ID> -p <PROJECT_ID>
 
 (the `-p` option can be omitted if the project is `climblab`).
 The `-c` argument can be omitted (defaulting to `T1w` standard settings),
@@ -259,7 +268,7 @@ based on activity fluctuations. It can only be run after
 cleaning is complete. To parcellate a participant's data,
 run:
 
-    python -m climblab.parcellate <PARTICIPANT_ID> -p <PROJECT_ID>
+    python -m climbprep.parcellate <PARTICIPANT_ID> -p <PROJECT_ID>
 
 (the `-p` option can be omitted if the project is `climblab`).
 The `-c` argument can be omitted (defaults to `T1w`) or set to
@@ -273,7 +282,7 @@ The plotting step generates surface plots of the results of the modeling
 step. It can only be run after modeling is complete. To plot a participant's
 data, run:
 
-    python -m climblab.plot <PARTICIPANT_ID> -p <PROJECT_ID>
+    python -m climbprep.plot <PARTICIPANT_ID> -p <PROJECT_ID>
 
 (the `-p` option can be omitted if the project is `climblab`).
 The `-c` argument can be omitted (defaults to `T1w`) or set to

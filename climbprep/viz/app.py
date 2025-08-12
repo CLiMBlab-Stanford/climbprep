@@ -16,7 +16,7 @@ from climbprep import resources
 
 
 CACHE_PATH = os.path.join(os.getcwd(), '.cache', 'viz')
-CACHE_SIZE = 1024 * 1024 * 1024 * 16  # 16GB
+CACHE_SIZE = 1024 * 1024 * 1024 * 64  # 64GB
 OPTION_HEIGHT = 50
 
 
@@ -687,10 +687,11 @@ def assign_callbacks(app, cache):
                     BIDS_PATH, project, 'derivatives', 'parcellate', parcellation_label, f'node-{node}', subdir,
                 )
                 statmap_path = None
-                for x in os.listdir(statmap_dir):
-                    if ('_hemi-L' in x and x.endswith(f'{network}.gii')) or x.endswith(f'{network}.nii.gz'):
-                        statmap_path = os.path.join(statmap_dir, x)
-                        break
+                if os.path.exists(statmap_dir):
+                    for x in os.listdir(statmap_dir):
+                        if ('_hemi-L' in x and x.endswith(f'{network}.gii')) or x.endswith(f'{network}.nii.gz'):
+                            statmap_path = os.path.join(statmap_dir, x)
+                            break
                 if not statmap_path or not os.path.exists(statmap_path):
                     continue
                 statmap_in = dict(
@@ -886,7 +887,7 @@ def assign_callbacks(app, cache):
                     x, y, z = trace['x'][seed_ix], trace['y'][seed_ix], trace['z'][seed_ix]
                 else:
                     raise ValueError(f'Invalid seed hemisphere: {seed_hemi}. Must be "left" or "right".')
-                extra_traces.append(pl.make_sphere((x, y, z)))
+                extra_traces.append(pl.make_sphere((x, y, z), radius=plot_data['sphere_radius'], color=seed['color']))
             fig_['data'].extend(extra_traces)
 
             # fig_['layout'] = fig_prev['layout']

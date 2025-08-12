@@ -115,6 +115,7 @@ class PlotLib:
             bg_alpha=PLOT_BG_ALPHA,
             additive_color=False,
             turn_out_hemis=False,
+            sphere_radius_factor=0.01,
             progress_fn=None
     ):
         statmaps_in = statmaps
@@ -212,6 +213,7 @@ class PlotLib:
         if progress_fn is not None:
             progress_fn.incr = incr_statmaps
         out = {}
+        sphere_radius = None
         for hemi in ('left', 'right'):
             # Background colors
             if progress_fn is not None:
@@ -238,6 +240,8 @@ class PlotLib:
             ))
             coord_map = self.get_coord_map(x, y, z, hemi, turn_out_hemis=turn_out_hemis)
             x, y, z = coord_map(x, y, z)
+            if sphere_radius is None:
+                sphere_radius = sphere_radius_factor * (y.max() - y.min())
             display_surface.parts[hemi].coordinates = np.column_stack((x, y, z))
 
             # Statmap colors
@@ -315,10 +319,13 @@ class PlotLib:
                 )
 
                 if seed:
+                    color = cmap(1.)
+                    color = f'rgba({",".join([str(int(x * 255)) for x in color[:3]])}, {color[3]})'
                     seeds.append(dict(
                         seed=seed,
                         hemi=seed_hemi,
-                        ix=seed_ix
+                        ix=seed_ix,
+                        color=color
                     ))
 
                 col = label if label else 'val'
@@ -377,6 +384,7 @@ class PlotLib:
         out['colorbars'] = colorbars
         out['seeds'] = seeds
         out['turn_out_hemis'] = turn_out_hemis
+        out['sphere_radius'] = sphere_radius
 
         return out
 
@@ -387,6 +395,7 @@ class PlotLib:
             colorbars=None,
             seeds=None,
             turn_out_hemis=False,
+            sphere_radius=0.01,
             cbar_step=0.1
     ):
         traces = []
@@ -419,7 +428,7 @@ class PlotLib:
                 x, y, z = right['mesh'].coordinates[seed_ix]
             else:
                 raise ValueError(f'Invalid seed hemisphere: {seed_hemi}. Must be "left" or "right".')
-            traces.append(self.make_sphere((x, y, z)))
+            traces.append(self.make_sphere((x, y, z), radius=sphere_radius, color=seed['color']))
 
         fig = go.Figure()
         fig.layout.paper_bgcolor = 'white'
@@ -1156,11 +1165,11 @@ class PlotLib:
         return cbar
 
     # Cachable
-    def make_sphere(self, center, radius=1, opacity=0.7):
+    def make_sphere(self, center, radius=1., opacity=0.7, color='white'):
         sphere_pv = pyvista.Sphere(radius=radius, center=center)
         x, y, z = sphere_pv.points.T.astype(np.float32)
         i, j, k = sphere_pv.faces.reshape((-1, 4))[:, 1:].T
-        sphere = go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k, color='white', opacity=opacity)
+        sphere = go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k, color=color, opacity=opacity)
 
         return sphere
 
@@ -1342,6 +1351,8 @@ if __name__ == '__main__':
                 continue
             subdir = f'sub-{participant}'
             participant_dir = os.path.join(node_dir, subdir)
+            if not os.path.exists(participant_dir):
+                continue
             sessions = set([x[4:] for x in os.listdir(os.path.join(participant_dir)) if x.startswith('ses-')])
             if not sessions:
                 sessions = {None}
