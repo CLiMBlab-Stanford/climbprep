@@ -136,6 +136,7 @@ if __name__ ==  '__main__':
             stderr('Error creating BIDS scaffold. Exiting.\n')
             exit(status)
 
+    if not os.path.exists(os.path.join(BIDS_PATH, project, 'participants.tsv')):
         participants_tsv = []
         for participant in participants:
             tasks_ = set()
