@@ -204,8 +204,8 @@ CONFIG = dict(
             clean_surf=True,
             preprocessing_label=PREPROCESS_DEFAULT_KEY,
             mask_suffix=DEFAULT_MASK_SUFFIX,
-            # Matches 7 core motion regressors, acompcor + discrete cosine, and motion and non-steady-state outliers 
-            confounds_regex=f'^(framewise_displacement|trans_[xyz]|rot_[xyz]|a_comp_cor_0[0-4]|cosine.*|.*_outlier.*)$',
+            # Matches global signal, 7 core motion regressors, acompcor + discrete cosine, and motion and non-steady-state outliers 
+            confounds_regex=f'^(global_signal|framewise_displacement|trans_[xyz]|rot_[xyz]|a_comp_cor_0[0-4]|cosine.*|.*_outlier.*)$',
             volume_fwhm=4,
             surface_fwhm=4,
             standardize=True,
@@ -220,8 +220,8 @@ CONFIG = dict(
             clean_surf=True,
             preprocessing_label=PREPROCESS_DEFAULT_KEY,
             mask_suffix=DEFAULT_MASK_SUFFIX,
-            # Matches 7 core motion regressors, acompcor + discrete cosine, and motion and non-stead-state outliers 
-            confounds_regex=f'^(framewise_displacement|trans_[xyz]|rot_[xyz]|a_comp_cor_0[0-4]|cosine.*|.*_outlier.*)$',
+            # Matches global signal, 7 core motion regressors, acompcor + discrete cosine, and motion and non-stead-state outliers 
+            confounds_regex=f'^(global_signal|framewise_displacement|trans_[xyz]|rot_[xyz]|a_comp_cor_0[0-4]|cosine.*|.*_outlier.*)$',
             volume_fwhm=4,
             surface_fwhm=4,
             standardize=False,
@@ -246,7 +246,7 @@ CONFIG = dict(
             space='T1w',
             sample=dict(
                 main=dict(
-                    n_networks=100,
+                    n_networks=50,
                     n_samples=0,
                     n_components_pca='auto',
                     n_components_ica='auto',
@@ -265,7 +265,7 @@ CONFIG = dict(
             space='MNI152NLin2009cAsym',
             sample=dict(
                 main=dict(
-                    n_networks=100,
+                    n_networks=50,
                     n_samples=0,
                     n_components_pca='auto',
                     n_components_ica='auto',
