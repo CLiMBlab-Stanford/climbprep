@@ -109,7 +109,7 @@ if __name__ == '__main__':
             print(cmd)
             status = os.system(cmd)
             if status:
-                stderr('Error during dcm2bids. Exiting\n.')
+                stderr('Error during dcm2bids_helper. Exiting\n.')
                 exit(status)
             descriptions = []
             for jsonpath in sorted(
