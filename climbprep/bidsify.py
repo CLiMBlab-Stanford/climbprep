@@ -124,12 +124,13 @@ if __name__ == '__main__':
                 if 'BidsGuess' not in meta:
                     continue
                 dtype, suffix = meta['BidsGuess']
-                print(dtype, suffix)
                 suffix = suffix.split('_')[-1]
                 if dtype not in ('derived', 'discard'):
                     if dtype == 'func' and len(descriptions) and \
                             'AcquisitionTime' in meta and 'AcquisitionTime' in descriptions[-1]['criteria'] and \
                             meta['AcquisitionTime'] == descriptions[-1]['criteria']['AcquisitionTime']:
+                        continue
+                    if 'GE HOS' in meta['SeriesDescription']:
                         continue
                         
                     description = dict(
@@ -248,16 +249,16 @@ if __name__ == '__main__':
             functionals_time = {
                 functional: parse(functional_meta[functional]['AcquisitionTime']) for functional in functionals
             }
+            functionals = sorted(list(functionals), key=lambda x: functionals_time[x])
             func_t = np.array([functionals_time[functional] for functional in functionals])
 
             for regex in (
                     r'^.*_fieldmap\.nii\.gz$',
                     r'^.*_magnitude\.nii\.gz$',
-                    r'^_dir-AP.*_epi\.nii\.gz$',
-                    r'^_dir-PA.*_epi\.nii\.gz$'
+                    r'^.*_dir-AP.*_epi\.nii\.gz$',
+                    r'^.*_dir-PA.*_epi\.nii\.gz$'
             ):
-                fmaps = set([x for x in os.listdir(fmap_path) if re.match(x, regex)])
-                print(regex, fmaps)
+                fmaps = set([x for x in os.listdir(fmap_path) if re.match(regex, x)])
                 if not fmaps:
                     continue
                 fmap_meta = {}
@@ -265,6 +266,7 @@ if __name__ == '__main__':
                     with open(os.path.join(fmap_path, fmap.replace('.nii.gz', '.json')), 'r') as f:
                         fmap_meta[fmap] = json.load(f)
                 fmaps_time = {fmap: parse(fmap_meta[fmap]['AcquisitionTime']) for fmap in fmaps}
+                fmaps = sorted(list(fmaps), key=lambda x: fmaps_time[x])
                 if len(fmaps_time):
                     # Counts the number of fmaps that are earlier than each functional
                     # and assigns the index of one fmap less than this (given 0-indexing),
