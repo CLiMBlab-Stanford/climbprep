@@ -2,7 +2,9 @@ import os
 import json
 import sys
 import shutil
+from dateutil.parser import parse
 from tempfile import TemporaryDirectory
+import numpy as np
 import pandas as pd
 import argparse
 
@@ -220,6 +222,77 @@ if __name__ == '__main__':
                                     sidecar['EventsFile'] = events_path_new
                             with open(filepath, 'w') as f:
                                 json.dump(sidecar, f, indent=2)
+
+            # Compute IntendedFor fields for any fieldmaps
+            # Rule: pick the most recently preceding fieldmap for each functional, or, if no fieldmaps precede,
+            # the nearest functional in time.
+            fmap_path = os.path.join(out_path, 'fmap')
+            if not os.path.exists(fmap_path):
+                continue
+            func_path = os.path.join(out_path, 'func')
+            if not os.path.exists(func_path):
+                continue
+            fmaps = set([x for x in os.listdir(fmap_path) if x.endswith('.nii.gz')])
+            if not fmaps:
+                continue
+            fmap_meta = {}
+            for fmap in fmaps:
+                with open(os.path.join(fmap_path, fmap.replace('.nii.gz', '.json')), 'r') as f:
+                    fmap_meta[fmap] = json.load(f)
+            fmaps_j = [fmap for fmap in fmaps if fmap_meta[fmap]['PhaseEncodingDirection'] == 'j']
+            fmaps_j_time = {fmap: parse(fmap_meta[fmap]['AcquisitionTime']) for fmap in fmaps_j}
+            fmaps_j = sorted(fmaps_j, key=lambda x: fmaps_j_time[x])
+            fmaps_jm = [fmap for fmap in fmaps if fmap_meta[fmap]['PhaseEncodingDirection'] == 'j-']
+            fmaps_jm_time = {fmap: parse(fmap_meta[fmap]['AcquisitionTime']) for fmap in fmaps_jm}
+            fmaps_jm = sorted(fmaps_jm, key=lambda x: fmaps_jm_time[x])
+
+            functionals = set([x for x in os.listdir(func_path) if x.endswith('.nii.gz')])
+            if not functionals:
+                continue
+            functional_meta = {}
+            for functional in functionals:
+                with open(functional.replace('.nii.gz', '.json'), 'r') as f:
+                    functional_meta[functional] = json.load(f)
+            functionals_time = {
+                functional: parse(functional_meta[functional]['AcquisitionTime']) for functional in functionals
+            }
+            f_t = np.array([functionals_time[functional] for functional in functionals])
+            j_t = np.array([fmaps_j_time[fmap] for fmap in fmaps_j])
+            jm_t = np.array([fmaps_jm_time[fmap] for fmap in fmaps_jm])
+            if j_t:
+                # Counts the number of fmaps_j that are earlier than each functional
+                # and assigns the index of one fmap less than this (given 0-indexing),
+                # clipping at 0 so that functionals with no preceding fieldmaps are assigned
+                # to the first fieldmap.
+                j_ix = np.clip((f_t[..., None] > j_t[None, ...]).sum(axis=1) - 1, 0, np.inf).astype(int)
+                functional_to_fmap = {x: y for x, y in zip(functionals, np.array(fmaps_j)[j_ix])}
+                fmap_to_functional = {}
+                for functional, fmap in functional_to_fmap.items():
+                    if fmap not in fmap_to_functional:
+                        fmap_to_functional[fmap] = []
+                    fmap_to_functional[fmap].append(functional)
+                for fmap in fmap_to_functional:
+                    fmap_meta[fmap]['IntendedFor'] = [
+                        ('bids::' + os.path.join(subdir, 'func', fmap_to_functional[fmap]))
+                            for fmap in fmap_to_functional[fmap]
+                    ]
+                    with open(os.path.join(fmap_path, fmap.replace('.nii.gz', '.json')), 'w') as f:
+                        json.dump(fmap_meta[fmap], f, indent=2)
+            if jm_t:
+                jm_ix = np.clip((f_t[..., None] > jm_t[None, ...]).sum(axis=1) - 1, 0, np.inf).astype(int)
+                functional_to_fmap = {x: y for x, y in zip(functionals, np.array(fmaps_jm)[jm_ix])}
+                fmap_to_functional = {}
+                for functional, fmap in functional_to_fmap.items():
+                    if fmap not in fmap_to_functional:
+                        fmap_to_functional[fmap] = []
+                    fmap_to_functional[fmap].append(functional)
+                for fmap in fmap_to_functional:
+                    fmap_meta[fmap]['IntendedFor'] = [
+                        ('bids::' + os.path.join(subdir, 'func', fmap_to_functional[fmap]))
+                            for fmap in fmap_to_functional[fmap]
+                    ]
+                    with open(os.path.join(fmap_path, fmap.replace('.nii.gz', '.json')), 'w') as f:
+                        json.dump(fmap_meta[fmap], f, indent=2)
 
     os.system('bids-validator %s' % project_path)
 
