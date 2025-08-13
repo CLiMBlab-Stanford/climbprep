@@ -1311,19 +1311,21 @@ if __name__ == '__main__':
 
     stderr(f'Plotting outputs will be written to {os.path.join(derivatives_path, "plot", plot_label)}\n')
 
-    cache_dir = os.path.join(derivatives_path, "plot", plot_label, participant)
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir)
-    cache_path = os.path.join(cache_dir, '.cache')
+    # cache_dir = os.path.join(derivatives_path, "plot", plot_label, participant)
+    # if not os.path.exists(cache_dir):
+    #     os.makedirs(cache_dir)
+    # cache_path = os.path.join(cache_dir, '.cache')
+    #
+    # cache = diskcache.Cache(
+    #     cache_path,
+    #     size_limit=1024 * 1024 * 1024 * 32,  # 32GB
+    # )
+    #
+    # pl = PlotLibMemoized(
+    #     cache.memoize(ignore={'progress_fn', 'masker'})
+    # )
 
-    cache = diskcache.Cache(
-        cache_path,
-        size_limit=1024 * 1024 * 1024 * 32,  # 32GB
-    )
-
-    pl = PlotLibMemoized(
-        cache.memoize(ignore={'progress_fn', 'masker'})
-    )
+    pl = PlotLib()
 
     for model_subdir in os.listdir(models_path):
         if models and model_subdir not in models:
@@ -1459,4 +1461,4 @@ if __name__ == '__main__':
                     )
                     stderr(f'  Finished plotting: {plot_path_}\n')
 
-    shutil.rmtree(cache_path)
+    # shutil.rmtree(cache_path)
