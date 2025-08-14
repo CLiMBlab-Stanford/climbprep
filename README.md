@@ -362,7 +362,17 @@ sequentially through the entire climbprep pipeline, from bidsification through c
 If you have a subset of steps you want to run, you can specify them as a space-delimited
 list using the `-j` option.
 
-Run the above with `-h` to see all available command line options.
+For multisession projects, you can get big speedups from parallelizing certain
+steps (esp. `bidsify` and `clean`) across sessions, whereas other steps (e.g., 
+`preprocess`, `model`, and `parcellate`) are global for the participant
+and cannot be parallelized across sessions. You can request session-parallelism
+with `make_jobs` by specifying the `-s` option, which you can use to specify
+specific sessions, or `-s all` to make a job for each separate session.
+The script will not let you use `-s` if your `-j` argument contains
+job types that cannot be parallized across sessions, so to use `-s`, you must
+break your steps up into separate jobs.
+
+Run `make_jobs` with `-h` to see all available command line options.
 
 The result will be a collection of files with the suffix `*.pbs` (in the
 current working directory by default, although this can be configured),
@@ -425,8 +435,11 @@ Note that the weight magnitudes should sum to one, to facilitate comparison
 across contrasts.
 
 
-
 ### repair
+
+*This is a destructive, non-parallelizable operation!* Do not run it
+unless you know what you are doing and are certain that no one else
+in the group is also running it at the same time.
 
 Much of the global repository metadata, especially `participants.tsv`, can
 be automatically generated from the project data itself, so a utility is
@@ -439,27 +452,60 @@ searching for specific tasks. To perform repair, run:
 
     python -m climbprep.repair
 
-Because `repair` modifies global files, *it should not be run in parallel*.
-Only run it if you are confident that no one else in the group is running
-`repair` or editing a `participants.tsv` file.
+*IMPORTANT NOTE 1:* Because this utility will overwrite the `participants.tsv`
+file for all projects being repaired, and because *it will delete* rows for
+participants who do not have a subdirectory in the project, it will result
+in lost metadata if you run on a project that has not been fully bidsified.
+
+*IMPORTANT NOTE 2:* Because `repair` modifies global files, *it should not
+be run in parallel*. Only run it if you are confident that no one else in
+the group is running `repair` or editing a `participants.tsv` file.
 
 
 ### rescaffold
 
 If you want to run multisession analyses, you need to "rescaffold" the
-relevant subset of `climblab` data into a new BIDS project so that fMRIprep
-can correctly transform the multisession data into a shared anatomical space.
-You can rescaffold the entire dataset, which will produce a copy of `climblab`
-in which sessions are organized by subject. You can also provide a set
-of `climblab_id`'s or task names (either space-delimited in the command line
-or a path to a textfile containing the list, one item per line) to rescaffold 
-only a subset of the data. To rescaffold, run:
+relevant subset of a single-session project (e.g., `climblab`) into a new 
+BIDS project so that fMRIprep can correctly transform the multisession data 
+into a shared anatomical space. You can rescaffold the entire dataset, which 
+will produce a copy of the source project in which sessions are organized by
+subject. You can also provide a set of `<PROJECT>_id`'s or task names (either 
+space-delimited in the command line or a path to a textfile containing the 
+list, one item per line) to rescaffold  only a subset of the data. To 
+rescaffold, run:
 
-    python -m climbprep.rescaffold <OUTPUT_PROJECT_ID> [<CLIMBLAB_ID> ...]
+    python -m climbprep.rescaffold <OUTPUT_PROJECT_ID> [<PARTICIPANT_ID> ...]
 
 This tool will provide minimal BIDS metadata to the new project to pass
 validation, but it is strongly recommended to enrich the metadata before
 publication/release.
+
+Rescaffolding can safely be run on the same project multiple times, and it will
+only copy over the source data that is not already present in the output
+project. This means that you can rescaffold a project, then add new
+sessions to the source project, and rescaffold again to add the new sessions
+to the output project.
+
+Rescaffolding will only work if the source project is fully bidsified with
+an up-to-date `participants.tsv` file that maps sessions in the source
+(`participant_id`) to unique participant-level identifiers (e.g., 
+`climblab_id`). When new sessions have been collected and you want to
+rescaffold them, you must first:
+
+1. Download the new sessions to the `sourcedata` directory of the 
+source project.
+2. Create appropriate `runs.csv` files as described under `bidsify`
+above.
+3. Run `bidsify` on the new sessions in the source project.
+4. Run `repair` on the source project to update `participants.tsv`.
+5. Manually add participant-level identifiers (e.g., `climblab_id`)
+to `participants.tsv` (check with Cory or another core
+lab member with access to high-risk data if you don't know the
+person's unique identifier)
+
+Once the above are finished, you can run `rescaffold` to copy the
+new sessions to a new or existing multisession project.
+
 
 
 ### climbbatch and climbbcancel
