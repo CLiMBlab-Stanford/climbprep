@@ -52,6 +52,9 @@ if __name__ == '__main__':
         if key == 'submm_recon':
             if not val:
                 kwarg_strings.append('--no-submm-recon')
+        elif key == 'use_syn_sdc':
+            if val:
+                kwarg_strings.append('--use-syn-sdc')
         else:
             if isinstance(val, list) or isinstance(val, tuple):
                 val = ' '.join(val)

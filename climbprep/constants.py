@@ -196,7 +196,8 @@ CONFIG = dict(
             skull_strip_t1w='skip',
             dvars_spike_threshold=3,
             cifti_output='91k',
-            submm_recon=False
+            submm_recon=False,
+            use_syn_sdc=True
         )
     ),
     clean=dict(

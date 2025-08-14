@@ -65,10 +65,13 @@ if __name__ == '__main__':
     args = argparser.parse_args()
 
     projects = args.projects
+    job_types = args.job_types
     sessions = args.sessions
+    for job_type in job_types:
+        assert not sessions or job_type not in ('preprocess', 'model', 'plot', 'parcellate'), \
+                f'--sessions provided for a {job_type} job, which does not accept this argument'
     if not sessions:
         sessions = [None]
-    job_types = args.job_types
     for job_type in job_types:
         assert job_type in JOB_TYPES, 'Unrecognized job_type %s' % job_type
     time = args.time
@@ -110,17 +113,37 @@ if __name__ == '__main__':
         os.makedirs(outdir)
    
     for project in projects:
-        for session in sessions:
-            sourcedata_path = os.path.join(BIDS_PATH, project, 'sourcedata')
-            participants = args.participants
-            if not participants:
-                participants = set([x for x in os.listdir(os.path.join(BIDS_PATH, project)) if x.startswith('sub-')])
-                if os.path.exists(sourcedata_path):
-                    participants |= set([x for x in os.listdir(sourcedata_path) if x.startswith('sub-')])
-            else:
-                participants = set(participants)
-            participants = [x.replace('sub-', '') for x in participants]
+        sourcedata_path = os.path.join(BIDS_PATH, project, 'sourcedata')
+        participants = args.participants
+        if not participants:
+            participants = set([x for x in os.listdir(os.path.join(BIDS_PATH, project)) if x.startswith('sub-')])
+            if os.path.exists(sourcedata_path):
+                participants |= set([x for x in os.listdir(sourcedata_path) if x.startswith('sub-')])
+        else:
+            participants = set(participants)
+        participants = [x.replace('sub-', '') for x in participants]
+        if sessions == ['all']:
+            sessions_ = []
+            for participant_dir in [x for x in os.listdir(sourcedata_path) if x.startswith('sub-')]:
+                participant = participant_dir[4:]
+                if participant not in participants:
+                    continue
+                for session_dir in [
+                        x for x in os.listdir(os.path.join(sourcedata_path, participant_dir)) if x.startswith('ses-')
+                ]:
+                    sessions_.append(session_dir[4:])
+        else:
+           sessions_ = sessions
+        for session in sessions_:
             for participant in participants:
+                has_this_session = False
+                if not session:
+                    has_this_session = True
+                for path in os.listdir(os.path.join(sourcedata_path, f'sub-{participant}')):
+                    if path == f'ses-{session}':
+                        has_this_session = True
+                if not has_this_session:
+                    continue
                 name_parts = [project, participant]
                 if session:
                     name_parts.append(session)
