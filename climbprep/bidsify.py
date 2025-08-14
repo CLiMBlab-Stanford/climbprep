@@ -230,8 +230,7 @@ if __name__ == '__main__':
 
             # Compute IntendedFor fields for any fieldmaps
             # Rule: pick the most recently preceding fieldmap for each functional, or, if no fieldmaps precede,
-            # the nearest functional in time.
-            print('Processing fieldmaps')
+            # the nearest subsequent fieldmap.
             fmap_path = os.path.join(out_path, 'fmap')
             if not os.path.exists(fmap_path):
                 continue
@@ -287,7 +286,6 @@ if __name__ == '__main__':
                         ]
                         with open(os.path.join(fmap_path, fmap.replace('.nii.gz', '.json')), 'w') as f:
                             json.dump(fmap_meta[fmap], f, indent=2)
-            print('Done processing fieldmaps')
 
     stderr('bids-validator %s\n' % project_path)
     os.system('bids-validator %s' % project_path)

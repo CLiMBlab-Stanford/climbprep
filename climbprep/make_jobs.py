@@ -69,6 +69,8 @@ if __name__ == '__main__':
     if not sessions:
         sessions = [None]
     job_types = args.job_types
+    for job_type in job_types:
+        assert job_type in JOB_TYPES, 'Unrecognized job_type %s' % job_type
     time = args.time
     n_cores = args.n_cores
     memory = args.memory
