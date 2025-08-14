@@ -279,9 +279,12 @@ if __name__ == '__main__':
                         if fmap not in fmap_to_functional:
                             fmap_to_functional[fmap] = []
                         fmap_to_functional[fmap].append(functional)
+                    intended_for_subdir = 'func'
+                    if session:
+                        intended_for_subdir = os.path.join('ses-%s' % session, intended_for_subdir)
                     for fmap in fmap_to_functional:
                         fmap_meta[fmap]['IntendedFor'] = [
-                            ('bids::' + os.path.join(subdir, 'func', functional))
+                            (os.path.join(intended_for_subdir, functional))
                                 for functional in fmap_to_functional[fmap]
                         ]
                         with open(os.path.join(fmap_path, fmap.replace('.nii.gz', '.json')), 'w') as f:
