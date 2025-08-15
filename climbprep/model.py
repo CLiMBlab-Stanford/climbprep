@@ -159,11 +159,8 @@ if __name__ == '__main__':
                    f'--derivatives {preprocess_path}',
                    f'--work-dir {work_path}'
                ] + kwarg_strings
-        # database_path = os.path.join(project_path, 'code', 'pybids_dbcache')
-        # if os.path.exists(database_path):
-        #     args.append(f'--database-path {database_path}')
         cmd = " ".join(args)
-        cmd = f'''singularity run {FITLINS_IMG} {cmd}'''
+        cmd = f'''singularity run {os.path.join(APPTAINER_PATH, "images", FITLINS_IMG)} {cmd}'''
 
         stderr(cmd + '\n')
         status = os.system(cmd)

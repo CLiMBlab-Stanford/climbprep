@@ -68,7 +68,7 @@ if __name__ == '__main__':
         f'--participant-label {participant}'
     ] + kwarg_strings
     cmd = f'fmriprep {" ".join(args)}'
-    cmd = f'singularity exec {FMRIPREP_IMG} bash -c "{cmd}"'
+    cmd = f'singularity exec {os.path.join(APPTAINER_PATH, "images", FMRIPREP_IMG)} bash -c "{cmd}"'
 
     stderr(cmd + '\n')
     os.system(cmd)

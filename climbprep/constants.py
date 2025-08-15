@@ -11,8 +11,8 @@ WORK_PATH = os.path.join(LAB_PATH, 'WORK')
 EVENTFILES_PATH = os.path.join(LAB_PATH, 'eventfiles')
 MODELFILES_PATH = os.path.join(LAB_PATH, 'modelfiles')
 FS_LICENSE_PATH = os.path.join(LAB_PATH, 'freesurfer', 'license.txt')
-FMRIPREP_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fmriprep.simg')
-FITLINS_IMG = os.path.join(LAB_PATH, 'apptainer', 'images', 'fitlins-climbprep.sif')
+FMRIPREP_IMG = 'fmriprep-25.2.0-unstable.simg'
+FITLINS_IMG = 'fitlins-climbprep.sif'
 
 # Defaults
 DEFAULT_TASK = 'UnknownTask'
