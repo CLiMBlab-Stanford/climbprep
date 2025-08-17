@@ -33,6 +33,7 @@ if __name__ == '__main__':
     args = argparser.parse_args()
 
     participant = args.participant.replace('sub-', '')
+    project = args.project
     target_sessions = args.sessions
     if target_sessions:
         target_sessions = set(target_sessions)
@@ -63,7 +64,7 @@ if __name__ == '__main__':
     target_affine = config.get('target_affine', DEFAULT_TARGET_AFFINE)
 
     # Set session-agnostic paths
-    project_path = os.path.join(BIDS_PATH, args.project)
+    project_path = os.path.join(BIDS_PATH, project)
     assert os.path.exists(project_path), 'Path not found: %s' % project_path
     derivatives_path = os.path.join(project_path, 'derivatives')
     assert os.path.exists(derivatives_path), 'Path not found: %s' % derivatives_path
@@ -90,9 +91,7 @@ if __name__ == '__main__':
         assert os.path.exists(bids_path), 'Path not found: %s' % bids_path
         func_path = os.path.join(preprocess_path, 'func')
         assert os.path.exists(func_path), 'Path not found: %s' % func_path
-        anat_path = os.path.join(derivatives_path, 'preprocess', preprocessing_label, participant_dir, 'anat')
-        if not os.path.exists(anat_path):
-            anat_path = os.path.join(preprocess_path, 'anat')
+        anat_path = get_preprocessed_anat_dir(project, participant, preprocessing_label=preprocessing_label)
         assert os.path.exists(anat_path), 'Path not found: %s' % anat_path
 
         if session:

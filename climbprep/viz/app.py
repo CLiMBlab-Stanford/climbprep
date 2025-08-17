@@ -12,6 +12,7 @@ except ImportError:
 
 from climbprep.plot import PlotLibMemoized
 from climbprep.constants import *
+from climbprep.util import *
 from climbprep import resources
 
 
@@ -586,16 +587,8 @@ def assign_callbacks(app, cache):
                 )) if x.startswith('ses-')
             ]
             anat = {}
-            mask_path = os.path.join(
-                BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}', 'anat',
-                f'sub-{participant}{DEFAULT_MASK_SUFFIX}'
-            )
-            if not os.path.exists(mask_path) and session_subdirs:
-                session = session_subdirs[0][4:]
-                mask_path = os.path.join(
-                    BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}',
-                    f'ses-{session}', 'anat', f'sub-{participant}_ses-{session}{DEFAULT_MASK_SUFFIX}'
-                )
+            anat_dir = get_preprocessed_anat_dir(project, participant, preprocessing_label=preprocessing_label)
+            mask_path = os.path.join(anat_dir, f'sub-{participant}{DEFAULT_MASK_SUFFIX}')
             anat['mask'] = None if use_template_surface else mask_path
             for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
                 if surf_type == 'sulc':
