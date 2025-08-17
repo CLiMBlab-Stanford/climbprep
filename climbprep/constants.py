@@ -11,7 +11,7 @@ WORK_PATH = os.path.join(LAB_PATH, 'WORK')
 EVENTFILES_PATH = os.path.join(LAB_PATH, 'eventfiles')
 MODELFILES_PATH = os.path.join(LAB_PATH, 'modelfiles')
 FS_LICENSE_PATH = os.path.join(LAB_PATH, 'freesurfer', 'license.txt')
-FMRIPREP_IMG = 'fmriprep-25.2.0-unstable.simg'
+FMRIPREP_IMG = 'fmriprep.simg'
 FITLINS_IMG = 'fitlins-climbprep.sif'
 
 # Defaults
@@ -197,7 +197,7 @@ CONFIG = dict(
             dvars_spike_threshold=3,
             cifti_output='91k',
             submm_recon=False,
-            use_syn_sdc=True
+            use_syn_sdc=False
         )
     ),
     clean=dict(

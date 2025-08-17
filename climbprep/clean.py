@@ -313,9 +313,9 @@ if __name__ == '__main__':
                         )
                         kwargs = dict(confounds=confounds.fillna(0))
                         desc = 'desc-clean'
-                        if 'space' == 'fsnative':
+                        if space == 'fsnative':
                             mesh = surface.PolyMesh(left=surf_L_path, right=surf_R_path)
-                        elif 'space' == 'fsaverage':
+                        elif space == 'fsaverage':
                             fsaverage = nidatasets.fetch_surf_fsaverage()
                             mesh = surface.PolyMesh(
                                 left=fsaverage['pial_left'],
