@@ -316,7 +316,7 @@ if __name__ == '__main__':
                         if space == 'fsnative':
                             mesh = surface.PolyMesh(left=surf_L_path, right=surf_R_path)
                         elif space == 'fsaverage':
-                            fsaverage = nidatasets.fetch_surf_fsaverage()
+                            fsaverage = nidatasets.fetch_surf_fsaverage(mesh='fsaverage')
                             mesh = surface.PolyMesh(
                                 left=fsaverage['pial_left'],
                                 right=fsaverage['pial_right']
