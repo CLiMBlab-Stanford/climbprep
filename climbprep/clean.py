@@ -4,6 +4,7 @@ import yaml
 import numpy as np
 import pandas as pd
 from nilearn import image, surface, maskers, signal, interfaces, glm
+from nilearn import datasets as nidatasets
 import argparse
 
 from climbprep.constants import *
@@ -312,7 +313,16 @@ if __name__ == '__main__':
                         )
                         kwargs = dict(confounds=confounds.fillna(0))
                         desc = 'desc-clean'
-                        mesh = surface.PolyMesh(left=surf_L_path, right=surf_R_path)
+                        if 'space' == 'fsnative':
+                            mesh = surface.PolyMesh(left=surf_L_path, right=surf_R_path)
+                        elif 'space' == 'fsaverage':
+                            fsaverage = nidatasets.fetch_surf_fsaverage()
+                            mesh = surface.PolyMesh(
+                                left=fsaverage['pial_left'],
+                                right=fsaverage['pial_right']
+                            )
+                        else:
+                            raise ValueError('Unknown space: %s' % space)
                         if config['surface_fwhm'] and geodesic_smoothing_weights is None:
                             geodesic_smoothing_weights = {}
                             for hemi in ('left', 'right'):
