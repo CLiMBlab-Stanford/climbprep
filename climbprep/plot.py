@@ -12,6 +12,7 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, Normalize, to_rgb, to_hex
 from plotly import io as pio
 from plotly import graph_objects as go
+import choreographer
 from tempfile import TemporaryDirectory
 from PIL import Image
 import pyvista
@@ -497,10 +498,22 @@ class PlotLib:
                     zoom = zoom_factor[hemi][view]
                     camera.eye.x = camera.eye.x * zoom
                     fig_path = os.path.join(tmp_dir, out_path_base + f'_hemi-{hemi}_view-{view}{ext}')
-                    fig.write_image(
-                        fig_path,
-                        scale=scale
-                    )
+                    i = 0
+                    success = False
+                    while not success and i < 10:
+                        try:
+                            if i:
+                                stderr(f'Previous attempts to write image failed. Attempt {i + 1}...\n')
+                            fig.write_image(
+                                fig_path,
+                                scale=scale
+                            )
+                            success = True
+                        except choreographer.browsers._errors.BrowserFailedError:
+                            time.sleep(2)
+                            i += 1
+                    if not success:
+                        raise choreographer.browsers._errors.BrowserFailedError('Writing image failed after 10 attempts')
                     img = Image.open(fig_path)
                     w, h = img.size
                     l, t, r, b = w * htrim, h * vtrim, \
@@ -1310,20 +1323,6 @@ if __name__ == '__main__':
     assert os.path.exists(models_path), 'Path not found: %s' % models_path
 
     stderr(f'Plotting outputs will be written to {os.path.join(derivatives_path, "plot", plot_label)}\n')
-
-    # cache_dir = os.path.join(derivatives_path, "plot", plot_label, participant)
-    # if not os.path.exists(cache_dir):
-    #     os.makedirs(cache_dir)
-    # cache_path = os.path.join(cache_dir, '.cache')
-    #
-    # cache = diskcache.Cache(
-    #     cache_path,
-    #     size_limit=1024 * 1024 * 1024 * 32,  # 32GB
-    # )
-    #
-    # pl = PlotLibMemoized(
-    #     cache.memoize(ignore={'progress_fn', 'masker'})
-    # )
 
     pl = PlotLib()
 

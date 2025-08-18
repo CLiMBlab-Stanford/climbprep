@@ -98,6 +98,10 @@ if __name__ == '__main__':
             ses_str = f'_ses-{session}'
         else:
             ses_str = ''
+        if os.path.basename(os.path.dirname(anat_path)).startswith('ses-'):
+            ses_str_anat = f'_ses-{os.path.basename(os.path.dirname(anat_path))[4:]}'
+        else:
+            ses_str_anat = ''
 
         datasets = {}  # Structure: space > task > run > filetype (func, mask, confounds, tr) > value
         type_by_space = {}
@@ -117,16 +121,16 @@ if __name__ == '__main__':
                         run_str = ''
                     task = task.group(1)
                     if space == 'T1w':
-                        mask = f'sub-{participant}{ses_str}{config.get("mask_suffix", DEFAULT_MASK_SUFFIX)}'
+                        mask = f'sub-{participant}{ses_str_anat}{config.get("mask_suffix", DEFAULT_MASK_SUFFIX)}'
                     else:
-                        mask = f'sub-{participant}{ses_str}_space-{space}' \
+                        mask = f'sub-{participant}{ses_str_anat}_space-{space}' \
                                f'{config.get("mask_suffix", DEFAULT_MASK_SUFFIX)}'
                     mask = os.path.join(anat_path, mask)
                     if not os.path.exists(mask):
                         if space == 'T1w':
-                            mask = f'sub-{participant}_label-GM_probseg.nii.gz'
+                            mask = f'sub-{participant}{ses_str_anat}_label-GM_probseg.nii.gz'
                         else:
-                            mask = f'sub-{participant}_space-{space}_label-GM_probseg.nii.gz'
+                            mask = f'sub-{participant}{ses_str_anat}_space-{space}_label-GM_probseg.nii.gz'
                         mask = os.path.join(anat_path, mask)
                     assert os.path.exists(mask), 'Mask file not found: %s' % mask
                     confounds = os.path.join(
@@ -234,7 +238,7 @@ if __name__ == '__main__':
                         events = pd.read_csv(eventfile_path, sep='\t')
                         if 'trial_type' not in events:
                             events['trial_type'] = 'dummy'
-                        events = pd.read_csv(eventfile_path, sep='\t')[['trial_type', 'onset', 'duration']]
+                        events = events[['trial_type', 'onset', 'duration']]
                         dummies = pd.get_dummies(events.trial_type, prefix='trial_type', prefix_sep='.')
                         events = pd.concat([dummies, events[['onset', 'duration']]], axis=1)
                         cols = [x for x in events.columns if x.startswith('trial_type')]
@@ -294,12 +298,8 @@ if __name__ == '__main__':
                         else:
                             space_str = '_space-%s' % space
                         surf_L_path = os.path.join(
-                            anat_path, f'sub-{participant}{space_str}_hemi-L_pial.surf.gii'
+                            anat_path, f'sub-{participant}{ses_str_anat}{space_str}_hemi-L_pial.surf.gii'
                         )
-                        if not os.path.exists(surf_L_path):
-                            surf_L_path = os.path.join(
-                                anat_path, f'sub-{participant}{ses_str}{space_str}_hemi-L_pial.surf.gii'
-                            )
                         surf_R_path = surf_L_path.replace('_hemi-L_', '_hemi-R_')
 
                         masker = maskers.SurfaceMasker(

@@ -50,6 +50,7 @@ if __name__ == '__main__':
     argparser.add_argument('-a', '--account', default='nlp', help='Value for SLURM --account setting, if applicable')
     argparser.add_argument('-e', '--exclude', nargs='+', help='Nodes to exclude')
     argparser.add_argument('-o', '--outdir', default='./', help='Directory in which to place generated batch scripts.')
+    argparser.add_argument('-S', '--suffix', default='', help='Optional suffix to add to job name')
     argparser.add_argument('--bidsify-config', default=None, help=('BIDSify config path. If not '
                                                                    'specified, the default config will be used.'))
     argparser.add_argument('--preprocess-config', default=None, help=('Preprocessing config (path or keyword). If not '
@@ -58,6 +59,8 @@ if __name__ == '__main__':
                                                                  'specified, the default config will be used.'))
     argparser.add_argument('--model-config', default=None, help=('Modeling config (path or keyword). If not '
                                                                  'specified, the default config will be used.'))
+    argparser.add_argument('--models', nargs='+', default=[], help=('Models to run for `model` step. If not specified, '
+                                                                    'will infer models from task names.'))
     argparser.add_argument('--plot-config', default=None, help=('Plotting config (path or keyword). If not '
                                                                 'specified, the default config will be used.'))
     argparser.add_argument('--parcellate-config', default=None, help=('Parcellation config (path or keyword). If not '
@@ -84,6 +87,11 @@ if __name__ == '__main__':
     else:
         exclude = []
     outdir = args.outdir
+    suffix = args.suffix
+    if suffix:
+        suffix_str = '_' + suffix
+    else:
+        suffix_str = ''
     if args.bidsify_config:
         bidsify_config_str = ' -c %s' % args.bidsify_config
     else:
@@ -100,6 +108,10 @@ if __name__ == '__main__':
         model_config_str = ' -c %s' % args.model_config
     else:
         model_config_str = ''
+    if args.models:
+        models_str = ' -m %s' % ' '.join(args.models)
+    else:
+        models_str = ''
     if args.plot_config:
         plot_config_str = ' -c %s' % args.plot_config
     else:
@@ -151,7 +163,7 @@ if __name__ == '__main__':
                 else:
                     session_str = ''
                 name_parts.append('-'.join(job_types))
-                job_name = '_'.join(name_parts)
+                job_name = '_'.join(name_parts) + suffix_str
                 filename = os.path.normpath(os.path.join(outdir, job_name + '.pbs'))
                 with open(filename, 'w') as f:
                     f.write(base % (job_name, job_name, time, memory, n_cores))
@@ -176,8 +188,8 @@ if __name__ == '__main__':
                             job_str = wrapper % ('python -m climbprep.clean %s -p %s%s%s\n' %
                                                  (participant, project, session_str, clean_config_str))
                         elif job_type.lower() == 'model':
-                            job_str = wrapper % ('python -m climbprep.model %s -p %s%s\n' %
-                                                 (participant, project, model_config_str))
+                            job_str = wrapper % ('python -m climbprep.model %s -p %s%s%s\n' %
+                                                 (participant, project, model_config_str, models_str))
                         elif job_type.lower() == 'plot':
                             job_str = wrapper % ('python -m climbprep.plot %s -p %s%s\n' %
                                                  (participant, project, plot_config_str))
