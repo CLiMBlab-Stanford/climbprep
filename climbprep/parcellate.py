@@ -282,6 +282,7 @@ if __name__ == '__main__':
     args = argparser.parse_args()
 
     participant = args.participant.replace('sub-', '')
+    project = args.project
     config = args.config
     if config in CONFIG['parcellate']:
         parcellation_label = config
@@ -306,7 +307,7 @@ if __name__ == '__main__':
     space = config.pop('space')
 
     # Set session-agnostic paths
-    project_path = os.path.join(BIDS_PATH, args.project)
+    project_path = os.path.join(BIDS_PATH, project)
     assert os.path.exists(project_path), 'Path not found: %s' % project_path
     derivatives_path = os.path.join(project_path, 'derivatives')
     assert os.path.exists(derivatives_path), 'Path not found: %s' % derivatives_path
@@ -335,12 +336,12 @@ if __name__ == '__main__':
         preprocessing_label = cleaning_config['preprocessing_label']
         preprocess_path = os.path.join(derivatives_path, 'preprocess', preprocessing_label, subdir)
         assert os.path.exists(preprocess_path), 'Path not found: %s' % preprocess_path
-        anat_path = os.path.join(derivatives_path, 'preprocess', preprocessing_label, participant_dir, 'anat')
-        anat_by_session = False
-        if not os.path.exists(anat_path):
-            anat_path = os.path.join(preprocess_path, 'anat')
-            anat_by_session = True
+        anat_path = get_preprocessed_anat_dir(project, participant, preprocessing_label=preprocessing_label)
         assert os.path.exists(anat_path), 'Path not found: %s' % anat_path
+        if os.path.basename(os.path.dirname(anat_path)).startswith('ses-'):
+            ses_str_anat = f'_ses-{os.path.basename(os.path.dirname(anat_path))[4:]}'
+        else:
+            ses_str_anat = ''
 
         if session:
             ses_str = f'_ses-{session}'
@@ -407,29 +408,25 @@ if __name__ == '__main__':
                     xfm_path = xfm_path[::-1]
             assert xfm_path, f'Non-MNI space used but no matching transform (*_xfm.h5) found in {anat_path}.'
 
-            if anat_by_session:
-                ses_str_ = ses_str
-            else:
-                ses_str_ = ''
             surfaces = dict(
                 pial=dict(
-                    left=os.path.join(anat_path, f'sub-{participant}{ses_str_}_hemi-L_pial.surf.gii'),
-                    right=os.path.join(anat_path, f'sub-{participant}{ses_str_}_hemi-R_pial.surf.gii')
+                    left=os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-L_pial.surf.gii'),
+                    right=os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-R_pial.surf.gii')
                 ),
                 white=dict(
-                    left=os.path.join(anat_path, f'sub-{participant}{ses_str_}_hemi-L_white.surf.gii'),
-                    right=os.path.join(anat_path, f'sub-{participant}{ses_str_}_hemi-R_white.surf.gii')
+                    left=os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-L_white.surf.gii'),
+                    right=os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-R_white.surf.gii')
                 ),
                 midthickness=dict(
-                    left=os.path.join(anat_path, f'sub-{participant}{ses_str_}_hemi-L_midthickness.surf.gii'),
-                    right=os.path.join(anat_path, f'sub-{participant}{ses_str_}_hemi-R_midthickness.surf.gii')
+                    left=os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-L_midthickness.surf.gii'),
+                    right=os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-R_midthickness.surf.gii')
                 ),
                 sulc=dict(
-                    left=os.path.join(anat_path, f'sub-{participant}{ses_str_}_hemi-L_sulc.shape.gii'),
-                    right=os.path.join(anat_path, f'sub-{participant}{ses_str_}_hemi-R_sulc.shape.gii')
+                    left=os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-L_sulc.shape.gii'),
+                    right=os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-R_sulc.shape.gii')
                 )
             )
-            T1 = os.path.join(anat_path, f'sub-{participant}{ses_str_}_desc-preproc_T1w.nii.gz')
+            T1 = os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_desc-preproc_T1w.nii.gz')
 
         parcellation_config = deepcopy(config)
         if mask_path:
