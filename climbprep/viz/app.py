@@ -581,13 +581,13 @@ def assign_callbacks(app, cache):
                 participant = participants[0] if participants else None
 
             preprocessing_label = preprocessing_label or PREPROCESS_DEFAULT_KEY
-            session_subdirs = [
-                x for x in os.listdir(os.path.join(
-                    BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}'
-                )) if x.startswith('ses-')
-            ]
             anat = {}
             anat_dir = get_preprocessed_anat_dir(project, participant, preprocessing_label=preprocessing_label)
+            if os.path.basename(os.path.dirname(anat_dir)).startswith('ses-'):
+                ses_str_anat = '_ses-' + os.path.basename(os.path.dirname(anat_dir))[4:]
+            else:
+                ses_str_anat = ''
+            print(os.path.basename(os.path.dirname(anat_dir)), ses_str_anat)
             mask_path = os.path.join(anat_dir, f'sub-{participant}{DEFAULT_MASK_SUFFIX}')
             anat['mask'] = None if use_template_surface else mask_path
             for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
@@ -600,16 +600,8 @@ def assign_callbacks(app, cache):
                         surf_path = surfaces[surf_type][hemi]
                     else:
                         surf_path = os.path.join(
-                            BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}',
-                            'anat', f'sub-{participant}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
+                            anat_dir, f'sub-{participant}{ses_str_anat}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
                         )
-                        if not os.path.exists(surf_path) and session_subdirs:
-                            session = session_subdirs[0][4:]
-                            surf_path = os.path.join(
-                                BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}',
-                                f'ses-{session}', 'anat',
-                                f'sub-{participant}_ses-{session}_hemi-{hemi[0].upper()}_{surf_type}{suffix}'
-                            )
                     if not surf_type in anat:
                         anat[surf_type] = dict()
                     anat[surf_type][hemi] = surf_path

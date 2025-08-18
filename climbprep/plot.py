@@ -1460,5 +1460,3 @@ if __name__ == '__main__':
                         vtrim=config['vtrim']
                     )
                     stderr(f'  Finished plotting: {plot_path_}\n')
-
-    # shutil.rmtree(cache_path)
