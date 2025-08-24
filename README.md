@@ -144,6 +144,10 @@ you should first remove the existing session directory
 unless you really know what you're doing. Otherwise, unexpected
 behaviors can result.
 
+*IMPORTANT NOTE:* Task names in BIDS must be alphanumeric (e.g., no
+hyphens or underscores), so make sure the `TaskName` column
+in `runs.csv` contains only alphanumeric values.
+
 
 ### preprocess
 

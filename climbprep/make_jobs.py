@@ -50,7 +50,9 @@ if __name__ == '__main__':
     argparser.add_argument('-a', '--account', default='nlp', help='Value for SLURM --account setting, if applicable')
     argparser.add_argument('-e', '--exclude', nargs='+', help='Nodes to exclude')
     argparser.add_argument('-o', '--outdir', default='./', help='Directory in which to place generated batch scripts.')
-    argparser.add_argument('-S', '--suffix', default='', help='Optional suffix to add to job name')
+    argparser.add_argument('-S', '--suffix', default='', help='Optional suffix to add to job name.')
+    argparser.add_argument('-f', '--fwhm', default=None, help='Smoothing FWHM (in mm) to use across relevant jobs. '
+                                                              'If not specified, default smoothing will be applied.')
     argparser.add_argument('--bidsify-config', default=None, help=('BIDSify config path. If not '
                                                                    'specified, the default config will be used.'))
     argparser.add_argument('--preprocess-config', default=None, help=('Preprocessing config (path or keyword). If not '
@@ -88,6 +90,7 @@ if __name__ == '__main__':
         exclude = []
     outdir = args.outdir
     suffix = args.suffix
+    fwhm = args.fwhm
     if suffix:
         suffix_str = '_' + suffix
     else:
@@ -102,10 +105,14 @@ if __name__ == '__main__':
         preprocess_config_str = ''
     if args.clean_config:
         clean_config_str = ' -c %s' % args.clean_config
+    elif fwhm:
+        clean_config_str = ' -c %s' % (CLEAN_DEFAULT_KEY + fwhm + 'mm')
     else:
         clean_config_str = ''
     if args.model_config:
         model_config_str = ' -c %s' % args.model_config
+    elif fwhm:
+        model_config_str = ' -c %s' % (MODEL_DEFAULT_KEY + fwhm + 'mm')
     else:
         model_config_str = ''
     if args.models:
@@ -114,10 +121,14 @@ if __name__ == '__main__':
         models_str = ''
     if args.plot_config:
         plot_config_str = ' -c %s' % args.plot_config
+    elif fwhm:
+        plot_config_str = ' -c %s' % (PLOT_DEFAULT_KEY + fwhm + 'mm')
     else:
         plot_config_str = ''
     if args.parcellate_config:
         parcellate_config_str = ' -c %s' % args.parcellate_config
+    elif fwhm:
+        parcellate_config_str = ' -c %s' % (PARCELLATE_DEFAULT_KEY + fwhm + 'mm')
     else:
         parcellate_config_str = ''
 

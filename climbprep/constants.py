@@ -23,19 +23,21 @@ PLOT_DEFAULT_KEY = MODEL_DEFAULT_KEY
 PARCELLATE_DEFAULT_KEY = 'fsnative'
 DEFAULT_MASK_SUFFIX = '_label-GM_probseg.nii.gz'
 DEFAULT_MASK_FWHM = 2
+DEFAULT_SMOOTHING_FWHM = 4
 DEFAULT_TARGET_AFFINE = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
 
 # Regex
-SUB_RE = re.compile('.*sub-([a-zA-Z0-9]+)_')
-SES_RE = re.compile('.+_ses-([a-zA-Z0-9]+)_')
-SPACE_RE = re.compile('.+_space-([a-zA-Z0-9]+)_')
-RUN_RE = re.compile('.+_run-([0-9]+)_')
-TASK_RE = re.compile('.+_task-([a-zA-Z0-9]+)_')
-CONTRAST_RE = re.compile('.+_contrast-([a-zA-Z0-9]+)_')
-HEMI_RE = re.compile('.+_hemi-([a-zA-Z0-9]+)_')
-STAT_RE = re.compile('.+_stat-([a-zA-Z0-9]+)_')
-FROM_RE = re.compile('.+_from-([a-zA-Z0-9]+)_')
-TO_RE = re.compile('.+_to-([a-zA-Z0-9]+)_')
+SUB_RE = re.compile(r'.*sub-([a-zA-Z0-9]+)_')
+SES_RE = re.compile(r'.+_ses-([a-zA-Z0-9]+)_')
+SPACE_RE = re.compile(r'.+_space-([a-zA-Z0-9]+)_')
+RUN_RE = re.compile(r'.+_run-([0-9]+)_')
+TASK_RE = re.compile(r'.+_task-([a-zA-Z0-9]+)_')
+CONTRAST_RE = re.compile(r'.+_contrast-([a-zA-Z0-9]+)_')
+HEMI_RE = re.compile(r'.+_hemi-([a-zA-Z0-9]+)_')
+STAT_RE = re.compile(r'.+_stat-([a-zA-Z0-9]+)_')
+FROM_RE = re.compile(r'.+_from-([a-zA-Z0-9]+)_')
+TO_RE = re.compile(r'.+_to-([a-zA-Z0-9]+)_')
+SMOOTHING_RE = re.compile(r'(.+)([0-9.]+)mm$')
 
 # Modeling
 MODEL_CONFOUNDS = [
@@ -207,8 +209,8 @@ CONFIG = dict(
             mask_suffix=DEFAULT_MASK_SUFFIX,
             # Matches global signal, 7 core motion regressors, acompcor + discrete cosine, and motion and non-steady-state outliers 
             confounds_regex=f'^(global_signal|framewise_displacement|trans_[xyz]|rot_[xyz]|a_comp_cor_0[0-4]|cosine.*|.*_outlier.*)$',
-            volume_fwhm=4,
-            surface_fwhm=4,
+            volume_fwhm=DEFAULT_SMOOTHING_FWHM,
+            surface_fwhm=DEFAULT_SMOOTHING_FWHM,
             standardize=True,
             detrend=True,
             regress_out_task=True,
@@ -223,8 +225,8 @@ CONFIG = dict(
             mask_suffix=DEFAULT_MASK_SUFFIX,
             # Matches global signal, 7 core motion regressors, acompcor + discrete cosine, and motion and non-stead-state outliers 
             confounds_regex=f'^(global_signal|framewise_displacement|trans_[xyz]|rot_[xyz]|a_comp_cor_0[0-4]|cosine.*|.*_outlier.*)$',
-            volume_fwhm=4,
-            surface_fwhm=4,
+            volume_fwhm=DEFAULT_SMOOTHING_FWHM,
+            surface_fwhm=DEFAULT_SMOOTHING_FWHM,
             standardize=False,
             detrend=True,
             regress_out_task=False,
@@ -284,7 +286,7 @@ CONFIG = dict(
     model=dict(
         mni=dict(
             preprocessing_label=PREPROCESS_DEFAULT_KEY,
-            smoothing_fwhm=4,
+            smoothing_fwhm=DEFAULT_SMOOTHING_FWHM,
             smoothing_method='iso',
             space='MNI152NLin2009cAsym',
             estimator='nilearn',
@@ -293,7 +295,7 @@ CONFIG = dict(
         ),
         T1w=dict(
             preprocessing_label=PREPROCESS_DEFAULT_KEY,
-            smoothing_fwhm=4,
+            smoothing_fwhm=DEFAULT_SMOOTHING_FWHM,
             smoothing_method='iso',
             space='T1w',
             estimator='nilearn',
@@ -306,6 +308,22 @@ CONFIG = dict(
         mni=dict()
     ),
 )
+for key in list(CONFIG['clean'].keys()):
+    new = CONFIG['clean'][key].copy()
+    new['volume_fwhm'] = 2
+    new['surface_fwhm'] = 2
+    CONFIG['clean'][key + '2mm'] = new
+
+for key in list(CONFIG['parcellate'].keys()):
+    new = CONFIG['parcellate'][key].copy()
+    new['cleaning_label'] = new['cleaning_label'] + '2mm'
+    CONFIG['parcellate'][key + '2mm'] = new
+
+for key in list(CONFIG['model'].keys()):
+    new = CONFIG['model'][key].copy()
+    new['smoothing_fwhm'] = 2
+    CONFIG['model'][key + '2mm'] = new
+
 for key in CONFIG['model']:
     CONFIG['plot'][key] = dict(
         model_label=key,
