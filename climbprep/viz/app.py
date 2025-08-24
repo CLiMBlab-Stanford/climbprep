@@ -587,7 +587,6 @@ def assign_callbacks(app, cache):
                 ses_str_anat = '_ses-' + os.path.basename(os.path.dirname(anat_dir))[4:]
             else:
                 ses_str_anat = ''
-            print(os.path.basename(os.path.dirname(anat_dir)), ses_str_anat)
             mask_path = os.path.join(anat_dir, f'sub-{participant}{DEFAULT_MASK_SUFFIX}')
             anat['mask'] = None if use_template_surface else mask_path
             for surf_type in ('pial', 'white', 'midthickness', 'sulc'):
@@ -738,7 +737,7 @@ def assign_callbacks(app, cache):
                     statmap_label_default += f', {session}'
                 statmap_label = get_value(statmap, 'text') or statmap_label_default
                 vmin_ = get_value(statmap, 'vmin') or 0
-                vmax_ = get_value(statmap, 'vmax') or 0.5
+                vmax_ = get_value(statmap, 'vmax') or 0.7
             elif stat_type == 'connectivity_local':
                 seed = (
                     get_value(statmap, 'seed_x'),
