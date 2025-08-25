@@ -105,13 +105,13 @@ if __name__ == '__main__':
         preprocess_config_str = ''
     if args.clean_config:
         clean_config_str = ' -c %s' % args.clean_config
-    elif fwhm:
+    elif fwhm is not None:
         clean_config_str = ' -c %s' % (CLEAN_DEFAULT_KEY + fwhm + 'mm')
     else:
         clean_config_str = ''
     if args.model_config:
         model_config_str = ' -c %s' % args.model_config
-    elif fwhm:
+    elif fwhm is not None:
         model_config_str = ' -c %s' % (MODEL_DEFAULT_KEY + fwhm + 'mm')
     else:
         model_config_str = ''
@@ -121,13 +121,13 @@ if __name__ == '__main__':
         models_str = ''
     if args.plot_config:
         plot_config_str = ' -c %s' % args.plot_config
-    elif fwhm:
+    elif fwhm is not None:
         plot_config_str = ' -c %s' % (PLOT_DEFAULT_KEY + fwhm + 'mm')
     else:
         plot_config_str = ''
     if args.parcellate_config:
         parcellate_config_str = ' -c %s' % args.parcellate_config
-    elif fwhm:
+    elif fwhm is not None:
         parcellate_config_str = ' -c %s' % (PARCELLATE_DEFAULT_KEY + fwhm + 'mm')
     else:
         parcellate_config_str = ''
