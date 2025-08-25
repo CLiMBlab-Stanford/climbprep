@@ -1308,9 +1308,10 @@ if __name__ == '__main__':
         config = {}
     elif SMOOTHING_RE.match(config):
         config, fwhm = SMOOTHING_RE.match(config).groups()
+        model_label = f'{config}{fwhm}mm'
         assert config in CONFIG['plot'], 'Provided config (%s) does not match any known keyword.' % config
         config_default = CONFIG['plot'][config]
-        config_default['cleaning_label'] = config_default['cleaning_label'] + fwhm + 'mm'
+        config_default['cleaning_label'] = f'{config_default["cleaning_label"]}{fwhm}mm'
         config = {}
     else:
         n = len(PLOT_STATMAP_SUFFIX)

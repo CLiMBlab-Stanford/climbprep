@@ -46,9 +46,12 @@ if __name__ == '__main__':
         config = {}
     elif SMOOTHING_RE.match(config):
         config, fwhm = SMOOTHING_RE.match(config).groups()
+        cleaning_label = f'{config}{fwhm}mm'
         assert config in CONFIG['clean'], 'Provided config (%s) does not match any known keyword.' % config
         config_default = CONFIG['clean'][config]
         config_default['cleaning_label'] = config_default['cleaning_label'] + fwhm + 'mm'
+        config_default['volume_fwhm'] = float(fwhm)
+        config_default['surface_fwhm'] = float(fwhm)
         config = {}
     else:
         assert config.endswith('_clean.yml'), 'config must either be a known keyword or a file ending in ' \
