@@ -49,7 +49,6 @@ if __name__ == '__main__':
         cleaning_label = f'{config}{fwhm}mm'
         assert config in CONFIG['clean'], 'Provided config (%s) does not match any known keyword.' % config
         config_default = CONFIG['clean'][config]
-        config_default['cleaning_label'] = config_default['cleaning_label'] + fwhm + 'mm'
         config_default['volume_fwhm'] = float(fwhm)
         config_default['surface_fwhm'] = float(fwhm)
         config = {}
