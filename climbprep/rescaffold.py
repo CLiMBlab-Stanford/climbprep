@@ -37,6 +37,8 @@ if __name__ ==  '__main__':
             if participant.endswith('.tsv'):
                 participants_df = pd.read_csv(participant, sep='\t', header=None, names=['participant_id'])
                 participants_ |= set(participants_df['participant_id'].str.replace('^sub-', '', regex=True).tolist())
+            else:
+                participants_.add(participant)
         participants = participants_
 
     tasks = args.tasks or None
@@ -46,6 +48,8 @@ if __name__ ==  '__main__':
             if task.endswith('.tsv'):
                 tasks_df = pd.read_csv(task, sep='\t', header=None, names=['task'])
                 tasks_ |= set(tasks_df['task'].tolist())
+            else:
+                tasks_.add(task)
         tasks = tasks_
 
     stderr(f'Rescaffolded project will be written to {os.path.join(BIDS_PATH, project)}\n')

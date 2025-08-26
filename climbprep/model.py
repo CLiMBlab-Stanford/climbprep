@@ -43,6 +43,7 @@ if __name__ == '__main__':
         model_label = f'{config}{fwhm}mm'
         assert config in CONFIG['model'], 'Provided config (%s) does not match any known keyword.' % config
         config_default = CONFIG['model'][config]
+        config_default['smoothing_fwhm'] = float(fwhm)
         config = {}
     else:
         assert config.endswith('_model.yml'), 'config must either be a known keyword or a file ending in ' \
