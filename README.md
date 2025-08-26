@@ -344,7 +344,7 @@ space, you can run:
     python -m climbprep.viz.reset_cache
 
 <details>
-<summary>**Solutions for MacOS users**</summary>
+<summary> Solutions for MacOS users </summary>
 MacOS users might experience a "Read-only file system" error when 
 executing the first `sudo` command in the above code chunk. To solve this problem, you first create a synthetic firm link that connects a virtual folder `juice6` at the root of the file sytem to an actual directory that this synthetic link will point to.
 
