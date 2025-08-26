@@ -36,7 +36,7 @@ if __name__ ==  '__main__':
         for participant in participants:
             if participant.endswith('.tsv'):
                 participants_df = pd.read_csv(participant, sep='\t', header=None, names=['participant_id'])
-                participants_ |= set(participants_df['participant_id'].str.replace('^sub-', '', regex=True).tolist())
+                participants_ |= set(participants_df['participant_id'].astype(str).str.replace('^sub-', '', regex=True).tolist())
         participants = participants_
 
     tasks = args.tasks or None
@@ -53,7 +53,7 @@ if __name__ ==  '__main__':
     source_project_path = os.path.join(BIDS_PATH, source)
     participants_table = pd.read_csv(os.path.join(source_project_path, 'participants.tsv'), sep='\t')
     participants_table.participant_id = participants_table.participant_id.str.replace('^sub-', '', regex=True)
-    session_to_id = {x: y for x, y in zip(participants_table['participant_id'], participants_table[f'{source}_id'])}
+    session_to_id = {x: y for x, y in zip(participants_table['participant_id'].astype(str), participants_table[f'{source}_id'].astype(str))}
     id_to_sessions = {}
     for session in session_to_id:
         source_id = session_to_id[session]
@@ -62,6 +62,8 @@ if __name__ ==  '__main__':
         id_to_sessions[source_id].add(session)
     available_participants = set(id_to_sessions.keys())
     if participants:
+        print(participants)
+        print(available_participants)
         missing = participants - available_participants
         if missing:
             stderr((f'WARNING: The following participants were not found in the {source} dataset: '
