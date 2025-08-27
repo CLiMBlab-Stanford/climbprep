@@ -31,7 +31,7 @@ if __name__ == '__main__':
                 'config must either by a known keyword or a file ending in `_preprocess.yml'
         assert os.path.exists(config), ('Provided config (%s) does not match any known keyword or any existing '
                                         'filepath. Please provide a valid config.' % config)
-        preprocessing_label = config[:-15]
+        preprocessing_label = os.path.basename(config)[:-15]
         config_default = CONFIG['preprocess'][PREPROCESS_DEFAULT_KEY]
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
