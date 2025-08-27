@@ -299,8 +299,7 @@ class PlotLib:
                     try:
                         color = next(plot_colors)
                     except StopIteration:
-                        raise ValueError('Not enough colors in `climbprep.constants.PLOT_COLORS` to plot all statmaps. '
-                                         'Please provide a list of colors for `cmaps`.')
+                        color = self.sample_color()
 
                 if skip_:
                     continue
@@ -1106,7 +1105,6 @@ class PlotLib:
         statmap_abs = np.abs(statmap)
         statmap -= cmin / (cmax - cmin)
 
-        assert isinstance(color, str), '`cmap` must be a string.'
         try:
             color = to_rgb(color)
             cmap = LinearSegmentedColormap.from_list(f'{color}', [color, color])
@@ -1252,6 +1250,15 @@ class PlotLib:
 
         return nii
 
+    def sample_color(self):
+        r, g, b = np.random.random(size=3)
+        max_val = max(r, g, b)
+        r = r / max_val
+        g = g / max_val
+        b = b / max_val
+
+        return np.array([r, g, b])
+
 class PlotLibMemoized(PlotLib):
 
     def __init__(
@@ -1298,6 +1305,13 @@ if __name__ == '__main__':
     if config in CONFIG['plot']:
         plot_label = config
         config_default = CONFIG['plot'][config]
+        config = {}
+    elif SMOOTHING_RE.match(config):
+        config, fwhm = SMOOTHING_RE.match(config).groups()
+        model_label = f'{config}{fwhm}mm'
+        assert config in CONFIG['plot'], 'Provided config (%s) does not match any known keyword.' % config
+        config_default = CONFIG['plot'][config]
+        config_default['cleaning_label'] = f'{config_default["cleaning_label"]}{fwhm}mm'
         config = {}
     else:
         n = len(PLOT_STATMAP_SUFFIX)
