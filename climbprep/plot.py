@@ -1363,7 +1363,22 @@ if __name__ == '__main__':
             mni_space = False
         bids_path = os.path.join(derivatives_path, 'preprocess', preprocessing_label)
         assert os.path.exists(bids_path), 'Path not found: %s' % bids_path
-        anat_path = os.path.join(bids_path, f'sub-{participant}', 'anat')
+
+        # Yuhan revised these lines of codes.
+        subject_preprocess_path = os.path.join(bids_path, f'sub-{participant}')
+        session_count=0
+        sessions = []
+        for subdir in os.listdir(subject_preprocess_path):
+            if 'ses-' in subdir:
+                session_count += 1
+                sessions.append(subdir)
+        if session_count==0:
+            raise ValueError(f'There is no session folder in {subject_preprocess_path}.')
+        elif session_count==1:
+            session_name = sessions[0]
+            anat_path = os.path.join(bids_path, f'sub-{participant}', session_name, 'anat')
+        elif session_count > 1:
+            anat_path = os.path.join(bids_path, f'sub-{participant}', 'anat')
         assert os.path.exists(anat_path), 'Path not found: %s' % anat_path
 
         for node in ('subject', 'session', 'run'):
@@ -1416,22 +1431,47 @@ if __name__ == '__main__':
                         right=fsaverage['sulc_right']
                     )
                 else:
-                    pial = dict(
-                        left=os.path.join(anat_path, f'sub-{participant}_hemi-L_pial.surf.gii'),
-                        right=os.path.join(anat_path, f'sub-{participant}_hemi-R_pial.surf.gii')
-                    )
-                    midthickness = dict(
-                        left=os.path.join(anat_path, f'sub-{participant}_hemi-L_midthickness.surf.gii'),
-                        right=os.path.join(anat_path, f'sub-{participant}_hemi-R_midthickness.surf.gii')
-                    )
-                    white = dict(
-                        left=os.path.join(anat_path, f'sub-{participant}_hemi-L_white.surf.gii'),
-                        right=os.path.join(anat_path, f'sub-{participant}_hemi-R_white.surf.gii')
-                    )
-                    sulc = dict(
-                        left=os.path.join(anat_path, f'sub-{participant}_hemi-L_sulc.shape.gii'),
-                        right=os.path.join(anat_path, f'sub-{participant}_hemi-R_sulc.shape.gii')
-                    )
+                    if 'ses-' in anat_path:
+                        components = anat_path.split("/")
+                        session_name_ = None
+                        for seg in components:
+                            if 'ses-' in seg:
+                                session_name_ = seg
+                                print(f'The session folder that the anatomical scans are in is {session_name_}.')
+                        assert session_name_ is not None, 'There is supposed to be a session name in between.'
+                        pial = dict(
+                            left=os.path.join(anat_path, f'sub-{participant}_{session_name_}_hemi-L_pial.surf.gii'),
+                            right=os.path.join(anat_path, f'sub-{participant}_{session_name_}_hemi-R_pial.surf.gii')
+                        )
+                        midthickness = dict(
+                            left=os.path.join(anat_path, f'sub-{participant}_{session_name_}_hemi-L_midthickness.surf.gii'),
+                            right=os.path.join(anat_path, f'sub-{participant}_{session_name_}_hemi-R_midthickness.surf.gii')
+                        )
+                        white = dict(
+                            left=os.path.join(anat_path, f'sub-{participant}_{session_name_}_hemi-L_white.surf.gii'),
+                            right=os.path.join(anat_path, f'sub-{participant}_{session_name_}_hemi-R_white.surf.gii')
+                        )
+                        sulc = dict(
+                            left=os.path.join(anat_path, f'sub-{participant}_{session_name_}_hemi-L_sulc.shape.gii'),
+                            right=os.path.join(anat_path, f'sub-{participant}_{session_name_}_hemi-R_sulc.shape.gii')
+                        )     
+                    else:
+                        pial = dict(
+                            left=os.path.join(anat_path, f'sub-{participant}_hemi-L_pial.surf.gii'),
+                            right=os.path.join(anat_path, f'sub-{participant}_hemi-R_pial.surf.gii')
+                        )
+                        midthickness = dict(
+                            left=os.path.join(anat_path, f'sub-{participant}_hemi-L_midthickness.surf.gii'),
+                            right=os.path.join(anat_path, f'sub-{participant}_hemi-R_midthickness.surf.gii')
+                        )
+                        white = dict(
+                            left=os.path.join(anat_path, f'sub-{participant}_hemi-L_white.surf.gii'),
+                            right=os.path.join(anat_path, f'sub-{participant}_hemi-R_white.surf.gii')
+                        )
+                        sulc = dict(
+                            left=os.path.join(anat_path, f'sub-{participant}_hemi-L_sulc.shape.gii'),
+                            right=os.path.join(anat_path, f'sub-{participant}_hemi-R_sulc.shape.gii')
+                        )
 
                 statmap_paths = []
                 for x in os.listdir(contrast_path):

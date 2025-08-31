@@ -57,7 +57,7 @@ if __name__ ==  '__main__':
     source_project_path = os.path.join(BIDS_PATH, source)
     participants_table = pd.read_csv(os.path.join(source_project_path, 'participants.tsv'), sep='\t')
     participants_table.participant_id = participants_table.participant_id.str.replace('^sub-', '', regex=True)
-    session_to_id = {x: y for x, y in zip(participants_table['participant_id'], participants_table[f'{source}_id'])}
+    session_to_id = {x: y for x, y in zip(participants_table['participant_id'].astype(str), participants_table[f'{source}_id'].astype(str))}
     id_to_sessions = {}
     for session in session_to_id:
         source_id = session_to_id[session]
