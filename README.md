@@ -347,6 +347,30 @@ space, you can run:
 
     python -m climbprep.viz.reset_cache
 
+<details>
+<summary> Solutions for MacOS users </summary>
+MacOS users might experience a "Read-only file system" error when 
+executing the first `sudo` command in the above code chunk. To solve this problem, you first create a synthetic firm link that connects a virtual folder `juice6` at the root of the file sytem to an actual directory that this synthetic link will point to.
+
+    mkdir -p /path/to/actual/directory
+    sudo vim /etc/synthetic.conf
+
+In the editor, enter the following line and make sure that a TAB character separates the two names, not SPACE.
+
+    juice6  /path/to/actual/directory
+
+After saving this line to `/etc/synthetic.conf`, set the correct ownership and permissions.
+
+    sudo chown root:wheel /etc/synthetic.conf
+    sudo chmod 644 /etc/synthetic.conf
+
+To apply this change, enter the following code or reboot the system. Then you can see the directory `juice6` at the root of the directory. You can iteratively create directories to make a `juice6/u/nlp/climblab` directory. Then you proceed to the `sshfs` step.
+
+    sudo /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t
+
+</details>
+
+
 
 ## Usage: Helper Functions
 

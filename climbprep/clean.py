@@ -57,7 +57,7 @@ if __name__ == '__main__':
                 '_clean.yml'
         assert os.path.exists(config), ('Provided config (%s) does not match any known keyword or any existing '
                                         'filepath. Please provide a valid config.' % config)
-        cleaning_label = config[:-10]
+        cleaning_label = os.path.basename(config)[:-10]
         config_default = CONFIG['clean'][CLEAN_DEFAULT_KEY]
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
