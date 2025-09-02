@@ -357,6 +357,14 @@ if __name__ == '__main__':
                                 out_dir, img_path_hemi.replace('_bold.func.gii', '_%s_bold.func.gii' % desc)
                             )
                             run.data.to_filename(run_path)
+                        # Generate CIFTI surfaces
+                        left_path = run_path.replace('_hemi-R_', '_hemi-L_')
+                        right_path = run_path
+                        out_path = left_path.replace('_hemi-L_', '').replace('_bold.func.gii', '_bold.dtseries.nii')
+                        cmd = f'wb_command -cifti-create-dense-timeseries {out_path} ' \
+                              f'-left-metric {left_path} -right-metric {right_path} ' \
+                              f'-timestep {TR} -starttime 0'
+                        cmd = f'singularity exec {os.path.join(APPTAINER_PATH, "images", FMRIPREP_IMG)} bash -c "{cmd}"'
                         confounds_outpath = os.path.join(
                             out_dir, func_file.replace('_hemi-L', '').replace('_bold.func.gii', '_desc-confounds_timeseries.tsv')
                         )
