@@ -32,6 +32,14 @@ if __name__ == '__main__':
         seed_label = config
         config_default = CONFIG['seed'][config]
         config = {}
+    elif SMOOTHING_RE.match(config):
+        config, fwhm = SMOOTHING_RE.match(config).groups()
+        seed_label = f'{config}{fwhm}mm'
+        assert config in CONFIG['seed'], 'Provided config (%s) does not match any known keyword.' % config
+        config_default = CONFIG['seed'][config]
+        if not config_default['cleaning_label'].endswith(f'{fwhm}mm'):
+            config_default['cleaning_label'] = f'{config_default["cleaning_label"]}{fwhm}mm'
+        config = {}
     else:
         assert config.endswith('_seed.yml') , \
                 'config must either by a known keyword or a file ending in `_seed.yml'
