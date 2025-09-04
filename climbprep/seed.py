@@ -60,7 +60,6 @@ if __name__ == '__main__':
     session_paths = [x for x in os.listdir(timeseries_path) if x.startswith('ses-')]
     functionals = set()
     if session_paths:
-        cleaning_config_path = os.path.join(timeseries_path, session_paths[0], 'config.yml')
         for session_path_ in session_paths:
             session_path = os.path.join(timeseries_path, session_path_)
             for x in os.listdir(session_path):
@@ -69,7 +68,6 @@ if __name__ == '__main__':
                         (SPACE_RE.match(x) and SPACE_RE.match(x).group(1) == space):
                     functionals.add(os.path.join(timeseries_path, session_path, x))
     else:
-        cleaning_config_path = os.path.join(timeseries_path, 'config.yml')
         for x in os.listdir(timeseries_path):
             if x.endswith('_desc-clean_bold.func.gii') and match.match(x) and \
                     (HEMI_RE.match(x) and HEMI_RE.match(x).group(1) == 'L') and \
@@ -83,8 +81,8 @@ if __name__ == '__main__':
                              'volumetric data is not currently supported).' % (
                                     participant, seed_label, config['regex_filter'], space
                              )
-    with open(cleaning_config_path, 'r') as f:
-        preprocessing_label = yaml.safe_load(f)['preprocessing_label']
+    with open(list(functionals)[0].replace('.func.gii', '.json'), 'r') as f:
+        preprocessing_label = yaml.safe_load(f)['CleanParameters']['preprocessing_label']
     anat_path = get_preprocessed_anat_dir(project, participant, preprocessing_label=preprocessing_label)
     if os.path.basename(os.path.dirname(anat_path)).startswith('ses-'):
         ses_str_anat = f'_ses-{os.path.basename(os.path.dirname(anat_path))[4:]}'
