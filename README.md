@@ -275,7 +275,7 @@ run:
     python -m climbprep.parcellate <PARTICIPANT_ID> -p <PROJECT_ID>
 
 (the `-p` option can be omitted if the project is `climblab`).
-The `-c` argument can be omitted (defaults to `T1w`) or set to
+The `-c` argument can be omitted (defaults to `fsnative`) or set to
 another named configuration or a path to a YAML configuration file.
 To view the available config options, see `CONFIG['parcellate']` in
 `climbprep/constants.py`.
@@ -294,6 +294,51 @@ another named configuration or a path to a YAML configuration file.
 To view the available config options, see `CONFIG['plot']` in
 `climbprep/constants.py`.
 
+
+### seed
+Seed analyses are inherently interactive, so they are deployed a little
+differently than the other core `climbprep` functions. The function
+signature is similar:
+
+    python -m climbprep.seed <PARTICIPANT_ID> -p <PROJECT_ID> -c <CONFIG>
+
+(the `-p` option can be omitted if the project is `climblab`).
+The `-c` argument can be omitted (defaults to `fsnative`) or set to
+another named configuration or a path to a YAML configuration file.
+To view the available config options, see `CONFIG['seed']` in
+`climbprep/constants.py`.
+
+This utility can be run optionally in interactive mode with `-i`,
+to launch an interactive session of the HCP's `Connectome Workbench`
+tool (`wb_view`). In order for this to work, you must run `seed`
+in an interactive session on the cluster with X11 forwarding
+enabled both in your `ssh` command and in your job request to
+SLURM. In particular, you should follow these steps:
+1. From your local machine, run `ssh -X sc` (or however you normally ssh,
+   but with the `-X` flag to enable X11 forwarding).
+2. From the head node, run `screen -S <NAME>` to create a named screen session
+   that will persist even if your connection drops.
+3. From within the screen, run `srun --x11 --mem=64GB --time=4:00:00 --account=nlp --partition=sphinx --pty bash`
+   (or however you normally request an interactive session, but make sure
+   to have the `--x11` flag on).
+4. Call `python -m climbprep.seed ...` as above.
+
+Depending on the number of runs in your seed analysis, it may take several
+minutes to perform file conversion and merging prior to launching `wb_view`.
+Once `wb_view` launches, it will show up as a GUI on your local machine,
+but it will be running and reading data on the cluster, so data IO
+should be fast but the graphical interface may seem a laggy. In most cases, this
+is preferable to running `wb_view` locally, which requires you to manually
+download, process, and load all relevant files.
+
+If you do not run in interactive mode, the utility will simply zip the files
+needed for a seed analysis, along with a `*.spec` file for easy loading into
+`wb_view`, and place them in the following directory:
+
+    derivatives/seed/<SEED_LABEL>/sub-<PARTICIPANT_ID>
+
+where `SEED_LABEL` is a label specified in the config (default `fsnative`).
+This archive can then be downloaded and loaded into `wb_view` on your local machine.
 
 ## Usage: viz
 
