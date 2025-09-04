@@ -306,7 +306,9 @@ signature is similar:
 The `-c` argument can be omitted (defaults to `fsnative`) or set to
 another named configuration or a path to a YAML configuration file.
 To view the available config options, see `CONFIG['seed']` in
-`climbprep/constants.py`.
+`climbprep/constants.py`. One notable option is `regex_filter`, which
+you can use to subset runs based on regex matches to their filenames.
+The default setting is to include all runs.
 
 This utility can be run optionally in interactive mode with `-i`,
 to launch an interactive session of the HCP's `Connectome Workbench`
