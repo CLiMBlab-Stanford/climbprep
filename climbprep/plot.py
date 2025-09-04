@@ -28,7 +28,7 @@ from climbprep.core import get_geodesic_smoothing_weights, apply_geodesic_smooth
 class PlotLib:
 
     CACHABLE = {
-        'get_statmap_surface_and_color',
+        # 'get_statmap_surface_and_color',
         'get_surface_mesh_hemi',
         'infer_midthickness_mesh_hemi',
         'get_surface_data',
@@ -1363,7 +1363,7 @@ if __name__ == '__main__':
             mni_space = False
         bids_path = os.path.join(derivatives_path, 'preprocess', preprocessing_label)
         assert os.path.exists(bids_path), 'Path not found: %s' % bids_path
-        anat_path = os.path.join(bids_path, f'sub-{participant}', 'anat')
+        anat_path = get_preprocessed_anat_dir(project, participant, preprocessing_label=preprocessing_label)
         assert os.path.exists(anat_path), 'Path not found: %s' % anat_path
 
         for node in ('subject', 'session', 'run'):
