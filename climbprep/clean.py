@@ -189,11 +189,19 @@ if __name__ == '__main__':
                         f'sub-{participant}{ses_str}_task-{task}{run_str}_desc-confounds_timeseries.tsv'
                     )
                     assert os.path.exists(confounds), 'Confounds file not found: %s' % confounds
+                    confounds_sidecar = os.path.join(
+                        func_path,
+                        f'sub-{participant}{ses_str}_task-{task}{run_str}_desc-confounds_timeseries.json'
+                    )
+                    assert os.path.exists(confounds), 'Confounds sidecar file not found: %s' % confounds_sidecar
+                    with open(confounds_sidecar, 'r') as f:
+                        confounds_sidecar = json.load(f)
                     func = os.path.join(func_path, img_path)
                     sidecar_path = func.replace('.func.gii', '.json')
                     assert os.path.exists(sidecar_path), 'Path not found: %s' % sidecar_path
                     with open(sidecar_path, 'r') as f:
                         sidecar = json.load(f)
+                    sidecar['CleanParameters'] = config
                     eventfile_path = os.path.join(
                         bids_path, 'func', img_path.split('_task-')[0] + '_task-' + task + run_str + '_events.tsv'
                     )
@@ -210,30 +218,29 @@ if __name__ == '__main__':
                     datasets[space][task][run]['func'] = func
                     datasets[space][task][run]['mask'] = None
                     datasets[space][task][run]['confounds'] = confounds
+                    datasets[space][task][run]['confounds_sidecar'] = confounds_sidecar.copy()
                     datasets[space][task][run]['eventfile_path'] = eventfile_path
                     datasets[space][task][run]['TR'] = TR
                     datasets[space][task][run]['StartTime'] = StartTime
+                    datasets[space][task][run]['sidecar'] = sidecar
 
         out_dir = os.path.join(derivatives_path, 'clean', cleaning_label, subdir)
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
-
-        # Save the configuration used for cleaning
-        config_path = os.path.join(out_dir, 'config.yml')
-        with open(config_path, 'w') as f:
-            yaml.safe_dump(config, f, sort_keys=False)
 
         for space in datasets:
             geodesic_smoothing_weights = None
             for task in datasets[space]:
                 for run in datasets[space][task]:
                     confounds = datasets[space][task][run]['confounds']
+                    confounds_sidecar = datasets[space][task][run]['confounds_sidecar']
                     eventfile_path = datasets[space][task][run]['eventfile_path']
                     mask = datasets[space][task][run]['mask']
                     func_path = datasets[space][task][run]['func']
                     func_file = os.path.basename(func_path)
                     TR = datasets[space][task][run]['TR']
                     StartTime = datasets[space][task][run]['StartTime']
+                    sidecar = datasets[space][task][run]['sidecar']
 
                     stderr(f'Cleaning {func_file}\n')
 
@@ -259,6 +266,9 @@ if __name__ == '__main__':
                             )
                             convolved_ = pd.DataFrame(convolved_, columns=[col])
                             convolved.append(convolved_)
+                            confounds_sidecar[col] = dict(
+                                Description='Task regressor for events of type %s' % col
+                            )
                     confounds = pd.concat(convolved + [confounds], axis=1)
 
                     if type_by_space[space] == 'vol':  # Volumetric data
@@ -299,6 +309,11 @@ if __name__ == '__main__':
                         confounds_outpath = os.path.join(
                             out_dir, func_file.replace('desc-preproc_bold.nii.gz', 'desc-confounds_timeseries.tsv')
                         )
+                        sidecar_outpath = os.path.join(
+                            out_dir, run_path.replace('_bold.nii.gz', '_bold.json')
+                        )
+                        with open(sidecar_outpath, 'w') as f:
+                            json.dump(sidecar, f, indent=2)
                     elif clean_surf and type_by_space[space] == 'surf':  # Surface data
                         mask_nii = None
                         if space == 'fsnative':
@@ -357,16 +372,11 @@ if __name__ == '__main__':
                                 out_dir, img_path_hemi.replace('_bold.func.gii', '_%s_bold.func.gii' % desc)
                             )
                             run.data.to_filename(run_path)
-                        # Generate CIFTI surfaces
-                        left_path = run_path.replace('_hemi-R_', '_hemi-L_')
-                        right_path = run_path
-                        out_path = left_path.replace('_hemi-L', '').replace('_bold.func.gii', '_bold.dtseries.nii')
-                        cmd = f'wb_command -cifti-create-dense-timeseries {out_path} ' \
-                              f'-left-metric {left_path} -right-metric {right_path} ' \
-                              f'-timestep {TR} -timestart 0'
-                        cmd = f'singularity exec {os.path.join(APPTAINER_PATH, "images", FMRIPREP_IMG)} bash -c "{cmd}"'
-                        status = os.system(cmd)
-                        assert not status, f'CIFTI file generation failed for {out_path} with exit code {status}'
+                            sidecar_outpath = os.path.join(
+                                out_dir, run_path.replace('_bold.nii.gz', '_bold.json')
+                            )
+                            with open(sidecar_outpath, 'w') as f:
+                                json.dump(sidecar, f, indent=2)
                         confounds_outpath = os.path.join(
                             out_dir, func_file.replace('_hemi-L', '').replace('_bold.func.gii', '_desc-confounds_timeseries.tsv')
                         )
@@ -374,5 +384,8 @@ if __name__ == '__main__':
                         raise ValueError('Unknown space: %s' % space)
 
                     confounds.to_csv(confounds_outpath, sep='\t', index=False)
+                    confounds_sidecar_outpath = confounds_outpath.replace('.tsv', '.json')
+                    with open(confounds_sidecar_outpath, 'w') as f:
+                        json.dump(confounds_sidecar, f, indent=2)
 
                     gc.collect()
