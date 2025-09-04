@@ -1,6 +1,7 @@
 import os
 import shutil
 import yaml
+import json
 import argparse
 from tempfile import TemporaryDirectory
 from nilearn import surface
@@ -94,7 +95,12 @@ if __name__ == '__main__':
         space_str = f'_space-{space}'
 
     with TemporaryDirectory() as tmp_dir:
-        spec_path = os.path.join(tmp_dir, 'wb.spec')
+        spec_path = os.path.join(tmp_dir, f'sub-{participant}{ses_str_anat}_space-{space}_label-{seed_label}.spec')
+        spec_sidecar_path = spec_path.replace('.spec', '.json')
+        spec_sidecar = dict(Description='Specification file for easy loading into `wb_view`. If you load the spec file ' \
+                                        'first, all required data will be loaded in as well.')
+        with open(spec_sidecar_path, 'w') as f:
+            json.dump(spec_sidecar, f, indent=2)
         for surf in ('pial', 'white', 'midthickness', 'inflated', 'sulc'):
             for hemi in ('LEFT', 'RIGHT'):
                 if surf == 'inflated':
@@ -103,7 +109,7 @@ if __name__ == '__main__':
                         'freesurfer', f'sub-{participant}', 'surf', f'{hemi[0].lower()}h.inflated'
                     )
                     mesh = surface.PolyMesh(**{hemi.lower(): surf_path})
-                    surf_path = os.path.join(tmp_dir, f'inflated_hemi-{hemi[0]}.surf.gii')
+                    surf_path = os.path.join(tmp_dir, f'sub-{participant}{ses_str_anat}_hemi-{hemi[0]}{space_str}_inflated.surf.gii')
                     mesh.to_filename(surf_path)
                 else:
                     if surf == 'sulc':
@@ -155,13 +161,12 @@ if __name__ == '__main__':
             stderr(cmd + '\n\n')
             status = os.system(cmd)
         else:
-            out_dir = os.path.join(BIDS_PATH, project, 'derivatives', 'seed', seed_label, f'sub-{participant}')
+            out_dir = os.path.join(BIDS_PATH, project, 'derivatives', 'seed', seed_label)
             if not os.path.exists(out_dir):
                 os.makedirs(out_dir)
-            out_path = os.path.join(out_dir, f'sub-{participant}_seed.zip')
-            cmd = f'zip -FSrj {out_path} {tmp_dir}'
-            stderr(cmd + '\n\n')
-            status = os.system(cmd)
+            out_dir = os.path.join(out_dir, f'sub-{participant}')
+            stderr(f'Copying files to {out_dir}\n')
+            shutil.copytree(tmp_dir, out_dir, dirs_exist_ok=True)
 
 
 
