@@ -64,7 +64,6 @@ if __name__ == '__main__':
         for session_path_ in session_paths:
             session_path = os.path.join(timeseries_path, session_path_)
             for x in os.listdir(session_path):
-                #if x.endswith('_desc-clean_bold.dtseries.nii') and match.match(x) and \
                 if x.endswith('_desc-clean_bold.func.gii') and match.match(x) and \
                         (HEMI_RE.match(x) and HEMI_RE.match(x).group(1) == 'L') and \
                         (SPACE_RE.match(x) and SPACE_RE.match(x).group(1) == space):
@@ -72,7 +71,6 @@ if __name__ == '__main__':
     else:
         cleaning_config_path = os.path.join(timeseries_path, 'config.yml')
         for x in os.listdir(timeseries_path):
-            # if x.endswith('_desc-clean_bold.dtseries.nii') and match.match(x) and \
             if x.endswith('_desc-clean_bold.func.gii') and match.match(x) and \
                     (HEMI_RE.match(x) and HEMI_RE.match(x).group(1) == 'L') and \
                     (SPACE_RE.match(x) and SPACE_RE.match(x).group(1) == space):
@@ -121,6 +119,7 @@ if __name__ == '__main__':
                 out_path = os.path.basename(functional).replace('_hemi-L', '').replace('.func.gii', '.dtseries.nii')
                 out_path = os.path.join(tmp_dir_, out_path)
                 left_path = functional
+                sidecar_path = functional.replace('_bold.func.gii', '_desc-confounds_timeseries.tsv')
                 right_path = functional.replace('_hemi-L', '_hemi-R')
                 cmd_ = f'wb_command -cifti-create-dense-timeseries {out_path} ' \
                                   f'-left-metric {left_path} -right-metric {right_path} ' \

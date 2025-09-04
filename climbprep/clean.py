@@ -269,6 +269,9 @@ if __name__ == '__main__':
                             confounds_sidecar[col] = dict(
                                 Description='Task regressor for events of type %s' % col
                             )
+                    for col in list(confounds_sidecar.keys()):
+                        if col not in confounds.columns:
+                            confounds_sidecar.pop(col)
                     confounds = pd.concat(convolved + [confounds], axis=1)
 
                     if type_by_space[space] == 'vol':  # Volumetric data
