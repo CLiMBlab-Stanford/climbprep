@@ -2,6 +2,7 @@ import os
 import yaml
 import argparse
 from tempfile import TemporaryDirectory
+from nilearn import surface
 
 from climbprep.constants import *
 from climbprep.util import *
@@ -11,7 +12,7 @@ if __name__ == '__main__':
     argparser.add_argument('participant', help='BIDS participant ID')
     argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", '
                                                                         '"evlab", etc.). Default: "climblab"'))
-    argparser.add_argument('-c', '--config', default='main', help=('Config name (default: `fsnative`) '
+    argparser.add_argument('-c', '--config', default='fsnative', help=('Config name (default: `fsnative`) '
         'or YAML config file to used to parameterize seed analysis. '
         'See `climbprep.constants.CONFIG["seed"]` for available config names and their settings.'))
     args = argparser.parse_args()
@@ -40,9 +41,8 @@ if __name__ == '__main__':
     cleaning_label = config['cleaning_label']
     space = config['space']
     match = re.compile(config['regex_filter'])
-    surface = config['surface']
 
-    timeseries_path = os.path.join(project_path, 'derivatives', 'clean', cleaning_label, participant)
+    timeseries_path = os.path.join(project_path, 'derivatives', 'clean', cleaning_label, f'sub-{participant}')
     session_paths = [x for x in os.listdir(timeseries_path) if x.startswith('ses-')]
     functionals = set()
     if session_paths:
@@ -50,20 +50,26 @@ if __name__ == '__main__':
         for session_path_ in session_paths:
             session_path = os.path.join(timeseries_path, session_path_)
             for x in os.listdir(session_path):
-                if x.endswith('_desc-clean_bold.dtseries.nii') and match.match(x) and \
-                        ((space == 'fsnative' and not SPACE_RE.match(x)) or
-                            (space != 'fsnative' and SPACE_RE.match(x) and SPACE_RE.match(x).group(1) == space)):
+                #if x.endswith('_desc-clean_bold.dtseries.nii') and match.match(x) and \
+                if x.endswith('_desc-clean_bold.func.gii') and match.match(x) and \
+                        (HEMI_RE.match(x) and HEMI_RE.match(x).group(1) == 'L') and \
+                        (SPACE_RE.match(x) and SPACE_RE.match(x).group(1) == space):
                     functionals.add(os.path.join(timeseries_path, session_path, x))
     else:
         cleaning_config_path = os.path.join(timeseries_path, 'config.yml')
         for x in os.listdir(timeseries_path):
-            if x.endswith('_desc-clean_bold.dtseries.nii') and match.match(x) and \
-                    ((space == 'fsnative' and not SPACE_RE.match(x)) or
-                        (space != 'fsnative' and SPACE_RE.match(x) and SPACE_RE.match(x).group(1) == space)):
+            # if x.endswith('_desc-clean_bold.dtseries.nii') and match.match(x) and \
+            if x.endswith('_desc-clean_bold.func.gii') and match.match(x) and \
+                    (HEMI_RE.match(x) and HEMI_RE.match(x).group(1) == 'L') and \
+                    (SPACE_RE.match(x) and SPACE_RE.match(x).group(1) == space):
                 functionals.add(os.path.join(timeseries_path, x))
     with open(cleaning_config_path, 'r') as f:
         preprocessing_label = yaml.safe_load(f)['preprocessing_label']
     anat_path = get_preprocessed_anat_dir(project, participant, preprocessing_label=preprocessing_label)
+    if os.path.basename(os.path.dirname(anat_path)).startswith('ses-'):
+        ses_str_anat = f'_ses-{os.path.basename(os.path.dirname(anat_path))[4:]}'
+    else:
+        ses_str_anat = ''
     if space == 'fsnative':
         space_str = ''
     else:
@@ -71,37 +77,52 @@ if __name__ == '__main__':
 
     with TemporaryDirectory() as tmp_dir:
         spec_path = os.path.join(tmp_dir, 'wb.spec')
-        for hemi in ('LEFT', 'RIGHT'):
-            if surface == 'inflated':
-                surf_path = os.path.join(
-                    BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, 'sourcedata',
-                    'freesurfer', f'sub-{participant}', 'surf', f'{hemi[0].lower()}h.inflated'
-                )
-            else:
-                surf_path = os.path.join(anat_path, f'sub-{participant}_hemi-{hemi[0]}_{surface}.surf.gii')
-            cmd = f'wb_command -add-to-spec-file {spec_path} CORTEX_{hemi} {surf_path}'
-            cmd = f'singularity exec {os.path.join(APPTAINER_PATH, "images", WB_IMG)} bash -c "{cmd}"'
-            stderr(cmd + '\n\n')
-            status = os.system(cmd)
-            assert not status, 'Adding surface to spec file failed with exit status %s' % status
+        for surf in ('pial', 'white', 'midthickness', 'inflated', 'sulc'):
+            for hemi in ('LEFT', 'RIGHT'):
+                if surf == 'inflated':
+                    surf_path = os.path.join(
+                        BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, 'sourcedata',
+                        'freesurfer', f'sub-{participant}', 'surf', f'{hemi[0].lower()}h.inflated'
+                    )
+                    mesh = surface.PolyMesh(**{hemi.lower(): surf_path})
+                    surf_path = os.path.join(tmp_dir, f'inflated_hemi-{hemi[0]}.surf.gii')
+                    print(surf_path)
+                    mesh.to_filename(surf_path)
+                else:
+                    if surf == 'sulc':
+                        suffix = '.shape.gii'
+                    else:
+                        suffix = '.surf.gii'
+                    surf_path = os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-{hemi[0]}_{surf}{suffix}')
+                cmd = f'wb_command -add-to-spec-file {spec_path} CORTEX_{hemi} {surf_path}'
+                stderr(cmd + '\n\n')
+                status = os.system(cmd)
+                assert not status, 'Adding surf to spec file failed with exit status %s' % status
 
         dtseries_path = os.path.join(tmp_dir, 'merged.dtseries.nii')
         cmd = f'wb_command -cifti-merge {dtseries_path}'
-        for functional in sorted(list(functionals)):
-            cmd += f' -cifti {functional}'
-        cmd = f'singularity exec {os.path.join(APPTAINER_PATH, "images", FMRIPREP_IMG)} bash -c "{cmd}"'
+        for i, functional in enumerate(sorted(list(functionals))):
+            out_path = os.path.basename(functional).replace('_hemi-L', '').replace('.func.gii', '.dtseries.nii')
+            out_path = os.path.join(tmp_dir, out_path)
+            left_path = functional
+            right_path = functional.replace('_hemi-L', '_hemi-R')
+            cmd_ = f'wb_command -cifti-create-dense-timeseries {out_path} ' \
+                              f'-left-metric {left_path} -right-metric {right_path} ' \
+                              f'-timestep 1 -timestart 0'
+            stderr(cmd_ + '\n\n')
+            status = os.system(cmd_)
+            assert not status, f'Creating CIFTI {out_path} failed with exit status {status}'
+            cmd += f' -cifti {out_path}'
         stderr(cmd + '\n\n')
         status = os.system(cmd)
         assert not status, 'Merging CIFTIs failed with exit status %s' % status
 
         cmd = f'wb_command -add-to-spec-file {spec_path} CORTEX {dtseries_path}'
-        cmd = f'singularity exec {os.path.join(APPTAINER_PATH, "images", WB_IMG)} bash -c "{cmd}"'
         stderr(cmd + '\n\n')
         status = os.system(cmd)
         assert not status, 'Adding dtseries to spec file failed with exit status %s' % status
 
         cmd = f'wb_view -no-splash -spec-load-all {spec_path}'
-        cmd = f'singularity exec --nv {os.path.join(APPTAINER_PATH, "images", WB_IMG)} bash -c "{cmd}"'
         stderr(cmd + '\n\n')
         status = os.system(cmd)
 

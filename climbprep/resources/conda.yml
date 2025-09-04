@@ -1,9 +1,12 @@
 name: climbprep
 channels:
+  - conda-forge
+  - bioconda
   - defaults
 dependencies:
   - pip
   - python
+  - connectome-workbench
   - pip:
     - matplotlib
     - nibabel

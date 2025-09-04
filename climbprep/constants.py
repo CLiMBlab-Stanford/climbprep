@@ -13,7 +13,8 @@ MODELFILES_PATH = os.path.join(LAB_PATH, 'modelfiles')
 FS_LICENSE_PATH = os.path.join(LAB_PATH, 'freesurfer', 'license.txt')
 FMRIPREP_IMG = 'fmriprep.simg'
 FITLINS_IMG = 'fitlins-climbprep.sif'
-WB_IMG = 'connectome-workbench.sif'
+WB_IMG = 'connectome-workbench-tmp.sif'
+#WB_IMG = 'hcp-base_1.0.3_4.3.0.sif'
 
 # Defaults
 DEFAULT_TASK = 'UnknownTask'
@@ -309,7 +310,7 @@ CONFIG = dict(
         mni=dict()
     ),
     seed=dict(
-        T1w=dict(
+        fsnative=dict(
             cleaning_label=CLEAN_DEFAULT_KEY,
             regex_filter=r'.*',
             space='fsnative',
