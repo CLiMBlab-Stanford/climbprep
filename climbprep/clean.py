@@ -146,6 +146,13 @@ if __name__ == '__main__':
                         f'sub-{participant}{ses_str}_task-{task}{run_str}_desc-confounds_timeseries.tsv'
                     )
                     assert os.path.exists(confounds), 'Confounds file not found: %s' % confounds
+                    confounds_sidecar = os.path.join(
+                        func_path,
+                        f'sub-{participant}{ses_str}_task-{task}{run_str}_desc-confounds_timeseries.json'
+                    )
+                    assert os.path.exists(confounds_sidecar), 'Confounds sidecar file not found: %s' % confounds_sidecar
+                    with open(confounds_sidecar, 'r') as f:
+                        confounds_sidecar = json.load(f)
                     func = os.path.join(func_path, img_path)
                     sidecar_path = func.replace('.nii.gz', '.json')
                     assert os.path.exists(sidecar_path), 'Path not found: %s' % sidecar_path
@@ -167,6 +174,7 @@ if __name__ == '__main__':
                     datasets[space][task][run]['func'] = func
                     datasets[space][task][run]['mask'] = mask
                     datasets[space][task][run]['confounds'] = confounds
+                    datasets[space][task][run]['confounds_sidecar'] = confounds_sidecar.copy()
                     datasets[space][task][run]['eventfile_path'] = eventfile_path
                     datasets[space][task][run]['TR'] = TR
                     datasets[space][task][run]['StartTime'] = StartTime
@@ -193,7 +201,7 @@ if __name__ == '__main__':
                         func_path,
                         f'sub-{participant}{ses_str}_task-{task}{run_str}_desc-confounds_timeseries.json'
                     )
-                    assert os.path.exists(confounds), 'Confounds sidecar file not found: %s' % confounds_sidecar
+                    assert os.path.exists(confounds_sidecar), 'Confounds sidecar file not found: %s' % confounds_sidecar
                     with open(confounds_sidecar, 'r') as f:
                         confounds_sidecar = json.load(f)
                     func = os.path.join(func_path, img_path)

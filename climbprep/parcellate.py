@@ -1,4 +1,5 @@
 import yaml
+import json
 from copy import deepcopy
 try:
     import importlib.resources as pkg_resources
@@ -87,6 +88,7 @@ def parcellate_surface(
         output_dir,
         reference_target_affine=2,
         n_networks=100,
+        n_networks_per_reference=3,
         n_components_pca=None,
         **ignored
 ):
@@ -105,8 +107,6 @@ def parcellate_surface(
         n_components_pca=n_components_pca,
         ignored=ignored
     )
-    with open(os.path.join(output_dir, 'config.yml'), 'w') as f:
-        yaml.safe_dump(config, f, sort_keys=False)
 
     stderr('Loading atlases')
     reference = image.load_img(reference_image_path)
@@ -150,9 +150,19 @@ def parcellate_surface(
             right=atlas_surface_R
         )
         for hemi in ('L', 'R'):
+            atlas_path = os.path.join(output_dir, f'sub-{sub}_hemi-{hemi}_label-{atlas_name}REF.func.gii')
             atlas_surfaces[atlas_name].to_filename(
-                    os.path.join(output_dir, f'sub-{sub}_hemi-{hemi}_label-{atlas_name}REF.gii')
+                atlas_path
             )
+            sidecar_path = atlas_path.replace('.func.gii', '.json')
+            sidecar = dict(
+                mask_path=mask_path,
+                reference_image_path=reference_image_path,
+                xfm_path=xfm_path,
+                reference_target_affine=reference_target_affine,
+            )
+            with open(sidecar_path, 'w') as f:
+                json.dump(sidecar, f, indent=2)
 
     stderr('Loading timecourses\n')
     X = []
@@ -223,32 +233,280 @@ def parcellate_surface(
     for atlas_name in atlas_surfaces:
         atlas_surface = atlas_surfaces[atlas_name]
         atlas = np.concatenate([atlas_surface.parts['left'], atlas_surface.parts['right']], axis=0)
-        max_r = -np.inf
-        max_ix = None
+        parcellation_ix = np.arange(parcellation.shape[1])
+        scores = np.full((parcellation.shape[1],), np.nan)
         for ix in range(parcellation.shape[1]):
             network = parcellation[:, ix]
             r = np.corrcoef(atlas, network)[0, 1]
-            if r > max_r:
-                max_r = r
-                max_ix = ix
-        assert max_ix is not None, 'No matching network found for atlas %s.' % atlas_name
+            scores[ix] = r
+        sort_ix = np.argsort(scores)[::-1][:min(n_networks_per_reference, n_networks)]
+        parcellation_ranked = parcellation_ix[sort_ix]
+        scores = scores[sort_ix]
+
+        for i, (ix, r) in enumerate(zip(parcellation_ranked, scores)):
+            if ix in remaining:
+                remaining.remove(ix)
+            network_name = f'{atlas_name}{i:03d}'
+            metadata = dict(
+                atlas=atlas_name,
+                network=network_name,
+                index=ix,
+                similarity_rank=i + 1,
+                similarity_score=r
+            )
+            df.append(metadata)
+            network = parcellation[:, ix]
+            network = surface.PolyData(
+                left=network[:v_left],
+                right=network[v_left:]
+            )
+            for hemi in ('L', 'R'):
+                network_path = os.path.join(
+                        output_dir,
+                        f'sub-{sub}{ses_str}_hemi-{hemi}_network-{ix:03d}_label-{network_name}.func.gii'
+                    )
+                network.to_filename(network_path)
+                sidecar_path = network_path.replace('.func.gii', '.json')
+                sidecar = config.copy()
+                sidecar.update(metadata)
+                with open(sidecar_path, 'w') as f:
+                    json.dump(sidecar, f, indent=2)
+
+    for i, ix in enumerate(sorted(list(remaining))):
         df.append(dict(
-            network=atlas_name,
-            index=max_ix,
-            score=max_r
+            network='other',
+            index=ix,
+            score=np.nan
         ))
-        network = parcellation[:, max_ix]
+        network = parcellation[:, ix]
         network = surface.PolyData(
             left=network[:v_left],
             right=network[v_left:]
         )
         for hemi in ('L', 'R'):
-            network.to_filename(
-                os.path.join(output_dir, f'sub-{sub}{ses_str}_hemi-{hemi}_network-{max_ix:03d}_label-{atlas_name}.gii')
+            metadata = dict(
+                index=ix
             )
+            network_path = os.path.join(
+                output_dir,
+                f'sub-{sub}{ses_str}_hemi-{hemi}_network-{ix:03d}_label-other{i:03d}.func.gii'
+            )
+            network.to_filename(network_path)
+            sidecar_path = network_path.replace('.func.gii', '.json')
+            sidecar = config.copy()
+            sidecar.update(metadata)
+            with open(sidecar_path, 'w') as f:
+                json.dump(sidecar, f, indent=2)
 
-        if max_ix in remaining:
-            remaining.remove(max_ix)
+    df = pd.DataFrame(df)
+    df = df.sort_values('index')
+    df_path = os.path.join(output_dir, f'sub-{sub}{ses_str}_parcellation.tsv')
+    df.to_csv(df_path, index=False, sep='\t')
+    df_sidecar = dict(
+        atlas=dict(
+            Description='Name of the reference atlas used for labeling the network. '
+                        'Only provided for networks labeled with a reference atlas name.',
+        ),
+        network=dict(
+            Description='Name of the network, either a reference atlas name with a similarity rank (e.g., lang001) '
+                        'or "other". Only provided for networks labeled with a reference atlas name.'
+        ),
+        index=dict(
+            Description='Index of the network in the parcellation (0-indexed).',
+        ),
+        similarity_rank=dict(
+            Description='Rank of the network in terms of similarity to the reference atlas (1-indexed). '
+                        'Only provided for networks labeled with a reference atlas name.',
+        ),
+        similarity_score=dict(
+            Description='Similarity score (Pearson correlation) between the network and the reference atlas. '
+                        'Only provided for networks labeled with a reference atlas name.',
+        ),
+    )
+    df_sidecar_path = df_path.replace('.tsv', '.json')
+    with open(df_sidecar_path, 'w') as f:
+        json.dump(df_sidecar, f, indent=2)
+
+
+def parcellate_volume(
+        functional_paths,
+        mask_path,
+        reference_image_path,
+        xfm_path,
+        output_dir,
+        reference_target_affine=2,
+        n_networks=100,
+        n_networks_per_reference=3,
+        n_components_pca=None,
+        mask_fwhm=DEFAULT_MASK_FWHM,
+        **ignored
+):
+    raise NotImplementedError('Volume parcellation is not yet implemented.')
+    gii_cache = GII_CACHE
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    config = dict(
+        functional_paths=functional_paths,
+        mask_path=mask_path,
+        reference_image_path=reference_image_path,
+        xfm_path=xfm_path,
+        output_dir=output_dir,
+        reference_target_affine=reference_target_affine,
+        n_networks=n_networks,
+        n_components_pca=n_components_pca,
+        mask_fwhm=mask_fwhm,
+        ignored=ignored
+    )
+    with open(os.path.join(output_dir, 'config.yml'), 'w') as f:
+        yaml.safe_dump(config, f, sort_keys=False)
+
+    stderr('Loading atlases')
+    reference = image.load_img(reference_image_path)
+    if reference_target_affine is not None:
+        if isinstance(reference_target_affine, int):
+            reference_target_affine = np.eye(3) * reference_target_affine
+        elif isinstance(reference_target_affine, tuple) or isinstance(reference_target_affine, list):
+            reference_target_affine = np.diag(reference_target_affine)
+        reference = image.resample_img(reference, target_affine=reference_target_affine)
+    reference = image.crop_img(reference)
+
+    mask_nii = image.load_img(mask_path)
+    mask_nii = image.new_img_like(mask_nii, image.get_data(mask_nii).astype(np.float32))
+    if mask_fwhm:
+        mask_nii = image.smooth_img(mask_nii, fwhm=mask_fwhm)
+    mask_nii = image.resample_to_img(
+        mask_nii, reference, interpolation='linear'
+    )
+    mask_nii = image.math_img('x > 0.', x=mask_nii)
+    mask = image.get_data(mask_nii).astype(bool)
+    v = mask.sum()
+
+    sub = SUB_RE.match(reference_image_path)
+    assert sub, 'Surface data file name must contain a subject identifier (e.g., "sub-01").'
+    sub = sub.group(1)
+    atlases = {}
+    for atlas_name in ATLAS_NAME_TO_FILE:
+        atlases[atlas_name] = get_atlas(
+            atlas_name,
+            resampling_target_nii=reference,
+            xfm_path=xfm_path
+        )
+        atlas_path = os.path.join(output_dir, f'sub-{sub}_label-{atlas_name}REF.nii.gz')
+        atlases[atlas_name].to_filename(
+                atlas_path
+        )
+        sidecar_path = atlas_path.replace('.nii.gz', '.json')
+        sidecar = dict(
+            mask_path=mask_path,
+            reference_image_path=reference_image_path,
+            xfm_path=xfm_path,
+            reference_target_affine=reference_target_affine,
+        )
+        with open(sidecar_path, 'w') as f:
+            json.dump(sidecar, f, indent=2)
+
+    stderr('Loading timecourses\n')
+    X = []
+    ses = None
+    for functional_path in functional_paths:
+        assert functional_path.endswith('.gii') or functional_path.endswith('.gii.gz'), \
+            'Functional data must be in GIFTI format.'
+        if ses is None:
+            ses = SES_RE.match(functional_path)
+            if ses:
+                ses = ses.group(1)
+        hemi = HEMI_RE.match(functional_path)
+        assert hemi, 'Functional data file name must contain a hemisphere identifier (e.g., "hemi-L" or "hemi-R").'
+        hemi = hemi.group(1)
+        if hemi == 'L':
+            left = functional_path
+            right = functional_path.replace('hemi-L', 'hemi-R')
+        else:
+            left = functional_path.replace('hemi-R', 'hemi-L')
+            right = functional_path
+        left_path = left
+        if left_path not in gii_cache:
+            left = surface.load_surf_data(left_path)
+            assert len(left.shape) == 2, 'Functional data must be a 2D array (vertices x timepoints).'
+            if left.shape[0] != v_left:
+                left = left.T
+            assert left.shape[0] == v_left, 'Left hemisphere functional data must have %d vertices, got %d.' % (v_left, left.shape[0])
+            gii_cache[left_path] = left
+        left = gii_cache[left_path]
+        right_path = right
+        if right_path not in gii_cache:
+            right = surface.load_surf_data(right_path)
+            assert len(right.shape) == 2, 'Functional data must be a 2D array (vertices x timepoints).'
+            if right.shape[0] != v_right:
+                right = right.T
+            assert right.shape[0] == v_right, 'Right hemisphere functional data must have %d vertices, got %d.' % (v_right, right.shae[0])
+            gii_cache[right_path] = right
+        right = gii_cache[right_path]
+        X_ = np.concatenate([left, right], axis=0)
+        X.append(X_)
+    X = np.concatenate(X, axis=1)
+
+    if ses is None or ses == 'None':
+        ses_str = ''
+    else:
+        ses_str = f'_ses-{ses}'
+
+    if n_components_pca is not None:
+        stderr('Applying PCA\n')
+        if n_components_pca.lower() == 'auto':
+            n_components_pca = n_networks
+        pca = PCA(n_components=n_components_pca)
+        X = pca.fit_transform(X)
+
+    stderr('Parcellating\n')
+    X = FastICA(n_components=n_networks).fit_transform(X)
+
+    # Assume a network covers < half the mask volume, flip sign accordingly
+    X = np.where(np.median(X, axis=0, keepdims=True) > 0, -X, X)
+    # Clip and normalize (scale is arbitrary)
+    uq = np.quantile(X, 0.99, axis=0, keepdims=True)
+    X = np.clip(X, 0, uq) / uq
+    parcellation = X.astype(np.float32)
+
+    stderr('Labeling and saving results\n')
+    df = []
+    remaining = set(range(parcellation.shape[1]))
+    for atlas_name in atlases:
+        atlas_surface = atlases[atlas_name]
+        atlas = np.concatenate([atlas_surface.parts['left'], atlas_surface.parts['right']], axis=0)
+        parcellation_ix = np.arange(parcellation.shape[1])
+        scores = np.full((parcellation.shape[1],), np.nan)
+        for ix in range(parcellation.shape[1]):
+            network = parcellation[:, ix]
+            r = np.corrcoef(atlas, network)[0, 1]
+            scores[ix] = r
+        sort_ix = np.argsort(scores)[::-1][:min(n_networks_per_reference, n_networks)]
+        parcellation_ranked = parcellation_ix[sort_ix]
+        scores = scores[sort_ix]
+
+        for i, (ix, r) in enumerate(zip(parcellation_ranked, scores)):
+            if ix in remaining:
+                remaining.remove(ix)
+            network_name = f'{atlas_name}{i:03d}'
+            df.append(dict(
+                atlas=atlas_name,
+                network=network_name,
+                index=ix,
+                similarity_rank=i + 1,
+                similarity_score=r
+            ))
+            network = parcellation[:, ix]
+            network = surface.PolyData(
+                left=network[:v_left],
+                right=network[v_left:]
+            )
+            for hemi in ('L', 'R'):
+                network.to_filename(
+                    os.path.join(
+                        output_dir,
+                        f'sub-{sub}{ses_str}_hemi-{hemi}_network-{ix:03d}_label-{network_name}.gii'
+                    )
+                )
 
     for i, ix in enumerate(sorted(list(remaining))):
         df.append(dict(
@@ -368,6 +626,11 @@ if __name__ == '__main__':
                 if space_ and space_.group(1) == space and hemi and hemi.group(1) == 'L':
                     functional_paths.append(os.path.join(clean_path, path))
 
+        if not functional_paths:
+            stderr(f'No functional data found in {clean_path} for participant {participant} session {session} '
+                   f'in space {space}. Skipping.\n')
+            continue
+
         gii = set()
         nii = set()
         for path in functional_paths:
@@ -446,7 +709,9 @@ if __name__ == '__main__':
             if is_surface:
                 parcellation_config['surface_left_path'] = surfaces['pial']['left']
                 parcellation_config['surface_right_path'] = surfaces['pial']['right']
-        if T1 is not None:
+        if T1 is None:
+            parcellation_config['reference_image_path'] = functional_paths[0]
+        else:
             parcellation_config['reference_image_path'] = T1
         if is_surface:
             parcellation_config['functional_paths'] = []

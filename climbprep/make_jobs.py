@@ -17,18 +17,20 @@ JOB_TYPES = [
     'bidsify',
     'preprocess',
     'clean',
+    'parcellate',
+    'seed',
     'model',
-    'plot',
-    'parcellate'
+    'plot'
 ]
 
 JOB_ORDER = [
     'bidsify',
     'preprocess',
     'clean',
+    'parcellate',
+    'seed',
     'model',
-    'plot',
-    'parcellate'
+    'plot'
 ]
 
 
@@ -59,14 +61,16 @@ if __name__ == '__main__':
                                                                       'specified, the default config will be used.'))
     argparser.add_argument('--clean-config', default=None, help=('Cleaning config (path or keyword). If not '
                                                                  'specified, the default config will be used.'))
+    argparser.add_argument('--parcellate-config', default=None, help=('Parcellation config (path or keyword). If not '
+                                                                      'specified, the default config will be used.'))
+    argparser.add_argument('--seed-config', default=None, help=('Seed config (path or keyword). If not '
+                                                                'specified, the default config will be used.'))
     argparser.add_argument('--model-config', default=None, help=('Modeling config (path or keyword). If not '
                                                                  'specified, the default config will be used.'))
     argparser.add_argument('--models', nargs='+', default=[], help=('Models to run for `model` step. If not specified, '
                                                                     'will infer models from task names.'))
     argparser.add_argument('--plot-config', default=None, help=('Plotting config (path or keyword). If not '
                                                                 'specified, the default config will be used.'))
-    argparser.add_argument('--parcellate-config', default=None, help=('Parcellation config (path or keyword). If not '
-                                                                      'specified, the default config will be used.'))
     args = argparser.parse_args()
 
     projects = args.projects
@@ -109,6 +113,18 @@ if __name__ == '__main__':
         clean_config_str = ' -c %s' % (CLEAN_DEFAULT_KEY + fwhm + 'mm')
     else:
         clean_config_str = ''
+    if args.parcellate_config:
+        parcellate_config_str = ' -c %s' % args.parcellate_config
+    elif fwhm is not None:
+        parcellate_config_str = ' -c %s' % (PARCELLATE_DEFAULT_KEY + fwhm + 'mm')
+    else:
+        parcellate_config_str = ''
+    if args.seed_config:
+        seed_config_str = ' -c %s' % args.seed_config
+    elif fwhm is not None:
+        seed_config_str = ' -c %s' % (SEED_DEFAULT_KEY + fwhm + 'mm')
+    else:
+        seed_config_str = ''
     if args.model_config:
         model_config_str = ' -c %s' % args.model_config
     elif fwhm is not None:
@@ -125,12 +141,6 @@ if __name__ == '__main__':
         plot_config_str = ' -c %s' % (PLOT_DEFAULT_KEY + fwhm + 'mm')
     else:
         plot_config_str = ''
-    if args.parcellate_config:
-        parcellate_config_str = ' -c %s' % args.parcellate_config
-    elif fwhm is not None:
-        parcellate_config_str = ' -c %s' % (PARCELLATE_DEFAULT_KEY + fwhm + 'mm')
-    else:
-        parcellate_config_str = ''
 
     if not os.path.exists(outdir):
         os.makedirs(outdir)
@@ -198,15 +208,18 @@ if __name__ == '__main__':
                         elif job_type.lower() == 'clean':
                             job_str = wrapper % ('python -m climbprep.clean %s -p %s%s%s\n' %
                                                  (participant, project, session_str, clean_config_str))
+                        elif job_type.lower() == 'parcellate':
+                            job_str = wrapper % ('python -m climbprep.parcellate %s -p %s%s\n' %
+                                                 (participant, project, parcellate_config_str))
+                        elif job_type.lower() == 'seed':
+                            job_str = wrapper % ('python -m climbprep.seed %s -p %s%s\n' %
+                                                 (participant, project, seed_config_str))
                         elif job_type.lower() == 'model':
                             job_str = wrapper % ('python -m climbprep.model %s -p %s%s%s\n' %
                                                  (participant, project, model_config_str, models_str))
                         elif job_type.lower() == 'plot':
                             job_str = wrapper % ('python -m climbprep.plot %s -p %s%s\n' %
                                                  (participant, project, plot_config_str))
-                        elif job_type.lower() == 'parcellate':
-                            job_str = wrapper % ('python -m climbprep.parcellate %s -p %s%s\n' %
-                                                 (participant, project, parcellate_config_str))
                         else:
                             raise ValueError('Unrecognized job type: %s.' % job_type)
                         f.write(job_str)
