@@ -1,4 +1,5 @@
 import os
+import shutil
 import yaml
 import argparse
 from tempfile import TemporaryDirectory
@@ -15,11 +16,16 @@ if __name__ == '__main__':
     argparser.add_argument('-c', '--config', default='fsnative', help=('Config name (default: `fsnative`) '
         'or YAML config file to used to parameterize seed analysis. '
         'See `climbprep.constants.CONFIG["seed"]` for available config names and their settings.'))
+    argparser.add_argument('-i', '--interactive', action='store_true', help=("Launch wb_view interactively. Otherwise "
+                                                                             "just zip all files into an archive "
+                                                                             "for download, including a *.spec file "
+                                                                             "for easy loading into wb_view."))
     args = argparser.parse_args()
 
     participant = args.participant.replace('sub-', '')
     project = args.project
     project_path = os.path.join(BIDS_PATH, project)
+    interactive = args.interactive
 
     config = args.config
     if config in CONFIG['seed']:
@@ -86,45 +92,56 @@ if __name__ == '__main__':
                     )
                     mesh = surface.PolyMesh(**{hemi.lower(): surf_path})
                     surf_path = os.path.join(tmp_dir, f'inflated_hemi-{hemi[0]}.surf.gii')
-                    print(surf_path)
                     mesh.to_filename(surf_path)
                 else:
                     if surf == 'sulc':
                         suffix = '.shape.gii'
                     else:
                         suffix = '.surf.gii'
-                    surf_path = os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-{hemi[0]}_{surf}{suffix}')
+                    surf_path_ = os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-{hemi[0]}_{surf}{suffix}')
+                    surf_path = os.path.join(tmp_dir, os.path.basename(surf_path_))
+                    shutil.copy2(surf_path_, surf_path)
                 cmd = f'wb_command -add-to-spec-file {spec_path} CORTEX_{hemi} {surf_path}'
                 stderr(cmd + '\n\n')
                 status = os.system(cmd)
                 assert not status, 'Adding surf to spec file failed with exit status %s' % status
 
-        dtseries_path = os.path.join(tmp_dir, 'merged.dtseries.nii')
-        cmd = f'wb_command -cifti-merge {dtseries_path}'
-        for i, functional in enumerate(sorted(list(functionals))):
-            out_path = os.path.basename(functional).replace('_hemi-L', '').replace('.func.gii', '.dtseries.nii')
-            out_path = os.path.join(tmp_dir, out_path)
-            left_path = functional
-            right_path = functional.replace('_hemi-L', '_hemi-R')
-            cmd_ = f'wb_command -cifti-create-dense-timeseries {out_path} ' \
-                              f'-left-metric {left_path} -right-metric {right_path} ' \
-                              f'-timestep 1 -timestart 0'
-            stderr(cmd_ + '\n\n')
-            status = os.system(cmd_)
-            assert not status, f'Creating CIFTI {out_path} failed with exit status {status}'
-            cmd += f' -cifti {out_path}'
-        stderr(cmd + '\n\n')
-        status = os.system(cmd)
-        assert not status, 'Merging CIFTIs failed with exit status %s' % status
+        with TemporaryDirectory() as tmp_dir_:
+            dtseries_path = os.path.join(tmp_dir, 'merged.dtseries.nii')
+            cmd = f'wb_command -cifti-merge {dtseries_path}'
+            for i, functional in enumerate(sorted(list(functionals))):
+                out_path = os.path.basename(functional).replace('_hemi-L', '').replace('.func.gii', '.dtseries.nii')
+                out_path = os.path.join(tmp_dir_, out_path)
+                left_path = functional
+                right_path = functional.replace('_hemi-L', '_hemi-R')
+                cmd_ = f'wb_command -cifti-create-dense-timeseries {out_path} ' \
+                                  f'-left-metric {left_path} -right-metric {right_path} ' \
+                                  f'-timestep 1 -timestart 0'
+                stderr(cmd_ + '\n\n')
+                status = os.system(cmd_)
+                assert not status, f'Creating CIFTI {out_path} failed with exit status {status}'
+                cmd += f' -cifti {out_path}'
+            stderr(cmd + '\n\n')
+            status = os.system(cmd)
+            assert not status, 'Merging CIFTIs failed with exit status %s' % status
 
         cmd = f'wb_command -add-to-spec-file {spec_path} CORTEX {dtseries_path}'
         stderr(cmd + '\n\n')
         status = os.system(cmd)
         assert not status, 'Adding dtseries to spec file failed with exit status %s' % status
 
-        cmd = f'wb_view -no-splash -spec-load-all {spec_path}'
-        stderr(cmd + '\n\n')
-        status = os.system(cmd)
+        if interactive:
+            cmd = f'wb_view -no-splash -spec-load-all {spec_path}'
+            stderr(cmd + '\n\n')
+            status = os.system(cmd)
+        else:
+            out_dir = os.path.join(BIDS_PATH, project, 'derivatives', 'seed', seed_label, f'sub-{participant}')
+            if not os.path.exists(out_dir):
+                os.makedirs(out_dir)
+            out_path = os.path.join(out_dir, f'sub-{participant}_seed.zip')
+            cmd = f'zip -FSrj {out_path} {tmp_dir}'
+            stderr(cmd + '\n\n')
+            status = os.system(cmd)
 
 
 
