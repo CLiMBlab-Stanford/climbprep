@@ -75,6 +75,14 @@ if __name__ == '__main__':
                     (HEMI_RE.match(x) and HEMI_RE.match(x).group(1) == 'L') and \
                     (SPACE_RE.match(x) and SPACE_RE.match(x).group(1) == space):
                 functionals.add(os.path.join(timeseries_path, x))
+    assert len(functionals), 'No functional files found for participant %s with config %s. ' \
+                             'Common causes include a misspecified regex_filter (%s) or space (%s) ' \
+                             'in the config, or trying to run `seed` before `clean`. Make sure that ' \
+                             '`clean` has run to completion, double-check your regex_filter, and ensure ' \
+                             'that you have requested a surface (not volumetric) space (seed analysis of' \
+                             'volumetric data is not currently supported).' % (
+                                    participant, seed_label, config['regex_filter'], space
+                             )
     with open(cleaning_config_path, 'r') as f:
         preprocessing_label = yaml.safe_load(f)['preprocessing_label']
     anat_path = get_preprocessed_anat_dir(project, participant, preprocessing_label=preprocessing_label)

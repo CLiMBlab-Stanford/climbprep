@@ -290,15 +290,15 @@ if __name__ == '__main__':
                             mask_nii = image.smooth_img(mask_nii, fwhm=mask_fwhm)
                         if target_affine is not None:
                             mask_nii = image.resample_img(
-                                mask_nii, target_affine=target_affine, interpolation='linear'
+                                mask_nii, target_affine=target_affine, interpolation='linear', copy_header=True
                             )
                         mask_nii = image.math_img('x > 0.', x=mask_nii)
-                        mask_nii = image.crop_img(mask_nii)
+                        mask_nii = image.crop_img(mask_nii, copy_header=True)
 
                         func = load_img(func_path)
                         if not len(func.shape) > 3 or func.shape[3] < min_T:
                             continue
-                        func = image.resample_to_img(func, mask_nii)
+                        func = image.resample_to_img(func, mask_nii, copy_header=True, force_resample=True)
 
                         masker = maskers.NiftiMasker(
                             mask_img=None,
