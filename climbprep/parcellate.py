@@ -9,7 +9,7 @@ from climbprep import resources
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA, FastICA
-from nilearn import image, surface
+from nilearn import image, surface, masking
 from nitransforms import resampling, manip, linear
 import argparse
 
@@ -273,11 +273,15 @@ def parcellate_surface(
                     json.dump(sidecar, f, indent=2)
 
     for i, ix in enumerate(sorted(list(remaining))):
-        df.append(dict(
-            network='other',
+        network_name = f'other{i:03d}'
+        metadata = dict(
+            atlas=None,
+            network=network_name,
             index=ix,
-            score=np.nan
-        ))
+            similarity_rank=None,
+            similarity_score=None
+        )
+        df.append(metadata)
         network = parcellation[:, ix]
         network = surface.PolyData(
             left=network[:v_left],
@@ -289,7 +293,7 @@ def parcellate_surface(
             )
             network_path = os.path.join(
                 output_dir,
-                f'sub-{sub}{ses_str}_hemi-{hemi}_network-{ix:03d}_label-other{i:03d}.func.gii'
+                f'sub-{sub}{ses_str}_hemi-{hemi}_network-{ix:03d}_label-{network_name}.func.gii'
             )
             network.to_filename(network_path)
             sidecar_path = network_path.replace('.func.gii', '.json')
@@ -309,7 +313,7 @@ def parcellate_surface(
         ),
         network=dict(
             Description='Name of the network, either a reference atlas name with a similarity rank (e.g., lang001) '
-                        'or "other". Only provided for networks labeled with a reference atlas name.'
+                        'or "other".'
         ),
         index=dict(
             Description='Index of the network in the parcellation (0-indexed).',
@@ -341,8 +345,7 @@ def parcellate_volume(
         mask_fwhm=DEFAULT_MASK_FWHM,
         **ignored
 ):
-    raise NotImplementedError('Volume parcellation is not yet implemented.')
-    gii_cache = GII_CACHE
+    nii_cache = NII_CACHE
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     config = dict(
@@ -370,16 +373,18 @@ def parcellate_volume(
         reference = image.resample_img(reference, target_affine=reference_target_affine)
     reference = image.crop_img(reference)
 
-    mask_nii = image.load_img(mask_path)
-    mask_nii = image.new_img_like(mask_nii, image.get_data(mask_nii).astype(np.float32))
-    if mask_fwhm:
-        mask_nii = image.smooth_img(mask_nii, fwhm=mask_fwhm)
-    mask_nii = image.resample_to_img(
-        mask_nii, reference, interpolation='linear'
-    )
-    mask_nii = image.math_img('x > 0.', x=mask_nii)
+    if mask_path:
+        mask_nii = image.load_img(mask_path)
+        mask_nii = image.new_img_like(mask_nii, image.get_data(mask_nii).astype(np.float32))
+        if mask_fwhm:
+            mask_nii = image.smooth_img(mask_nii, fwhm=mask_fwhm)
+        mask_nii = image.resample_to_img(
+            mask_nii, reference, interpolation='linear'
+        )
+        mask_nii = image.math_img('x > 0.', x=mask_nii)
+    else:
+        mask_nii = masking.compute_background_mask(reference)
     mask = image.get_data(mask_nii).astype(bool)
-    v = mask.sum()
 
     sub = SUB_RE.match(reference_image_path)
     assert sub, 'Surface data file name must contain a subject identifier (e.g., "sub-01").'
@@ -409,40 +414,19 @@ def parcellate_volume(
     X = []
     ses = None
     for functional_path in functional_paths:
-        assert functional_path.endswith('.gii') or functional_path.endswith('.gii.gz'), \
-            'Functional data must be in GIFTI format.'
+        assert functional_path.endswith('.nii') or functional_path.endswith('.nii.gz'), \
+            'Functional data must be in NIFTI format.'
         if ses is None:
             ses = SES_RE.match(functional_path)
             if ses:
                 ses = ses.group(1)
-        hemi = HEMI_RE.match(functional_path)
-        assert hemi, 'Functional data file name must contain a hemisphere identifier (e.g., "hemi-L" or "hemi-R").'
-        hemi = hemi.group(1)
-        if hemi == 'L':
-            left = functional_path
-            right = functional_path.replace('hemi-L', 'hemi-R')
+        if functional_path not in nii_cache:
+            functional = image.load_img(functional_path)
+            nii_cache[functional_path] = functional
         else:
-            left = functional_path.replace('hemi-R', 'hemi-L')
-            right = functional_path
-        left_path = left
-        if left_path not in gii_cache:
-            left = surface.load_surf_data(left_path)
-            assert len(left.shape) == 2, 'Functional data must be a 2D array (vertices x timepoints).'
-            if left.shape[0] != v_left:
-                left = left.T
-            assert left.shape[0] == v_left, 'Left hemisphere functional data must have %d vertices, got %d.' % (v_left, left.shape[0])
-            gii_cache[left_path] = left
-        left = gii_cache[left_path]
-        right_path = right
-        if right_path not in gii_cache:
-            right = surface.load_surf_data(right_path)
-            assert len(right.shape) == 2, 'Functional data must be a 2D array (vertices x timepoints).'
-            if right.shape[0] != v_right:
-                right = right.T
-            assert right.shape[0] == v_right, 'Right hemisphere functional data must have %d vertices, got %d.' % (v_right, right.shae[0])
-            gii_cache[right_path] = right
-        right = gii_cache[right_path]
-        X_ = np.concatenate([left, right], axis=0)
+            functional = nii_cache[functional_path]
+        functional = image.resample_to_img(functional, reference, copy_header=True)
+        X_ = image.get_data(functional)[mask]
         X.append(X_)
     X = np.concatenate(X, axis=1)
 
@@ -488,45 +472,80 @@ def parcellate_volume(
             if ix in remaining:
                 remaining.remove(ix)
             network_name = f'{atlas_name}{i:03d}'
-            df.append(dict(
+            metadata = dict(
                 atlas=atlas_name,
                 network=network_name,
                 index=ix,
                 similarity_rank=i + 1,
                 similarity_score=r
-            ))
-            network = parcellation[:, ix]
-            network = surface.PolyData(
-                left=network[:v_left],
-                right=network[v_left:]
             )
-            for hemi in ('L', 'R'):
-                network.to_filename(
-                    os.path.join(
-                        output_dir,
-                        f'sub-{sub}{ses_str}_hemi-{hemi}_network-{ix:03d}_label-{network_name}.gii'
-                    )
-                )
+            df.append(metadata)
+            network_ = parcellation[:, ix]
+            network = np.zeros(mask_nii.shape, dtype=np.float32)
+            network[mask] = network_
+            network_path = os.path.join(
+                output_dir,
+                f'sub-{sub}{ses_str}_network-{ix:03d}_label-{network_name}.nii.gz'
+            )
+            network.to_filename(network_path)
+            sidecar_path = network_path.replace('.nii.gz', '.json')
+            sidecar = config.copy()
+            sidecar.update(metadata)
+            with open(sidecar_path, 'w') as f:
+                json.dump(sidecar, f, indent=2)
 
     for i, ix in enumerate(sorted(list(remaining))):
-        df.append(dict(
-            network='other',
+        network_name = f'other{i:03d}'
+        metadata = dict(
+            atlas=None,
+            network=network_name,
             index=ix,
-            score=np.nan
-        ))
-        network = parcellation[:, ix]
-        network = surface.PolyData(
-            left=network[:v_left],
-            right=network[v_left:]
+            similarity_rank=None,
+            similarity_score=None
         )
-        for hemi in ('L', 'R'):
-            network.to_filename(
-                    os.path.join(output_dir, f'sub-{sub}{ses_str}_hemi-{hemi}_network-{ix:03d}_label-other{i:03d}.gii')
-            )
+        df.append(metadata)
+        network_ = parcellation[:, ix]
+        network = np.zeros(mask_nii.shape, dtype=np.float32)
+        network[mask] = network_
+        network_path = os.path.join(
+            output_dir,
+            f'sub-{sub}{ses_str}_network-{ix:03d}_label-{network_name}.nii.gz'
+        )
+        network.to_filename(network_path)
+        sidecar_path = network_path.replace('.nii.gz', '.json')
+        sidecar = config.copy()
+        sidecar.update(metadata)
+        with open(sidecar_path, 'w') as f:
+            json.dump(sidecar, f, indent=2)
 
     df = pd.DataFrame(df)
     df = df.sort_values('index')
-    df.to_csv(os.path.join(output_dir, f'sub-{sub}{ses_str}_parcellation.tsv'), index=False, sep='\t')
+    df_path = os.path.join(output_dir, f'sub-{sub}{ses_str}_parcellation.tsv')
+    df.to_csv(df_path, index=False, sep='\t')
+    df_sidecar = dict(
+        atlas=dict(
+            Description='Name of the reference atlas used for labeling the network. '
+                        'Only provided for networks labeled with a reference atlas name.',
+        ),
+        network=dict(
+            Description='Name of the network, either a reference atlas name with a similarity rank (e.g., lang001) '
+                        'or "other".'
+        ),
+        index=dict(
+            Description='Index of the network in the parcellation (0-indexed).',
+        ),
+        similarity_rank=dict(
+            Description='Rank of the network in terms of similarity to the reference atlas (1-indexed). '
+                        'Only provided for networks labeled with a reference atlas name.',
+        ),
+        similarity_score=dict(
+            Description='Similarity score (Pearson correlation) between the network and the reference atlas. '
+                        'Only provided for networks labeled with a reference atlas name.',
+        ),
+    )
+    df_sidecar_path = df_path.replace('.tsv', '.json')
+    with open(df_sidecar_path, 'w') as f:
+        json.dump(df_sidecar, f, indent=2)
 
 
 if __name__ == '__main__':
@@ -734,7 +753,6 @@ if __name__ == '__main__':
             nodes['subject']['sample']['main']['functional_paths'] += functional_paths
 
     parcellation_dir = os.path.join(derivatives_path, 'parcellate', parcellation_label)
-    cliargs = []
     for node in nodes:
         node_dir = os.path.join(parcellation_dir, f'node-{node}')
         participant_dir = os.path.join(node_dir, 'sub-%s' % participant)
@@ -762,20 +780,8 @@ if __name__ == '__main__':
             config_path = os.path.join(session_dir, 'config.yml')
             with open(config_path, 'w') as f:
                 yaml.dump(config_, f)
-            cliargs.append(config_path)
-
-    for cliarg in cliargs:
-        if is_surface:
-            # Surface parcellation
-            with open(cliarg, 'r') as f:
-                config_ = yaml.safe_load(f)
-            parcellate_surface(**config_)
-        else:
-            cmd = f'python -m parcellate.bin.train {cliarg}'
-            stderr(cmd + '\n')
-            status = os.system(cmd)
-            if status:
-                stderr('Error during parcellation. Exiting.\n')
-                exit(status)
-
-
+            if is_surface:
+                parcellate = parcellate_surface
+            else:
+                parcellate = parcellate_volume
+            parcellate(**config_)

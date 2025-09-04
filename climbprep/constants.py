@@ -250,40 +250,16 @@ CONFIG = dict(
         T1w=dict(
             cleaning_label=CLEAN_DEFAULT_KEY,
             space='T1w',
-            sample=dict(
-                main=dict(
-                    n_networks=50,
-                    n_samples=0,
-                    n_components_pca='auto',
-                    n_components_ica='auto',
-                    use_connectivity_profile=False,
-                    surface=False,
-                    standardize=False,               # This is already done in the cleaning step
-                    detrend=False,                   # This is already done in the cleaning step
-                    low_pass=None,                   # This is already done in the cleaning step
-                    high_pass=None,                  # This is already done in the cleaning step
-                    fwhm=None                        # This is already done in the cleaning step
-                )
-            ),
+            n_networks=50,
+            n_components_pca='auto',
+            surface=False
         ),
         mni=dict(
             cleaning_label=CLEAN_DEFAULT_KEY,
             space='MNI152NLin2009cAsym',
-            sample=dict(
-                main=dict(
-                    n_networks=50,
-                    n_samples=0,
-                    n_components_pca='auto',
-                    n_components_ica='auto',
-                    use_connectivity_profile=False,
-                    surface=False,
-                    standardize=False,               # This is already done in the cleaning step
-                    detrend=False,                   # This is already done in the cleaning step
-                    low_pass=None,                   # This is already done in the cleaning step
-                    high_pass=None,                  # This is already done in the cleaning step
-                    fwhm=None                        # This is already done in the cleaning step
-                )
-            ),
+            n_networks=50,
+            n_components_pca='auto',
+            surface=False
         ),
     ),
     model=dict(

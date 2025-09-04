@@ -673,7 +673,7 @@ def assign_callbacks(app, cache):
                 statmap_path = None
                 if os.path.exists(statmap_dir):
                     for x in os.listdir(statmap_dir):
-                        if ('_hemi-L' in x and x.endswith(f'{network}.gii')) or x.endswith(f'{network}.nii.gz'):
+                        if ('_hemi-L' in x and x.endswith(f'{network}.func.gii')) or x.endswith(f'{network}.nii.gz'):
                             statmap_path = os.path.join(statmap_dir, x)
                             break
                 if not statmap_path or not os.path.exists(statmap_path):
