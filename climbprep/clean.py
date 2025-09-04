@@ -322,9 +322,7 @@ if __name__ == '__main__':
                             out_dir, func_file.replace('_hemi-L', '').replace('_space-%s' % space, '').
                                 replace('desc-preproc_bold.nii.gz', 'desc-confounds_timeseries.tsv')
                         )
-                        sidecar_outpath = os.path.join(
-                            out_dir, run_path.replace('_bold.nii.gz', '_bold.json')
-                        )
+                        sidecar_outpath = run_path.replace('_bold.nii.gz', '_bold.json')
                         with open(sidecar_outpath, 'w') as f:
                             json.dump(sidecar, f, indent=2)
                     elif clean_surf and type_by_space[space] == 'surf':  # Surface data
@@ -385,9 +383,7 @@ if __name__ == '__main__':
                                 out_dir, img_path_hemi.replace('_bold.func.gii', '_%s_bold.func.gii' % desc)
                             )
                             run.data.to_filename(run_path)
-                            sidecar_outpath = os.path.join(
-                                out_dir, run_path.replace('_bold.func.gii', '_bold.json')
-                            )
+                            sidecar_outpath = run_path.replace('_bold.func.gii', '_bold.json')
                             with open(sidecar_outpath, 'w') as f:
                                 json.dump(sidecar, f, indent=2)
                         confounds_outpath = os.path.join(
