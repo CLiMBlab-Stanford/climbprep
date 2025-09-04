@@ -119,11 +119,18 @@ if __name__ == '__main__':
                 out_path = os.path.basename(functional).replace('_hemi-L', '').replace('.func.gii', '.dtseries.nii')
                 out_path = os.path.join(tmp_dir_, out_path)
                 left_path = functional
-                sidecar_path = functional.replace('_bold.func.gii', '_desc-confounds_timeseries.tsv')
+                sidecar_path = functional.replace('_bold.func.gii', '_bold.json')
+                assert os.path.exists(sidecar_path), f'Sidecar file {sidecar_path} not found'
+                with open(sidecar_path, 'r') as f:
+                    sidecar = yaml.safe_load(f)
+                assert 'RepetitionTime' in sidecar, f'RepetitionTime not found in {sidecar_path}'
+                TR = sidecar['RepetitionTime']
+                assert 'StartTime' in sidecar, f'StartTime not found in {sidecar_path}'
+                StartTime = sidecar['StartTime']
                 right_path = functional.replace('_hemi-L', '_hemi-R')
                 cmd_ = f'wb_command -cifti-create-dense-timeseries {out_path} ' \
                                   f'-left-metric {left_path} -right-metric {right_path} ' \
-                                  f'-timestep 1 -timestart 0'
+                                  f'-timestep {TR} -timestart {StartTime}'
                 stderr(cmd_ + '\n\n')
                 status = os.system(cmd_)
                 assert not status, f'Creating CIFTI {out_path} failed with exit status {status}'
