@@ -172,6 +172,7 @@ if __name__ == '__main__':
                     if run not in datasets[space][task]:
                         datasets[space][task][run] = {}
                     datasets[space][task][run]['func'] = func
+                    datasets[space][task][run]['sidecar'] = sidecar
                     datasets[space][task][run]['mask'] = mask
                     datasets[space][task][run]['confounds'] = confounds
                     datasets[space][task][run]['confounds_sidecar'] = confounds_sidecar.copy()
@@ -224,13 +225,13 @@ if __name__ == '__main__':
                     if run not in datasets[space][task]:
                         datasets[space][task][run] = {}
                     datasets[space][task][run]['func'] = func
+                    datasets[space][task][run]['sidecar'] = sidecar
                     datasets[space][task][run]['mask'] = None
                     datasets[space][task][run]['confounds'] = confounds
                     datasets[space][task][run]['confounds_sidecar'] = confounds_sidecar.copy()
                     datasets[space][task][run]['eventfile_path'] = eventfile_path
                     datasets[space][task][run]['TR'] = TR
                     datasets[space][task][run]['StartTime'] = StartTime
-                    datasets[space][task][run]['sidecar'] = sidecar
 
         out_dir = os.path.join(derivatives_path, 'clean', cleaning_label, subdir)
         if not os.path.exists(out_dir):
