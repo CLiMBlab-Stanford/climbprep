@@ -124,6 +124,13 @@ def parcellate_surface(
     )
 
     stderr('Loading atlases')
+    reference_target_affine_in = reference_target_affine
+    sidecar = dict(
+        mask_path=mask_path,
+        reference_image_path=reference_image_path,
+        xfm_path=xfm_path,
+        reference_target_affine=reference_target_affine_in,
+    )
     reference = image.load_img(reference_image_path)
     if reference_target_affine is not None:
         if isinstance(reference_target_affine, int):
@@ -138,10 +145,9 @@ def parcellate_surface(
     sub = SUB_RE.match(surface_left_path)
     assert sub, 'Surface data file name must contain a subject identifier (e.g., "sub-01").'
     sub = sub.group(1)
-    for hemi in ('L', 'R'):
-        surf_anat.to_filename(
-            os.path.join(output_dir, f'sub-{sub}_hemi-{hemi}_surface.gii')
-        )
+    for hemi in ('left', 'right'):
+        surf_anat_path = os.path.join(output_dir, f'sub-{sub}_hemi-{hemi[0].upper()}.surf.gii')
+        surf_anat.to_filename(surf_anat_path)
     v_left = len(surf_anat.parts['left'].coordinates)
     v_right = len(surf_anat.parts['right'].coordinates)
     v = v_left + v_right
@@ -169,13 +175,9 @@ def parcellate_surface(
             atlas_surfaces[atlas_name].to_filename(
                 atlas_path
             )
+            sidecar['atlas_name'] = atlas_name
+            sidecar['hemi'] = hemi
             sidecar_path = atlas_path.replace('.func.gii', '.json')
-            sidecar = dict(
-                mask_path=mask_path,
-                reference_image_path=reference_image_path,
-                xfm_path=xfm_path,
-                reference_target_affine=reference_target_affine,
-            )
             with open(sidecar_path, 'w') as f:
                 json.dump(sidecar, f, indent=2)
 
@@ -261,13 +263,13 @@ def parcellate_surface(
         for i, (ix, r) in enumerate(zip(parcellation_ranked, scores)):
             if ix in remaining:
                 remaining.remove(ix)
-            network_name = f'{atlas_name}{i:03d}'
+            network_name = f'{atlas_name}{i + 1:03d}'
             metadata = dict(
                 atlas=atlas_name,
                 network=network_name,
-                index=ix,
+                index=int(ix),
                 similarity_rank=i + 1,
-                similarity_score=r
+                similarity_score=float(r)
             )
             df.append(metadata)
             network = parcellation[:, ix]
@@ -278,7 +280,7 @@ def parcellate_surface(
             for hemi in ('L', 'R'):
                 network_path = os.path.join(
                         output_dir,
-                        f'sub-{sub}{ses_str}_hemi-{hemi}_network-{ix:03d}_label-{network_name}.func.gii'
+                        f'sub-{sub}{ses_str}_hemi-{hemi}_label-{network_name}.func.gii'
                     )
                 network.to_filename(network_path)
                 sidecar_path = network_path.replace('.func.gii', '.json')
@@ -288,11 +290,11 @@ def parcellate_surface(
                     json.dump(sidecar, f, indent=2)
 
     for i, ix in enumerate(sorted(list(remaining))):
-        network_name = f'other{i:03d}'
+        network_name = f'other{i + 1:03d}'
         metadata = dict(
             atlas=None,
             network=network_name,
-            index=ix,
+            index=int(ix) + 1,
             similarity_rank=None,
             similarity_score=None
         )
@@ -308,7 +310,7 @@ def parcellate_surface(
             )
             network_path = os.path.join(
                 output_dir,
-                f'sub-{sub}{ses_str}_hemi-{hemi}_network-{ix:03d}_label-{network_name}.func.gii'
+                f'sub-{sub}{ses_str}_hemi-{hemi}_label-{network_name}.func.gii'
             )
             network.to_filename(network_path)
             sidecar_path = network_path.replace('.func.gii', '.json')
@@ -331,7 +333,7 @@ def parcellate_surface(
                         'or "other".'
         ),
         index=dict(
-            Description='Index of the network in the parcellation (0-indexed).',
+            Description='Index of the network in the parcellation (1-indexed).',
         ),
         similarity_rank=dict(
             Description='Rank of the network in terms of similarity to the reference atlas (1-indexed). '
@@ -375,10 +377,15 @@ def parcellate_volume(
         mask_fwhm=mask_fwhm,
         ignored=ignored
     )
-    with open(os.path.join(output_dir, 'config.yml'), 'w') as f:
-        yaml.safe_dump(config, f, sort_keys=False)
 
     stderr('Loading atlases')
+    reference_target_affine_in = reference_target_affine
+    sidecar = dict(
+        mask_path=mask_path,
+        reference_image_path=reference_image_path,
+        xfm_path=xfm_path,
+        reference_target_affine=reference_target_affine_in,
+    )
     reference = image.load_img(reference_image_path)
     if reference_target_affine is not None:
         if isinstance(reference_target_affine, int):
@@ -415,13 +422,8 @@ def parcellate_volume(
         atlases[atlas_name].to_filename(
                 atlas_path
         )
+        sidecar['atlas_name'] = atlas_name
         sidecar_path = atlas_path.replace('.nii.gz', '.json')
-        sidecar = dict(
-            mask_path=mask_path,
-            reference_image_path=reference_image_path,
-            xfm_path=xfm_path,
-            reference_target_affine=reference_target_affine,
-        )
         with open(sidecar_path, 'w') as f:
             json.dump(sidecar, f, indent=2)
 
@@ -486,13 +488,13 @@ def parcellate_volume(
         for i, (ix, r) in enumerate(zip(parcellation_ranked, scores)):
             if ix in remaining:
                 remaining.remove(ix)
-            network_name = f'{atlas_name}{i:03d}'
+            network_name = f'{atlas_name}{i + 1:03d}'
             metadata = dict(
                 atlas=atlas_name,
                 network=network_name,
-                index=ix,
+                index=int(ix) + 1,
                 similarity_rank=i + 1,
-                similarity_score=r
+                similarity_score=float(r)
             )
             df.append(metadata)
             network_ = parcellation[:, ix]
@@ -500,7 +502,7 @@ def parcellate_volume(
             network[mask] = network_
             network_path = os.path.join(
                 output_dir,
-                f'sub-{sub}{ses_str}_network-{ix:03d}_label-{network_name}.nii.gz'
+                f'sub-{sub}{ses_str}_label-{network_name}.nii.gz'
             )
             network.to_filename(network_path)
             sidecar_path = network_path.replace('.nii.gz', '.json')
@@ -510,11 +512,11 @@ def parcellate_volume(
                 json.dump(sidecar, f, indent=2)
 
     for i, ix in enumerate(sorted(list(remaining))):
-        network_name = f'other{i:03d}'
+        network_name = f'other{i + 1:03d}'
         metadata = dict(
             atlas=None,
             network=network_name,
-            index=ix,
+            index=int(ix) + 1,
             similarity_rank=None,
             similarity_score=None
         )
@@ -524,7 +526,7 @@ def parcellate_volume(
         network[mask] = network_
         network_path = os.path.join(
             output_dir,
-            f'sub-{sub}{ses_str}_network-{ix:03d}_label-{network_name}.nii.gz'
+            f'sub-{sub}{ses_str}_label-{network_name}.nii.gz'
         )
         network.to_filename(network_path)
         sidecar_path = network_path.replace('.nii.gz', '.json')
@@ -547,7 +549,7 @@ def parcellate_volume(
                         'or "other".'
         ),
         index=dict(
-            Description='Index of the network in the parcellation (0-indexed).',
+            Description='Index of the network in the parcellation (1-indexed).',
         ),
         similarity_rank=dict(
             Description='Rank of the network in terms of similarity to the reference atlas (1-indexed). '
@@ -595,8 +597,6 @@ if __name__ == '__main__':
                                         'filepath. Please provide a valid config.' % config)
         parcellation_label = os.path.basename(config)[:-15]
         config_default = CONFIG['parcellate'][PARCELLATE_DEFAULT_KEY]
-        with open(config, 'r') as f:
-            config = yaml.safe_load(f)
     config = {x: config.get(x, config_default[x]) for x in config_default}
     is_surface = config.get('surface', False)
     assert 'cleaning_label' in config, 'Required field `cleaning_label` not found in config. ' \
@@ -629,11 +629,28 @@ if __name__ == '__main__':
         if session:
             subdir = os.path.join(subdir, 'ses-%s' % session)
         clean_path = os.path.join(derivatives_path, 'clean', cleaning_label, subdir)
-        cleaning_config_path = os.path.join(clean_path, 'config.yml')
-        assert os.path.exists(cleaning_config_path), 'Path not found: %s' % cleaning_config_path
-        with open(cleaning_config_path, 'r') as f:
-            cleaning_config = yaml.safe_load(f)
-        preprocessing_label = cleaning_config['preprocessing_label']
+
+        functional_paths = []
+        for path in os.listdir(clean_path):
+            if not is_surface and path.endswith('desc-clean_bold.nii.gz'):
+                space_ = SPACE_RE.match(path)
+                if space_ and space_.group(1) == space:
+                    functional_paths.append(os.path.join(clean_path, path))
+            elif is_surface and path.endswith('desc-clean_bold.func.gii'):
+                space_ = SPACE_RE.match(path)
+                hemi = HEMI_RE.match(path)
+                if space_ and space_.group(1) == space and hemi and hemi.group(1) == 'L':
+                    functional_paths.append(os.path.join(clean_path, path))
+        if not functional_paths:
+            stderr(f'No functional data found in {clean_path} for participant {participant} session {session} '
+                   f'in space {space}. Skipping.\n')
+            continue
+        sidecar_path = functional_paths[0].replace('_bold.nii.gz', '_bold.json').replace('_bold.func.gii', '_bold.json')
+        with open(sidecar_path ,'r') as f:
+            preprocessing_label = json.load(f)['CleanParameters']['preprocessing_label']
+
+        gii = set()
+
         preprocess_path = os.path.join(derivatives_path, 'preprocess', preprocessing_label, subdir)
         assert os.path.exists(preprocess_path), 'Path not found: %s' % preprocess_path
         anat_path = get_preprocessed_anat_dir(project, participant, preprocessing_label=preprocessing_label)
@@ -648,24 +665,6 @@ if __name__ == '__main__':
         else:
             ses_str = ''
 
-        functional_paths = []
-        for path in os.listdir(clean_path):
-            if not is_surface and path.endswith('desc-clean_bold.nii.gz'):
-                space_ = SPACE_RE.match(path)
-                if space_ and space_.group(1) == space:
-                    functional_paths.append(os.path.join(clean_path, path))
-            elif is_surface and path.endswith('desc-clean_bold.func.gii') or path.endswith('desc-clean_bold.func.gii.gz'):
-                space_ = SPACE_RE.match(path)
-                hemi = HEMI_RE.match(path)
-                if space_ and space_.group(1) == space and hemi and hemi.group(1) == 'L':
-                    functional_paths.append(os.path.join(clean_path, path))
-
-        if not functional_paths:
-            stderr(f'No functional data found in {clean_path} for participant {participant} session {session} '
-                   f'in space {space}. Skipping.\n')
-            continue
-
-        gii = set()
         nii = set()
         for path in functional_paths:
             if path.endswith('.gii') or path.endswith('.gii.gz'):
@@ -792,9 +791,6 @@ if __name__ == '__main__':
                 del config_['surface']
                 del config_['mask_path']
 
-            config_path = os.path.join(session_dir, 'config.yml')
-            with open(config_path, 'w') as f:
-                yaml.dump(config_, f)
             if is_surface:
                 parcellate = parcellate_surface
             else:
