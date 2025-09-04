@@ -83,7 +83,7 @@ if __name__ == '__main__':
                                     participant, seed_label, config['regex_filter'], space
                              )
     with open(list(functionals)[0].replace('.func.gii', '.json'), 'r') as f:
-        preprocessing_label = yaml.safe_load(f)['CleanParameters']['preprocessing_label']
+        preprocessing_label = json.load(f)['CleanParameters']['preprocessing_label']
     anat_path = get_preprocessed_anat_dir(project, participant, preprocessing_label=preprocessing_label)
     if os.path.basename(os.path.dirname(anat_path)).startswith('ses-'):
         ses_str_anat = f'_ses-{os.path.basename(os.path.dirname(anat_path))[4:]}'

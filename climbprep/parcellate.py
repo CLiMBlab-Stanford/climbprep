@@ -19,6 +19,21 @@ from climbprep.util import *
 
 NII_CACHE = {}  # Map from paths to NII objects
 GII_CACHE = {}
+NETWORK_RE = re.compile(r'([a-zA-X]+)([0-9]*)')
+N_LEADING_ZEROS = 3
+
+def normalize_network_name(name):
+    match = NETWORK_RE.match(name)
+    assert match, 'Invalid network name: %s' % name
+    atlas, rank = match.groups()
+    if rank:
+        rank = int(rank)
+    else:
+        rank = 1
+    name = f'{atlas}{rank:0{N_LEADING_ZEROS}d}'
+
+    return name
+
 
 def resample_to(nii, template):
     """
