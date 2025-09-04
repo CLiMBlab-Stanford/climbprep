@@ -307,7 +307,8 @@ if __name__ == '__main__':
                         )
                         run.to_filename(run_path)
                         confounds_outpath = os.path.join(
-                            out_dir, func_file.replace('desc-preproc_bold.nii.gz', 'desc-confounds_timeseries.tsv')
+                            out_dir, func_file.replace('_hemi-L', '').replace('_space-%s' % space, '').
+                                replace('desc-preproc_bold.nii.gz', 'desc-confounds_timeseries.tsv')
                         )
                         sidecar_outpath = os.path.join(
                             out_dir, run_path.replace('_bold.nii.gz', '_bold.json')
@@ -373,12 +374,13 @@ if __name__ == '__main__':
                             )
                             run.data.to_filename(run_path)
                             sidecar_outpath = os.path.join(
-                                out_dir, run_path.replace('_bold.nii.gz', '_bold.json')
+                                out_dir, run_path.replace('_bold.func.gii', '_bold.json')
                             )
                             with open(sidecar_outpath, 'w') as f:
                                 json.dump(sidecar, f, indent=2)
                         confounds_outpath = os.path.join(
-                            out_dir, func_file.replace('_hemi-L', '').replace('_bold.func.gii', '_desc-confounds_timeseries.tsv')
+                            out_dir, func_file.replace('_hemi-L', '').replace('_space-%s' % space, '').
+                                replace('_bold.func.gii', '_desc-confounds_timeseries.tsv')
                         )
                     else:
                         raise ValueError('Unknown space: %s' % space)
