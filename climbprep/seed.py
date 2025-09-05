@@ -14,6 +14,9 @@ if __name__ == '__main__':
     argparser.add_argument('participant', help='BIDS participant ID')
     argparser.add_argument('-p', '--project', default='climblab', help=('Name of BIDS project (e.g., "climblab", '
                                                                         '"evlab", etc.). Default: "climblab"'))
+    argparser.add_argument('-s', '--sessions', default=None, help=("BIDS session ID. Plural to match the rest of the "
+                                                                   "command-line interface, but only one session can "
+                                                                   "be given at a time for `seed`."))
     argparser.add_argument('-c', '--config', default='fsnative', help=('Config name (default: `fsnative`) '
         'or YAML config file to used to parameterize seed analysis. '
         'See `climbprep.constants.CONFIG["seed"]` for available config names and their settings.'))
@@ -25,6 +28,11 @@ if __name__ == '__main__':
 
     participant = args.participant.replace('sub-', '')
     project = args.project
+    target_session = args.sessions
+    if target_session:
+        node = 'session'
+    else:
+        node = 'subject'
     project_path = os.path.join(BIDS_PATH, project)
     interactive = args.interactive
 
@@ -62,6 +70,8 @@ if __name__ == '__main__':
     functionals = set()
     if session_paths:
         for session_path_ in session_paths:
+            if target_session and session_path_ != f'ses-{target_session}':
+                continue
             session_path = os.path.join(timeseries_path, session_path_)
             for x in os.listdir(session_path):
                 if x.endswith('_desc-clean_bold.func.gii') and match.match(x) and \
@@ -69,6 +79,8 @@ if __name__ == '__main__':
                         (SPACE_RE.match(x) and SPACE_RE.match(x).group(1) == space):
                     functionals.add(os.path.join(timeseries_path, session_path, x))
     else:
+        assert not target_session, f'No session-level subdirectories found for participant {participant}, ' \
+                                   f'but a session was specified ({target_session})'
         for x in os.listdir(timeseries_path):
             if x.endswith('_desc-clean_bold.func.gii') and match.match(x) and \
                     (HEMI_RE.match(x) and HEMI_RE.match(x).group(1) == 'L') and \
@@ -170,12 +182,11 @@ if __name__ == '__main__':
             stderr(cmd + '\n\n')
             status = os.system(cmd)
         else:
-            out_dir = os.path.join(BIDS_PATH, project, 'derivatives', 'seed', seed_label)
+            out_dir = os.path.join(BIDS_PATH, project, 'derivatives', 'seed', seed_label,
+                                   f'node-{node}', f'sub-{participant}')
+            if node == 'session':
+                out_dir = os.path.join(out_dir, f'ses-{target_session}')
             if not os.path.exists(out_dir):
                 os.makedirs(out_dir)
-            out_dir = os.path.join(out_dir, f'sub-{participant}')
             stderr(f'Copying files to {out_dir}\n')
             shutil.copytree(tmp_dir, out_dir, dirs_exist_ok=True)
-
-
-
