@@ -141,10 +141,10 @@ if __name__ == '__main__':
                 tmp_dir,
                 f'sub-{participant}{ses_str_anat}_space-{space}_label-{seed_label}_bold.dtseries.nii'
             )
-            sidecar = dict(
+            dtseries_sidecar = dict(
                 Inputs=sorted(list(functionals))
             )
-            sidecar_path = dtseries_path.replace('.dtseries.nii', '.json')
+            dtseries_sidecar_path = dtseries_path.replace('.dtseries.nii', '.json')
             cmd = f'wb_command -cifti-merge {dtseries_path}'
             for i, functional in enumerate(sorted(list(functionals))):
                 out_path = os.path.basename(functional).replace('_hemi-L', '').replace('.func.gii', '.dtseries.nii')
@@ -153,7 +153,7 @@ if __name__ == '__main__':
                 sidecar_path = functional.replace('_bold.func.gii', '_bold.json')
                 assert os.path.exists(sidecar_path), f'Sidecar file {sidecar_path} not found'
                 with open(sidecar_path, 'r') as f:
-                    sidecar = yaml.safe_load(f)
+                    sidecar = json.load(f)
                 assert 'RepetitionTime' in sidecar, f'RepetitionTime not found in {sidecar_path}'
                 TR = sidecar['RepetitionTime']
                 assert 'StartTime' in sidecar, f'StartTime not found in {sidecar_path}'
@@ -169,8 +169,8 @@ if __name__ == '__main__':
             stderr(cmd + '\n\n')
             status = os.system(cmd)
             assert not status, 'Merging CIFTIs failed with exit status %s' % status
-            with open(sidecar_path, 'w') as f:
-                json.dump(sidecar, f, indent=2)
+            with open(dtseries_sidecar_path, 'w') as f:
+                json.dump(dtseries_sidecar, f, indent=2)
 
         cmd = f'wb_command -add-to-spec-file {spec_path} CORTEX {dtseries_path}'
         stderr(cmd + '\n\n')
