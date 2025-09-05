@@ -125,7 +125,14 @@ if __name__ == '__main__':
                 assert not status, 'Adding surf to spec file failed with exit status %s' % status
 
         with TemporaryDirectory() as tmp_dir_:
-            dtseries_path = os.path.join(tmp_dir, 'merged.dtseries.nii')
+            dtseries_path = os.path.join(
+                tmp_dir,
+                f'sub-{participant}{ses_str_anat}_space-{space}_label-{seed_label}_bold.dtseries.nii'
+            )
+            sidecar = dict(
+                Inputs=sorted(list(functionals))
+            )
+            sidecar_path = dtseries_path.replace('.dtseries.nii', '.json')
             cmd = f'wb_command -cifti-merge {dtseries_path}'
             for i, functional in enumerate(sorted(list(functionals))):
                 out_path = os.path.basename(functional).replace('_hemi-L', '').replace('.func.gii', '.dtseries.nii')
@@ -150,6 +157,8 @@ if __name__ == '__main__':
             stderr(cmd + '\n\n')
             status = os.system(cmd)
             assert not status, 'Merging CIFTIs failed with exit status %s' % status
+            with open(sidecar_path, 'w') as f:
+                json.dump(sidecar, f, indent=2)
 
         cmd = f'wb_command -add-to-spec-file {spec_path} CORTEX {dtseries_path}'
         stderr(cmd + '\n\n')
