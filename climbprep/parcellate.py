@@ -263,7 +263,7 @@ def parcellate_surface(
         for i, (ix, r) in enumerate(zip(parcellation_ranked, scores)):
             if ix in remaining:
                 remaining.remove(ix)
-            network_name = f'{atlas_name}{i + 1:03d}'
+            network_name = f'{atlas_name}{i + 1:0{N_LEADING_ZEROS}d}'
             metadata = dict(
                 atlas=atlas_name,
                 network=network_name,
@@ -290,7 +290,7 @@ def parcellate_surface(
                     json.dump(sidecar, f, indent=2)
 
     for i, ix in enumerate(sorted(list(remaining))):
-        network_name = f'other{i + 1:03d}'
+        network_name = f'other{i + 1:0{N_LEADING_ZEROS}d}'
         metadata = dict(
             atlas=None,
             network=network_name,
@@ -488,7 +488,7 @@ def parcellate_volume(
         for i, (ix, r) in enumerate(zip(parcellation_ranked, scores)):
             if ix in remaining:
                 remaining.remove(ix)
-            network_name = f'{atlas_name}{i + 1:03d}'
+            network_name = f'{atlas_name}{i + 1:0{N_LEADING_ZEROS}d}'
             metadata = dict(
                 atlas=atlas_name,
                 network=network_name,
@@ -512,7 +512,7 @@ def parcellate_volume(
                 json.dump(sidecar, f, indent=2)
 
     for i, ix in enumerate(sorted(list(remaining))):
-        network_name = f'other{i + 1:03d}'
+        network_name = f'other{i + 1:0{N_LEADING_ZEROS}d}'
         metadata = dict(
             atlas=None,
             network=network_name,

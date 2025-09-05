@@ -14,6 +14,7 @@ from climbprep.plot import PlotLibMemoized
 from climbprep.constants import *
 from climbprep.util import *
 from climbprep import resources
+from climbprep.parcellate import normalize_network_name
 
 
 CACHE_PATH = os.path.join(os.getcwd(), '.cache', 'viz')
@@ -665,6 +666,7 @@ def assign_callbacks(app, cache):
                 network = get_value(statmap, 'network') or None
                 if network is None:
                     continue
+                network = normalize_network_name(network)
                 parcellation_label = get_value(statmap, 'parcellation_label') or PARCELLATE_DEFAULT_KEY
                 node = 'session' if session else 'subject'
                 statmap_dir = os.path.join(
