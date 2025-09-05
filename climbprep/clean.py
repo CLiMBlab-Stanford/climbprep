@@ -158,6 +158,7 @@ if __name__ == '__main__':
                     assert os.path.exists(sidecar_path), 'Path not found: %s' % sidecar_path
                     with open(sidecar_path, 'r') as f:
                         sidecar = json.load(f)
+                    sidecar['CleanParameters'] = config
                     eventfile_path = os.path.join(
                         bids_path, 'func', img_path.split('_task-')[0] + '_task-' + task + run_str + '_events.tsv'
                     )
