@@ -167,7 +167,8 @@ if __name__ == '__main__':
                    f'--work-dir {work_path}'
                ] + kwarg_strings
         cmd = " ".join(args)
-        cmd = f'''singularity run {os.path.join(APPTAINER_PATH, "images", FITLINS_IMG)} {cmd}'''
+        cmd = f'singularity exec {os.path.join(APPTAINER_PATH, "images", FITLINS_IMG)} bash -c ' \
+              f'"source activate neuro && umask 002 && fitlins {cmd}"'
 
         stderr(cmd + '\n')
         status = os.system(cmd)

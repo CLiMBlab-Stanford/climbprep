@@ -67,8 +67,8 @@ if __name__ == '__main__':
         f'--work-dir {work_path}',
         f'--participant-label {participant}'
     ] + kwarg_strings
-    cmd = f'fmriprep {" ".join(args)}'
-    cmd = f'singularity exec {os.path.join(APPTAINER_PATH, "images", FMRIPREP_IMG)} bash -c "{cmd}"'
+    cmd = f'umask 002; fmriprep {" ".join(args)}'
+    cmd = f"singularity exec {os.path.join(APPTAINER_PATH, 'images', FMRIPREP_IMG)} bash -c '{cmd}'"
 
     stderr(cmd + '\n')
     os.system(cmd)

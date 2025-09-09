@@ -108,8 +108,8 @@ if __name__ == '__main__':
         with TemporaryDirectory() as tmp_dir:
             if tmp_dir_ is not None:
                 tmp_dir = tmp_dir_
-            cmd = 'dcm2bids_helper -d %s -o %s' % (src_path, tmp_dir)
-            print(cmd)
+            cmd = 'umask 002; dcm2bids_helper -d %s -o %s' % (src_path, tmp_dir)
+            stderr(cmd + '\n')
             status = os.system(cmd)
             if status:
                 stderr('Error during dcm2bids_helper. Exiting\n.')
@@ -204,7 +204,9 @@ if __name__ == '__main__':
                         filepath = os.path.join(dir_path, path)
                         if filepath.endswith('.nii.gz'):
                             filepath_tmp = filepath.replace('.nii.gz', '_tmp.nii.gz')
-                            os.system('synthstrip-singularity -i %s -o %s' % (filepath, filepath_tmp))
+                            cmd = 'umask 002; synthstrip-singularity -i %s -o %s' % (filepath, filepath_tmp)
+                            stderr(cmd + '\n')
+                            os.system(cmd)
                             shutil.move(filepath_tmp, filepath)
                     else:
                         if not RUN_RE.match(path):
@@ -223,7 +225,7 @@ if __name__ == '__main__':
                             if 'EventsFile' in sidecar:
                                 events_path_new = os.path.join(dir_path, path.replace('bold.json', 'events.tsv'))
                                 if events_path_new != sidecar['EventsFile']:
-                                    shutil.copy2(sidecar['EventsFile'], events_path_new)
+                                    shutil.copy(sidecar['EventsFile'], events_path_new)
                                     sidecar['EventsFile'] = events_path_new
                             with open(filepath, 'w') as f:
                                 json.dump(sidecar, f, indent=2)
@@ -290,6 +292,7 @@ if __name__ == '__main__':
                         with open(os.path.join(fmap_path, fmap.replace('.nii.gz', '.json')), 'w') as f:
                             json.dump(fmap_meta[fmap], f, indent=2)
 
-    stderr('bids-validator %s\n' % project_path)
-    os.system('bids-validator %s' % project_path)
+    cmd = f'umask 002; bids-validator {project_path}'
+    stderr(cmd + '\n')
+    os.system(cmd)
 

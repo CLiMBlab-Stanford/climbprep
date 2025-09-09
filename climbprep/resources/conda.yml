@@ -21,7 +21,7 @@ dependencies:
     - fast-poibin
     - seaborn
     - plotly
-    - kaleido
+    - kaleido<1.0.0
     - choreographer
     - pyvista
     - dash[diskcache]

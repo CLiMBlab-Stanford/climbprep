@@ -52,8 +52,6 @@ def get_geodesic_smoothing_weights(faces, coordinates=None, fwhm=None):
     s = (fwhm / 2.3548)  # Convert FWHM to standard deviation
     n_iter = int(np.ceil(3 * s / d))  # Number of iterations to cover 3 standard deviations
 
-    print('n_iter:', n_iter)
-
     # Add in diagonal
     A += sparse.eye(A.shape[0]).astype(bool).tocsr()
 

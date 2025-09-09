@@ -130,7 +130,7 @@ if __name__ == '__main__':
                         suffix = '.surf.gii'
                     surf_path_ = os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-{hemi[0]}_{surf}{suffix}')
                     surf_path = os.path.join(tmp_dir, os.path.basename(surf_path_))
-                    shutil.copy2(surf_path_, surf_path)
+                    shutil.copy(surf_path_, surf_path)
                 cmd = f'wb_command -add-to-spec-file {spec_path} CORTEX_{hemi} {surf_path}'
                 stderr(cmd + '\n\n')
                 status = os.system(cmd)
@@ -188,5 +188,6 @@ if __name__ == '__main__':
                 out_dir = os.path.join(out_dir, f'ses-{target_session}')
             if not os.path.exists(out_dir):
                 os.makedirs(out_dir)
-            stderr(f'Copying files to {out_dir}\n')
-            shutil.copytree(tmp_dir, out_dir, dirs_exist_ok=True)
+            for x in os.listdir(tmp_dir):
+                shutil.copy(os.path.join(tmp_dir, x), out_dir)
+            # shutil.copytree(tmp_dir, out_dir, dirs_exist_ok=True, copy_function=shutil.copy)

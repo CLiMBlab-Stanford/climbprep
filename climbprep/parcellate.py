@@ -137,7 +137,7 @@ def parcellate_surface(
             reference_target_affine = np.eye(3) * reference_target_affine
         elif isinstance(reference_target_affine, tuple) or isinstance(reference_target_affine, list):
             reference_target_affine = np.diag(reference_target_affine)
-        reference = image.resample_img(reference, target_affine=reference_target_affine)
+        reference = image.resample_img(reference, target_affine=reference_target_affine, copy_header=True)
     surf_anat = surface.PolyMesh(
         left=surface_left_path,
         right=surface_right_path
@@ -378,7 +378,7 @@ def parcellate_volume(
         ignored=ignored
     )
 
-    stderr('Loading atlases')
+    stderr('Loading reference and mask images\n')
     reference_target_affine_in = reference_target_affine
     sidecar = dict(
         mask_path=mask_path,
@@ -392,8 +392,13 @@ def parcellate_volume(
             reference_target_affine = np.eye(3) * reference_target_affine
         elif isinstance(reference_target_affine, tuple) or isinstance(reference_target_affine, list):
             reference_target_affine = np.diag(reference_target_affine)
-        reference = image.resample_img(reference, target_affine=reference_target_affine)
-    reference = image.crop_img(reference)
+        reference = image.resample_img(
+            reference,
+            target_affine=reference_target_affine,
+            copy_header=True,
+            force_resample=True
+        )
+    reference = image.crop_img(reference, copy_header=True)
 
     if mask_path:
         mask_nii = image.load_img(mask_path)
@@ -401,31 +406,12 @@ def parcellate_volume(
         if mask_fwhm:
             mask_nii = image.smooth_img(mask_nii, fwhm=mask_fwhm)
         mask_nii = image.resample_to_img(
-            mask_nii, reference, interpolation='linear'
+            mask_nii, reference, interpolation='linear', copy_header=True, force_resample=True
         )
         mask_nii = image.math_img('x > 0.', x=mask_nii)
     else:
         mask_nii = masking.compute_background_mask(reference)
     mask = image.get_data(mask_nii).astype(bool)
-
-    sub = SUB_RE.match(reference_image_path)
-    assert sub, 'Surface data file name must contain a subject identifier (e.g., "sub-01").'
-    sub = sub.group(1)
-    atlases = {}
-    for atlas_name in ATLAS_NAME_TO_FILE:
-        atlases[atlas_name] = get_atlas(
-            atlas_name,
-            resampling_target_nii=reference,
-            xfm_path=xfm_path
-        )
-        atlas_path = os.path.join(output_dir, f'sub-{sub}_label-{atlas_name}REF.nii.gz')
-        atlases[atlas_name].to_filename(
-                atlas_path
-        )
-        sidecar['atlas_name'] = atlas_name
-        sidecar_path = atlas_path.replace('.nii.gz', '.json')
-        with open(sidecar_path, 'w') as f:
-            json.dump(sidecar, f, indent=2)
 
     stderr('Loading timecourses\n')
     X = []
@@ -442,10 +428,33 @@ def parcellate_volume(
             nii_cache[functional_path] = functional
         else:
             functional = nii_cache[functional_path]
-        functional = image.resample_to_img(functional, reference, copy_header=True)
-        X_ = image.get_data(functional)[mask]
+        functional = image.resample_to_img(functional, reference, copy_header=True, force_resample=True)
+        X_ = image.get_data(functional)
+        mask &= X_.std(axis=-1) > 0  # Only keep voxels with positive variance in all runs
         X.append(X_)
-    X = np.concatenate(X, axis=1)
+    mask_nii = image.new_img_like(mask_nii, mask)
+    X = np.concatenate([X_[mask] for X_ in X], axis=1)
+
+    stderr('Loading atlases')
+    sub = SUB_RE.match(reference_image_path)
+    assert sub, 'Reference image file name must contain a subject identifier (e.g., "sub-01").'
+    sub = sub.group(1)
+    atlases = {}
+    for atlas_name in ATLAS_NAME_TO_FILE:
+        atlas = get_atlas(
+            atlas_name,
+            resampling_target_nii=reference,
+            xfm_path=xfm_path
+        )
+        atlas_path = os.path.join(output_dir, f'sub-{sub}_label-{atlas_name}REF.nii.gz')
+        atlas.to_filename(
+            atlas_path
+        )
+        sidecar['atlas_name'] = atlas_name
+        sidecar_path = atlas_path.replace('.nii.gz', '.json')
+        with open(sidecar_path, 'w') as f:
+            json.dump(sidecar, f, indent=2)
+        atlases[atlas_name] = image.get_data(atlas)[mask]
 
     if ses is None or ses == 'None':
         ses_str = ''
@@ -473,8 +482,7 @@ def parcellate_volume(
     df = []
     remaining = set(range(parcellation.shape[1]))
     for atlas_name in atlases:
-        atlas_surface = atlases[atlas_name]
-        atlas = np.concatenate([atlas_surface.parts['left'], atlas_surface.parts['right']], axis=0)
+        atlas = atlases[atlas_name]
         parcellation_ix = np.arange(parcellation.shape[1])
         scores = np.full((parcellation.shape[1],), np.nan)
         for ix in range(parcellation.shape[1]):
@@ -500,6 +508,7 @@ def parcellate_volume(
             network_ = parcellation[:, ix]
             network = np.zeros(mask_nii.shape, dtype=np.float32)
             network[mask] = network_
+            network = image.new_img_like(reference, network)
             network_path = os.path.join(
                 output_dir,
                 f'sub-{sub}{ses_str}_label-{network_name}.nii.gz'
@@ -524,6 +533,7 @@ def parcellate_volume(
         network_ = parcellation[:, ix]
         network = np.zeros(mask_nii.shape, dtype=np.float32)
         network[mask] = network_
+        network = image.new_img_like(reference, network)
         network_path = os.path.join(
             output_dir,
             f'sub-{sub}{ses_str}_label-{network_name}.nii.gz'
@@ -746,25 +756,16 @@ if __name__ == '__main__':
             parcellation_config['reference_image_path'] = functional_paths[0]
         else:
             parcellation_config['reference_image_path'] = T1
-        if is_surface:
-            parcellation_config['functional_paths'] = []
-        else:
-            parcellation_config['sample']['main']['functional_paths'] = []
+        parcellation_config['functional_paths'] = []
 
         if not 'session' in nodes:
             nodes['session'] = {}
         if not session in nodes['session']:
             nodes['session'][session] = deepcopy(parcellation_config)
-        if is_surface:
-            nodes['session'][session]['functional_paths'] = functional_paths
-        else:
-            nodes['session'][session]['sample']['main']['functional_paths'] = functional_paths
+        nodes['session'][session]['functional_paths'] = functional_paths
         if not 'subject' in nodes:
             nodes['subject'] = deepcopy(parcellation_config)
-        if is_surface:
-            nodes['subject']['functional_paths'] += functional_paths
-        else:
-            nodes['subject']['sample']['main']['functional_paths'] += functional_paths
+        nodes['subject']['functional_paths'] += functional_paths
 
     parcellation_dir = os.path.join(derivatives_path, 'parcellate', parcellation_label)
     for node in nodes:

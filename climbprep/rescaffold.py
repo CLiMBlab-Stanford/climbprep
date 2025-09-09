@@ -134,11 +134,16 @@ if __name__ ==  '__main__':
     if not os.path.exists(project_path):
         stderr(f'Project path {project_path} not found, automatically scaffolding.\n')
         cmd = f"dcm2bids_scaffold -o {project_path}"
-        print(cmd)
+        stderr(cmd + '\n')
         status = os.system(cmd)
         if status:
             stderr('Error creating BIDS scaffold. Exiting.\n')
             exit(status)
+        bidsignore_path = os.path.join(project_path, '.bidsignore')
+        with open(bidsignore_path, 'w') as f:
+            f.write('/derivatives\n')
+            f.write('/sourcedata\n')
+            f.write('/tmp_dcm2bids\n')
 
     if not os.path.exists(os.path.join(BIDS_PATH, project, 'participants.tsv')):
         participants_tsv = []
@@ -208,3 +213,4 @@ if __name__ ==  '__main__':
                     session = session_path[4:]
                     if session not in sessions:
                         os.remove(os.path.join(sourcedata_path, participant_path, session_path))
+
