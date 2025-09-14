@@ -227,6 +227,8 @@ if __name__ == '__main__':
                                 if events_path_new != sidecar['EventsFile']:
                                     shutil.copy(sidecar['EventsFile'], events_path_new)
                                     sidecar['EventsFile'] = events_path_new
+                            if 'AcquisitionDuration' in sidecar:
+                                del sidecar['AcquisitionDuration']
                             with open(filepath, 'w') as f:
                                 json.dump(sidecar, f, indent=2)
 
