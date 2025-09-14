@@ -501,7 +501,7 @@ BASHRC_CLIMBLAB = r'''export APPTAINER_BIND={{LAB_PATH}},/juice6/u/{{USER}},/jui
 export APPTAINER_CACHEDIR=/juice6/u/{{USER}}/.apptainer/cache
 export FREESURFER_HOME={{LAB_PATH}}/freesurfer
 export TEMPLATEFLOW_HOME={{LAB_PATH}}/templateflow
-export PATH=$PATH:/u/nlp/bin:/usr/local/cuda:{{APPTAINER_PATH}}/bin:{{CODE_PATH}}/climbprep/bin:{{LAB_PATH}}/bin:{{CODE_PATH}}/flywheel
+export PATH=$PATH:/u/nlp/bin:/usr/local/cuda:{{APPTAINER_PATH}}/bin:{{CODE_PATH}}/util:{{CODE_PATH}}/climbprep/bin:{{LAB_PATH}}/bin:{{CODE_PATH}}/flywheel
 export PYTHONPATH=$PYTHONPATH:{{CODE_PATH}}/climbprep:{{CODE_PATH}}/parcellate
 export TMPDIR={{LAB_PATH}}/tmp
 '''
