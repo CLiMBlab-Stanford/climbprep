@@ -45,18 +45,24 @@ if __name__ == '__main__':
     stderr(f'Preprocessing outputs will be written to {out_path}\n')
     stderr(f'Working directory will be {work_path}\n')
 
+    # pull heap override out of config so it isn't passed to fMRIPrep
+    heap_mb = str(config.pop('node_max_old_space_mb', 24576))
+
     kwarg_strings = []
     for key in config:
         key_str = '--%s' % key.replace('_', '-')
-        val =  config[key]
+        val = config[key]
         if key == 'submm_recon':
             if not val:
                 kwarg_strings.append('--no-submm-recon')
         elif key == 'use_syn_sdc':
             if val:
                 kwarg_strings.append('--use-syn-sdc')
+        elif key == 'skip_bids_validation':
+            if val:
+                kwarg_strings.append('--skip-bids-validation')
         else:
-            if isinstance(val, list) or isinstance(val, tuple):
+            if isinstance(val, (list, tuple)):
                 val = ' '.join(val)
             kwarg_strings.append(f'{key_str} {val}')
 
@@ -65,10 +71,17 @@ if __name__ == '__main__':
         out_path,
         'participant',
         f'--work-dir {work_path}',
-        f'--participant-label {participant}'
+        f'--participant-label {participant}',
     ] + kwarg_strings
-    cmd = f'umask 002; fmriprep {" ".join(args)}'
-    cmd = f"singularity exec {os.path.join(APPTAINER_PATH, 'images', FMRIPREP_IMG)} bash -c '{cmd}'"
+
+    inner = f'umask 002; fmriprep {" ".join(args)}'
+    img = os.path.join(APPTAINER_PATH, 'images', FMRIPREP_IMG)
+
+    cmd = (
+        'singularity exec --cleanenv --no-home '
+        f'--env NODE_OPTIONS="--max-old-space-size={heap_mb}" '
+        f'{img} bash -lc \'{inner}\''
+    )
 
     stderr(cmd + '\n')
     os.system(cmd)
