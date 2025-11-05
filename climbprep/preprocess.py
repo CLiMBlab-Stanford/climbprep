@@ -1,7 +1,6 @@
 import os
 import sys
 import yaml
-import pwd
 import argparse
 
 from climbprep.constants import *
@@ -23,11 +22,11 @@ def pick_heap_mb(cfg):
         cpus = int(os.environ.get('SLURM_CPUS_PER_TASK', os.environ.get('SLURM_CPUS_ON_NODE', '1')))
         mem_mb = mpc * cpus
     if mem_mb:
-        return str(min(int(mem_mb * 0.75), 131072))  # cap at 128 GiB
+        return str(min(int(mem_mb * 0.75), 131072))  # cap 128 GiB
     return '65536'  # default 64 GiB
 
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser('Run fMRIPrep on a participant')
+    ap = argparse.ArgumentParser('Run fMRIprep on a participant')
     ap.add_argument('participant', help='BIDS participant ID')
     ap.add_argument('-p', '--project', default='climblab', help='Name of BIDS project. Default: "climblab"')
     ap.add_argument('-c', '--config', default='main',
@@ -51,7 +50,7 @@ if __name__ == '__main__':
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
 
-    # fill unspecified keys from defaults
+    # merge defaults
     for key in config_default:
         if key not in config:
             config[key] = config_default[key]
@@ -59,25 +58,22 @@ if __name__ == '__main__':
     out_path = os.path.join(project_path, 'derivatives', 'preprocess', preprocessing_label)
     work_path = os.path.join(WORK_PATH, project, 'derivatives', 'preprocess', preprocessing_label, f'sub-{participant}')
 
-    stderr(f'Preprocessing outputs will be written to {out_path}\n')
-    stderr(f'Working directory will be {work_path}\n')
+    stderr(f'BIDS root: {project_path}\n')
+    stderr(f'Preprocessing outputs: {out_path}\n')
+    stderr(f'Working directory: {work_path}\n')
 
-    # Heap for host-side Node (bids-validator)
+    # Host-side BIDS validation with large Node heap
     heap_mb = pick_heap_mb(config)
-    stderr(f'Node/V8 heap target for host validation (MB): {heap_mb}\n')
-
-    # 1) Host-side BIDS validation (mirrors bidsify behavior)
-    host_val_cmd = f'UMASK=002 NODE_OPTIONS="--max-old-space-size={heap_mb}" bids-validator "{project_path}"'
-    # Use umask via shell so outputs are group-writable
+    stderr(f'Host BIDS validator Node heap (MB): {heap_mb}\n')
     host_val_cmd = f'umask 002; NODE_OPTIONS="--max-old-space-size={heap_mb}" bids-validator "{project_path}"'
     stderr(host_val_cmd + '\n')
     status = os.system(host_val_cmd)
     if status != 0:
-        stderr('Host BIDS validation failed. Aborting before fMRIPrep.\n')
+        stderr('Host BIDS validation failed. Aborting.\n')
         sys.exit(os.WEXITSTATUS(status) if os.WIFEXITED(status) else 1)
     stderr('Host BIDS validation passed.\n')
 
-    # 2) Build fMRIPrep CLI args, always skip in-container validation
+    # Build fMRIPrep CLI args
     kwarg_strings = []
     for key in list(config.keys()):
         if key == 'submm_recon':
@@ -87,7 +83,7 @@ if __name__ == '__main__':
             if config[key]:
                 kwarg_strings.append('--use-syn-sdc')
         elif key == 'skip_bids_validation':
-            # Ignore any user setting; we will force skipping below.
+            # ignore user-provided toggle; we force skip below
             continue
         else:
             key_str = '--%s' % key.replace('_', '-')
@@ -96,7 +92,7 @@ if __name__ == '__main__':
                 val = ' '.join(val)
             kwarg_strings.append(f'{key_str} {val}')
 
-    # Force skip inside container to avoid fixed Node heap there
+    # Force skip inside the container
     kwarg_strings.append('--skip-bids-validation')
 
     args_cli = [
@@ -107,27 +103,25 @@ if __name__ == '__main__':
         f'--participant-label {participant}',
     ] + kwarg_strings
 
-    # 3) Container paths and binds
+    # Container config: no /sailhome. Use central TemplateFlow.
     img = os.path.join(APPTAINER_PATH, 'images', FMRIPREP_IMG)
-    tf_host = os.path.join(LAB_PATH, 'templateflow')
-    user = os.environ.get('USER') or pwd.getpwuid(os.getuid()).pw_name
-    tf_cont = os.path.join('/sailhome', user, '.cache', 'templateflow')  # historical in-container path
-
-    binds = [
-        f'{LAB_PATH}:{LAB_PATH}',       # lab root
-        f'{tf_host}:{tf_cont}',         # map lab TF → historical path inside container
-    ]
+    tf_path = os.path.join(LAB_PATH, 'templateflow')   # /juice6/u/nlp/climblab/templateflow
+    binds = [f'{LAB_PATH}:{LAB_PATH}']                 # bind lab root only
     bind_str = ','.join(binds)
+
+    stderr(f'TEMPLATEFLOW_HOME (container): {tf_path}\n')
+    stderr(f'Bind mounts: {bind_str}\n')
 
     inner = f'umask 002; fmriprep {" ".join(args_cli)}'
 
-    # 4) Run fMRIPrep with a clean container env, no in-container validation
     cmd = (
         'singularity exec --cleanenv --no-home '
         f'--bind {bind_str} '
-        f'--env TEMPLATEFLOW_HOME="{tf_cont}" '
+        f'--env TEMPLATEFLOW_HOME="{tf_path}" '
+        f'--env MPLCONFIGDIR="/tmp/mpl-config" '
         f'{img} /bin/bash --noprofile --norc -lc \'{inner}\''
     )
-    stderr('Skipping in-container BIDS validation (already validated on host).\n')
+
+    stderr('Skipping in-container BIDS validation (validated on host).\n')
     stderr(cmd + '\n')
     os.system(cmd)
