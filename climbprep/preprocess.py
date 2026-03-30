@@ -94,6 +94,7 @@ if __name__ == '__main__':
 
     # Force skip inside the container
     kwarg_strings.append('--skip-bids-validation')
+<<<<<<< HEAD
 
     args_cli = [
         '/bids',
@@ -103,6 +104,17 @@ if __name__ == '__main__':
         f'--participant-label {participant}',
     ] + kwarg_strings
 
+=======
+
+    args_cli = [
+        project_path,
+        out_path,
+        'participant',
+        f'--work-dir {work_path}',
+        f'--participant-label {participant}',
+    ] + kwarg_strings
+
+>>>>>>> 9c984f30ed546e89b9345dc5a9dfe2a29753c9f9
     # Container config: no /sailhome. Use central TemplateFlow.
     img = os.path.join(APPTAINER_PATH, 'images', FMRIPREP_IMG)
     tf_path = os.path.join(LAB_PATH, 'templateflow')   # /juice6/u/nlp/climblab/templateflow
