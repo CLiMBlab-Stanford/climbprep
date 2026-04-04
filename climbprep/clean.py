@@ -162,10 +162,16 @@ if __name__ == '__main__':
                     eventfile_path = os.path.join(
                         bids_path, 'func', img_path.split('_task-')[0] + '_task-' + task + run_str + '_events.tsv'
                     )
+                    
                     TR = sidecar.get('RepetitionTime', None)
                     StartTime = sidecar.get('StartTime', None)
+                    SliceTimingCorrected = sidecar.get('SliceTimingCorrected', None)
+                    
                     assert TR, 'RepetitionTime information not found in sidecar: %s' % sidecar_path
-                    assert StartTime, 'StartTime information not found in sidecar: %s' % sidecar_path
+                    assert (SliceTimingCorrected and StartTime) or (not SliceTimingCorrected and StartTime is None), 'Either SliceTimingCorrected must be true with a StartTime, or SliceTimingCorrected must be false with no specified StartTime: %s' % sidecar_path
+                        
+                    StartTime = 0.0 if StartTime is None else StartTime
+                    
                     if space not in datasets:
                         datasets[space] = {}
                     if task not in datasets[space]:
@@ -215,10 +221,16 @@ if __name__ == '__main__':
                     eventfile_path = os.path.join(
                         bids_path, 'func', img_path.split('_task-')[0] + '_task-' + task + run_str + '_events.tsv'
                     )
+                    
                     TR = sidecar.get('RepetitionTime', None)
                     StartTime = sidecar.get('StartTime', None)
+                    SliceTimingCorrected = sidecar.get('SliceTimingCorrected', None)
+                    
                     assert TR, 'RepetitionTime information not found in sidecar: %s' % sidecar_path
-                    assert StartTime, 'StartTime information not found in sidecar: %s' % sidecar_path
+                    assert (SliceTimingCorrected and StartTime) or (not SliceTimingCorrected and StartTime is None), 'Either SliceTimingCorrected must be true with a StartTime, or SliceTimingCorrected must be false with no specified StartTime: %s' % sidecar_path
+                        
+                    StartTime = 0.0 if StartTime is None else StartTime
+                    
                     if space not in datasets:
                         datasets[space] = {}
                     if task not in datasets[space]:
@@ -237,6 +249,11 @@ if __name__ == '__main__':
         out_dir = os.path.join(derivatives_path, 'clean', cleaning_label, subdir)
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
+
+        #filter dictionary by space type if specified
+        space_specifier = config.get("space", None)
+        if space_specifier: 
+            datasets = {k: v for k, v in datasets.items() if k == space_specifier}
 
         for space in datasets:
             geodesic_smoothing_weights = None
@@ -315,8 +332,12 @@ if __name__ == '__main__':
                             low_pass=config['low_pass'],
                             high_pass=config['high_pass']
                         )
+                        
                         kwargs = dict(confounds=confounds.fillna(0))
                         desc = 'desc-clean'
+                        if kwargs['confounds'].empty:
+                            kwargs['confounds'] = None
+                                                    
                         run = masker.fit_transform(func_path, **kwargs)
                         run = masker.inverse_transform(run)
                         run_path = os.path.join(
@@ -372,6 +393,9 @@ if __name__ == '__main__':
                             continue
                         img = surface.SurfaceImage(mesh, data)
 
+                        if kwargs['confounds'].empty:
+                            kwargs['confounds'] = None
+                        
                         run = masker.fit_transform(img, **kwargs)
                         run = masker.inverse_transform(run)
                         for hemi in ('left', 'right'):

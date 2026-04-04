@@ -55,7 +55,7 @@ if __name__ == '__main__':
         assert os.path.exists(config), ('Provided config (%s) does not match any known keyword or any existing '
                                         'filepath. Please provide a valid config.' % config)
         seed_label = os.path.basename(config)[:-9]
-        config_default = CONFIG['seed'][PREPROCESS_DEFAULT_KEY]
+        config_default = CONFIG['seed'][SEED_DEFAULT_KEY]
         with open(config, 'r') as f:
             config = yaml.safe_load(f)
     for key in config_default:
@@ -68,13 +68,16 @@ if __name__ == '__main__':
     timeseries_path = os.path.join(project_path, 'derivatives', 'clean', cleaning_label, f'sub-{participant}')
     session_paths = [x for x in os.listdir(timeseries_path) if x.startswith('ses-')]
     functionals = set()
+    file_suffix = '_desc-clean_bold.func.gii'
+        
     if session_paths:
         for session_path_ in session_paths:
             if target_session and session_path_ != f'ses-{target_session}':
                 continue
             session_path = os.path.join(timeseries_path, session_path_)
+            
             for x in os.listdir(session_path):
-                if x.endswith('_desc-clean_bold.func.gii') and match.match(x) and \
+                if x.endswith(file_suffix) and match.match(x) and \
                         (HEMI_RE.match(x) and HEMI_RE.match(x).group(1) == 'L') and \
                         (SPACE_RE.match(x) and SPACE_RE.match(x).group(1) == space):
                     functionals.add(os.path.join(timeseries_path, session_path, x))
@@ -82,7 +85,7 @@ if __name__ == '__main__':
         assert not target_session, f'No session-level subdirectories found for participant {participant}, ' \
                                    f'but a session was specified ({target_session})'
         for x in os.listdir(timeseries_path):
-            if x.endswith('_desc-clean_bold.func.gii') and match.match(x) and \
+            if x.endswith(file_suffix) and match.match(x) and \
                     (HEMI_RE.match(x) and HEMI_RE.match(x).group(1) == 'L') and \
                     (SPACE_RE.match(x) and SPACE_RE.match(x).group(1) == space):
                 functionals.add(os.path.join(timeseries_path, x))
@@ -94,8 +97,10 @@ if __name__ == '__main__':
                              'volumetric data is not currently supported).' % (
                                     participant, seed_label, config['regex_filter'], space
                              )
+
     with open(list(functionals)[0].replace('.func.gii', '.json'), 'r') as f:
         preprocessing_label = json.load(f)['CleanParameters']['preprocessing_label']
+            
     anat_path = get_preprocessed_anat_dir(project, participant, preprocessing_label=preprocessing_label)
     if os.path.basename(os.path.dirname(anat_path)).startswith('ses-'):
         ses_str_anat = f'_ses-{os.path.basename(os.path.dirname(anat_path))[4:]}'
@@ -106,71 +111,82 @@ if __name__ == '__main__':
     else:
         space_str = f'_space-{space}'
 
-    with TemporaryDirectory() as tmp_dir:
-        spec_path = os.path.join(tmp_dir, f'sub-{participant}{ses_str_anat}_space-{space}_label-{seed_label}.spec')
-        spec_sidecar_path = spec_path.replace('.spec', '.json')
-        spec_sidecar = dict(Description='Specification file for easy loading into `wb_view`. If you load the spec file ' \
-                                        'first, all required data will be loaded in as well.')
-        with open(spec_sidecar_path, 'w') as f:
-            json.dump(spec_sidecar, f, indent=2)
-        for surf in ('pial', 'white', 'midthickness', 'inflated', 'sulc'):
-            for hemi in ('LEFT', 'RIGHT'):
-                if surf == 'inflated':
-                    surf_path = os.path.join(
-                        BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, 'sourcedata',
-                        'freesurfer', f'sub-{participant}', 'surf', f'{hemi[0].lower()}h.inflated'
-                    )
-                    mesh = surface.PolyMesh(**{hemi.lower(): surf_path})
-                    surf_path = os.path.join(tmp_dir, f'sub-{participant}{ses_str_anat}_hemi-{hemi[0]}{space_str}_inflated.surf.gii')
-                    mesh.to_filename(surf_path)
-                else:
-                    if surf == 'sulc':
-                        suffix = '.shape.gii'
-                    else:
-                        suffix = '.surf.gii'
-                    surf_path_ = os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-{hemi[0]}_{surf}{suffix}')
-                    surf_path = os.path.join(tmp_dir, os.path.basename(surf_path_))
-                    shutil.copy(surf_path_, surf_path)
-                cmd = f'wb_command -add-to-spec-file {spec_path} CORTEX_{hemi} {surf_path}'
-                stderr(cmd + '\n\n')
-                status = os.system(cmd)
-                assert not status, 'Adding surf to spec file failed with exit status %s' % status
+    out_dir = os.path.join(BIDS_PATH, project, 'derivatives', 'seed', seed_label,
+                   f'node-{node}', f'sub-{participant}')
+    if node == 'session':
+        out_dir = os.path.join(out_dir, f'ses-{target_session}')
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
 
-        with TemporaryDirectory() as tmp_dir_:
-            dtseries_path = os.path.join(
-                tmp_dir,
-                f'sub-{participant}{ses_str_anat}_space-{space}_label-{seed_label}_bold.dtseries.nii'
-            )
-            dtseries_sidecar = dict(
-                Inputs=sorted(list(functionals))
-            )
-            dtseries_sidecar_path = dtseries_path.replace('.dtseries.nii', '.json')
-            cmd = f'wb_command -cifti-merge {dtseries_path}'
-            for i, functional in enumerate(sorted(list(functionals))):
-                out_path = os.path.basename(functional).replace('_hemi-L', '').replace('.func.gii', '.dtseries.nii')
-                out_path = os.path.join(tmp_dir_, out_path)
-                left_path = functional
-                sidecar_path = functional.replace('_bold.func.gii', '_bold.json')
-                assert os.path.exists(sidecar_path), f'Sidecar file {sidecar_path} not found'
-                with open(sidecar_path, 'r') as f:
-                    sidecar = json.load(f)
-                assert 'RepetitionTime' in sidecar, f'RepetitionTime not found in {sidecar_path}'
-                TR = sidecar['RepetitionTime']
-                assert 'StartTime' in sidecar, f'StartTime not found in {sidecar_path}'
-                StartTime = sidecar['StartTime']
-                right_path = functional.replace('_hemi-L', '_hemi-R')
-                cmd_ = f'wb_command -cifti-create-dense-timeseries {out_path} ' \
-                                  f'-left-metric {left_path} -right-metric {right_path} ' \
-                                  f'-timestep {TR} -timestart {StartTime}'
-                stderr(cmd_ + '\n\n')
-                status = os.system(cmd_)
-                assert not status, f'Creating CIFTI {out_path} failed with exit status {status}'
-                cmd += f' -cifti {out_path}'
+    spec_path = os.path.join(out_dir, f'sub-{participant}{ses_str_anat}_space-{space}_label-{seed_label}.spec')
+    spec_sidecar_path = spec_path.replace('.spec', '.json')
+    spec_sidecar = dict(Description='Specification file for easy loading into `wb_view`. If you load the spec file ' \
+                                    'first, all required data will be loaded in as well.')
+    with open(spec_sidecar_path, 'w') as f:
+        json.dump(spec_sidecar, f, indent=2)
+    for surf in ('pial', 'white', 'midthickness', 'inflated', 'sulc'):
+        for hemi in ('LEFT', 'RIGHT'):
+            if surf == 'inflated':
+                surf_path = os.path.join(
+                    BIDS_PATH, project, 'derivatives', 'preprocess', preprocessing_label, 'sourcedata',
+                    'freesurfer', f'sub-{participant}', 'surf', f'{hemi[0].lower()}h.inflated'
+                )
+                mesh = surface.PolyMesh(**{hemi.lower(): surf_path})
+                surf_path = os.path.join(out_dir, f'sub-{participant}{ses_str_anat}_hemi-{hemi[0]}{space_str}_inflated.surf.gii')
+                mesh.to_filename(surf_path)
+            else:
+                if surf == 'sulc':
+                    suffix = '.shape.gii'
+                else:
+                    suffix = '.surf.gii'
+                surf_path_ = os.path.join(anat_path, f'sub-{participant}{ses_str_anat}_hemi-{hemi[0]}_{surf}{suffix}')
+                surf_path = os.path.join(out_dir, os.path.basename(surf_path_))
+                shutil.copy(surf_path_, surf_path)
+            cmd = f'wb_command -add-to-spec-file {spec_path} CORTEX_{hemi} {surf_path}'
             stderr(cmd + '\n\n')
             status = os.system(cmd)
-            assert not status, 'Merging CIFTIs failed with exit status %s' % status
-            with open(dtseries_sidecar_path, 'w') as f:
-                json.dump(dtseries_sidecar, f, indent=2)
+            assert not status, 'Adding surf to spec file failed with exit status %s' % status
+
+        dtseries_path = os.path.join(
+            out_dir,
+            f'sub-{participant}{ses_str_anat}_space-{space}_label-{seed_label}_bold.dtseries.nii'
+        )
+        dtseries_sidecar = dict(
+            Inputs=sorted(list(functionals))
+        )
+        dtseries_sidecar_path = dtseries_path.replace('.dtseries.nii', '.json')
+        cmd = f'wb_command -cifti-merge {dtseries_path}'
+        for i, functional in enumerate(sorted(list(functionals))):
+            out_path = os.path.basename(functional).replace('_hemi-L', '').replace('.func.gii', '.dtseries.nii')
+            out_path = os.path.join(out_dir, out_path)
+            left_path = functional
+            sidecar_path = functional.replace('_bold.func.gii', '_bold.json')
+            assert os.path.exists(sidecar_path), f'Sidecar file {sidecar_path} not found'
+            with open(sidecar_path, 'r') as f:
+                sidecar = json.load(f)
+            assert 'RepetitionTime' in sidecar, f'RepetitionTime not found in {sidecar_path}'
+            TR = sidecar['RepetitionTime']
+
+            if 'StartTime' in sidecar:
+                StartTime = sidecar['StartTime']
+            else:
+                StartTime = 0
+            
+            #assert 'StartTime' in sidecar, f'StartTime not found in {sidecar_path}'
+            
+            right_path = functional.replace('_hemi-L', '_hemi-R')
+            cmd_ = f'wb_command -cifti-create-dense-timeseries {out_path} ' \
+                              f'-left-metric {left_path} -right-metric {right_path} ' \
+                              f'-timestep {TR} -timestart {StartTime}'
+            stderr(cmd_ + '\n\n')
+            status = os.system(cmd_)
+            assert not status, f'Creating CIFTI {out_path} failed with exit status {status}'
+            cmd += f' -cifti {out_path}'
+        stderr(cmd + '\n\n')
+        status = os.system(cmd)
+        assert not status, 'Merging CIFTIs failed with exit status %s' % status
+        with open(dtseries_sidecar_path, 'w') as f:
+            json.dump(dtseries_sidecar, f, indent=2)
 
         cmd = f'wb_command -add-to-spec-file {spec_path} CORTEX {dtseries_path}'
         stderr(cmd + '\n\n')
@@ -181,13 +197,3 @@ if __name__ == '__main__':
             cmd = f'wb_view -no-splash -spec-load-all {spec_path}'
             stderr(cmd + '\n\n')
             status = os.system(cmd)
-        else:
-            out_dir = os.path.join(BIDS_PATH, project, 'derivatives', 'seed', seed_label,
-                                   f'node-{node}', f'sub-{participant}')
-            if node == 'session':
-                out_dir = os.path.join(out_dir, f'ses-{target_session}')
-            if not os.path.exists(out_dir):
-                os.makedirs(out_dir)
-            for x in os.listdir(tmp_dir):
-                shutil.copy(os.path.join(tmp_dir, x), out_dir)
-            # shutil.copytree(tmp_dir, out_dir, dirs_exist_ok=True, copy_function=shutil.copy)

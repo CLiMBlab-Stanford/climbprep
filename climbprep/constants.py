@@ -220,7 +220,8 @@ CONFIG = dict(
             low_pass=0.1,
             high_pass=0.01,
             min_T=50,
-            n_jobs=-1
+            n_jobs=-1,
+            space=None
         ),
         firstlevels_like=dict(
             clean_surf=True,
@@ -236,7 +237,8 @@ CONFIG = dict(
             low_pass=None,
             high_pass=0.01,
             min_T=50,
-            n_jobs=-1
+            n_jobs=-1,
+            space=None
         )
     ),
     parcellate=dict(
